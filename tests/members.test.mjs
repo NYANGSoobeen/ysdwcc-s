@@ -11,7 +11,7 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
 const fn = await import('../functions/lib/index.js')
 // 함수 코드와 같은 firebase-admin 인스턴스를 써야 초기화된 앱을 공유한다.
 const require = createRequire(new URL('../functions/package.json', import.meta.url))
-const { getFirestore, Timestamp } = require('firebase-admin/firestore')
+const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestore')
 const { getStorage } = require('firebase-admin/storage')
 const { getAuth } = require('firebase-admin/auth')
 const db = getFirestore()
@@ -157,4 +157,33 @@ test('기간별 삭제: 미리 보기는 지우지 않고, 삭제는 그 기간�
   assert.equal(newFiles.length, 2)
 
   await expectError(fn.deleteMessagesInRange.run(as(adminUid, { teamId, from: 10, to: 5, dryRun: true })), 'invalid-argument')
+})
+
+test('최고 관리자: 첫 관리자는 최고 관리자이고, 새 팀을 만들면 그 팀의 관리자가 된다', async () => {
+  assert.equal((await db.doc(`users/${adminUid}`).get()).get('superAdmin'), true)
+  assert.deepEqual(await fn.getMyAccess.run(as(adminUid, {})), { superAdmin: true })
+  const { teamId: newTeam } = await fn.createTeam.run(as(adminUid, { name: '지원팀' }))
+  assert.equal((await db.doc(`teams/${newTeam}`).get()).get(`members.${adminUid}`), 'admin')
+  assert.ok((await db.doc(`users/${adminUid}`).get()).get('teamIds').includes(newTeam))
+
+  // 다른 관리자는 팀을 만들 수 없고, 최고 관리자를 빼거나 강등할 수 없다
+  const { uid: otherAdmin } = await fn.addMember.run(
+    as(adminUid, { teamId: newTeam, name: '팀장', email: 'lead@workphone.local', password: 'pass123', role: 'admin' }),
+  )
+  await expectError(fn.createTeam.run(as(otherAdmin, { name: '몰래 만든 팀' })), 'permission-denied')
+  assert.deepEqual(await fn.getMyAccess.run(as(otherAdmin, {})), { superAdmin: false })
+  await expectError(fn.removeMember.run(as(otherAdmin, { teamId: newTeam, uid: adminUid })), 'failed-precondition')
+  await expectError(fn.updateMemberRole.run(as(otherAdmin, { teamId: newTeam, uid: adminUid, role: 'viewer' })), 'failed-precondition')
+})
+
+test('최고 관리자 표시가 생기기 전에 만든 프로젝트: 첫 팀 관리자가 최고 관리자가 된다', async () => {
+  await db.doc(`users/${adminUid}`).update({ superAdmin: FieldValue.delete() })
+  await db.doc('meta/setup').update({ ownerUid: FieldValue.delete() })
+  const { uid: second } = await fn.addMember.run(
+    as(adminUid, { teamId, name: '부관리자', email: 'sub@workphone.local', password: 'pass123', role: 'admin' }),
+  )
+  assert.deepEqual(await fn.getMyAccess.run(as(adminUid, {})), { superAdmin: true })
+  assert.equal((await db.doc('meta/setup').get()).get('ownerUid'), adminUid)
+  // 한 명이 정해지면 같은 팀의 다른 관리자는 최고 관리자가 되지 않는다
+  assert.deepEqual(await fn.getMyAccess.run(as(second, {})), { superAdmin: false })
 })

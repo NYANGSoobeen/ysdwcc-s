@@ -148,11 +148,63 @@ export const createFirstAdmin = onCall(async (req) => {
     members: { [uid]: 'admin' },
     createdAt: FieldValue.serverTimestamp(),
   })
-  batch.set(db.doc(`users/${uid}`), { name, email: userEmail, teamIds: [team.id] })
-  batch.update(db.doc('meta/setup'), { firstTeamId: team.id })
+  batch.set(db.doc(`users/${uid}`), { name, email: userEmail, teamIds: [team.id], superAdmin: true })
+  batch.update(db.doc('meta/setup'), { firstTeamId: team.id, ownerUid: uid })
   await batch.commit()
   return { teamId: team.id }
 })
+
+// ── 최고 관리자와 여러 팀 ────────────────────────────────────
+// 최고 관리자(처음 만든 관리자)는 새 팀을 만들 수 있고, 모든 팀에 관리자로 들어가 있어 모든 팀을 본다.
+// superAdmin 표시는 Functions만 쓴다 (보안 규칙상 본인은 name/platform/settings만 수정 가능).
+
+async function isSuperAdmin(uid: string) {
+  const db = getFirestore()
+  if ((await db.doc(`users/${uid}`).get()).get('superAdmin') === true) return true
+  // 최고 관리자 표시가 생기기 전에 만든 프로젝트: 첫 팀의 관리자를 최고 관리자로 정한다.
+  const setup = await db.doc('meta/setup').get()
+  if (!setup.exists || setup.get('ownerUid')) return false
+  const firstTeam = await db.doc(`teams/${setup.get('firstTeamId')}`).get()
+  if (firstTeam.get(`members.${uid}`) !== 'admin') return false
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(db.doc('meta/setup'))
+    if (fresh.get('ownerUid')) throw new HttpsError('failed-precondition', '이미 최고 관리자가 있습니다.')
+    tx.update(db.doc('meta/setup'), { ownerUid: uid })
+    tx.set(db.doc(`users/${uid}`), { superAdmin: true }, { merge: true })
+  })
+  return true
+}
+
+async function requireSuperAdmin(req: CallableRequest) {
+  const uid = requireUid(req)
+  if (!(await isSuperAdmin(uid))) throw new HttpsError('permission-denied', '최고 관리자만 할 수 있습니다.')
+  return uid
+}
+
+// 앱이 최고 관리자 화면(팀 만들기)을 보여 줄지 정한다.
+export const getMyAccess = onCall(async (req) => {
+  const uid = requireUid(req)
+  return { superAdmin: await isSuperAdmin(uid) }
+})
+
+export const createTeam = onCall(async (req) => {
+  const uid = await requireSuperAdmin(req)
+  const name = text(req.data?.name, '팀 이름', 30)
+  const db = getFirestore()
+  const team = db.collection('teams').doc()
+  const batch = db.batch()
+  batch.set(team, { name, members: { [uid]: 'admin' }, createdAt: FieldValue.serverTimestamp() })
+  batch.set(db.doc(`users/${uid}`), { teamIds: FieldValue.arrayUnion(team.id) }, { merge: true })
+  await batch.commit()
+  return { teamId: team.id }
+})
+
+// 최고 관리자는 모든 팀의 관리자로 남아 있어야 한다.
+async function protectSuperAdmin(uid: string) {
+  if ((await getFirestore().doc(`users/${uid}`).get()).get('superAdmin') === true) {
+    throw new HttpsError('failed-precondition', '최고 관리자는 모든 팀의 관리자로 남아 있어야 합니다.')
+  }
+}
 
 // 팀원 추가. 다른 팀에 이미 계정이 있으면 비밀번호는 그대로 두고 이 팀에만 추가한다.
 export const addMember = onCall(async (req) => {
@@ -200,6 +252,7 @@ export const updateMemberRole = onCall(async (req) => {
   const { teamId, members } = await requireAdmin(req, req.data?.teamId)
   const uid = requireMember(members, req.data?.uid)
   const newRole = role(req.data?.role)
+  if (newRole !== 'admin') await protectSuperAdmin(uid)
   if (newRole !== 'admin' && isLastAdmin(members, uid)) {
     throw new HttpsError('failed-precondition', '관리자가 최소 1명은 있어야 합니다.')
   }
@@ -212,6 +265,7 @@ export const updateMemberRole = onCall(async (req) => {
 export const removeMember = onCall(async (req) => {
   const { teamId, members } = await requireAdmin(req, req.data?.teamId)
   const uid = requireMember(members, req.data?.uid)
+  await protectSuperAdmin(uid)
   if (isLastAdmin(members, uid)) {
     throw new HttpsError('failed-precondition', '관리자가 최소 1명은 있어야 합니다.')
   }

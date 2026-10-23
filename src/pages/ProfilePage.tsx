@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
-import { useEffect, useState, type FormEvent } from 'react'
+import { doc, updateDoc } from 'firebase/firestore'
+import { useState, type FormEvent } from 'react'
 import { ROLE_LABELS } from '../api.ts'
 import { changePassword, errorMessage, logOutAndWipe, toLoginId } from '../auth.ts'
 import { db } from '../firebase.ts'
@@ -11,10 +11,9 @@ type Props = {
   user: User
   profile: Profile
   team: Team
-  onSelectTeam: (teamId: string) => void
 }
 
-export function ProfilePage({ user, profile, team, onSelectTeam }: Props) {
+export function ProfilePage({ user, profile, team }: Props) {
   return (
     <div className="page">
       <header className="page-header">
@@ -28,11 +27,8 @@ export function ProfilePage({ user, profile, team, onSelectTeam }: Props) {
           <dl className="stats">
             <div><dt>아이디</dt><dd>{toLoginId(user.email)}</dd></div>
             <div><dt>팀</dt><dd>{team.name}</dd></div>
-            <div><dt>권한</dt><dd>{ROLE_LABELS[team.members[user.uid]]}</dd></div>
+            <div><dt>권한</dt><dd>{profile.superAdmin ? '최고 관리자 (모든 팀)' : ROLE_LABELS[team.members[user.uid]]}</dd></div>
           </dl>
-          {profile.teamIds.length > 1 && (
-            <TeamSwitcher teamIds={profile.teamIds} current={team.id} onSelect={onSelectTeam} />
-          )}
         </section>
         <ContactsSync uid={user.uid} />
         <PasswordForm />
@@ -73,25 +69,6 @@ function NameForm({ uid, name }: { uid: string; name: string }) {
       </label>
       <button disabled={!value.trim() || value.trim() === name}>{saved ? '저장됨' : '저장'}</button>
     </form>
-  )
-}
-
-function TeamSwitcher({ teamIds, current, onSelect }: { teamIds: string[]; current: string; onSelect: (id: string) => void }) {
-  const [names, setNames] = useState<Record<string, string>>({})
-  useEffect(() => {
-    void Promise.all(teamIds.map((id) => getDoc(doc(db, 'teams', id)).catch(() => null))).then((snaps) =>
-      setNames(Object.fromEntries(snaps.flatMap((s) => (s?.exists() ? [[s.id, s.get('name') as string]] : [])))),
-    )
-  }, [teamIds])
-  return (
-    <label className="form">
-      팀 바꾸기
-      <select value={current} onChange={(e) => onSelect(e.target.value)}>
-        {teamIds.map((id) => (
-          <option key={id} value={id}>{names[id] ?? '…'}</option>
-        ))}
-      </select>
-    </label>
   )
 }
 

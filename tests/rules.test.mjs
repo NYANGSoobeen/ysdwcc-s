@@ -107,3 +107,9 @@ test('채팅 사진: editor만 올리고, 팀원만 보고, 크기와 형식 제
   await assertFails(deleteObject(ref(st('ed2'), 'teams/t1/chat/m1/0.jpg')))
   await assertSucceeds(deleteObject(ref(st('ed'), 'teams/t1/chat/m1/0.jpg')))
 })
+
+test('본인이 최고 관리자 표시를 스스로 붙일 수 없다', async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', email: 'ed@x.com', teamIds: ['t1'] }))
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { superAdmin: true }))
+})

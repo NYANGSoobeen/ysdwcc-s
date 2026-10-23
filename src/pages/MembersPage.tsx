@@ -1,6 +1,8 @@
+import { doc, updateDoc } from 'firebase/firestore'
 import { useState, type FormEvent } from 'react'
 import { api, ROLE_LABELS, type Role } from '../api.ts'
 import { errorMessage, toEmail, toLoginId } from '../auth.ts'
+import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 
 const ROLE_HELP: Record<Role, string> = {
@@ -9,7 +11,9 @@ const ROLE_HELP: Record<Role, string> = {
   viewer: '읽기만 가능',
 }
 
-export function MembersPage({ team, uid }: { team: Team; uid: string }) {
+type Props = { team: Team; uid: string; superAdmin: boolean; onSelectTeam: (teamId: string) => void }
+
+export function MembersPage({ team, uid, superAdmin, onSelectTeam }: Props) {
   const isAdmin = team.members[uid] === 'admin'
   const uids = Object.keys(team.members)
   const profiles = useMemberProfiles(uids)
@@ -36,6 +40,7 @@ export function MembersPage({ team, uid }: { team: Team; uid: string }) {
       </header>
       <div className="page-body">
         {adding && <AddMemberForm teamId={team.id} onDone={() => setAdding(false)} />}
+        {isAdmin && <TeamNameForm team={team} />}
         <ul className="list">
           {sorted.map((memberUid) => (
             <MemberRow
@@ -49,6 +54,7 @@ export function MembersPage({ team, uid }: { team: Team; uid: string }) {
             />
           ))}
         </ul>
+        {superAdmin && <CreateTeamForm onCreated={onSelectTeam} />}
         <dl className="card help">
           {(Object.keys(ROLE_HELP) as Role[]).map((r) => (
             <div key={r}>
@@ -204,6 +210,71 @@ function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void 
       {error && <p className="error">{error}</p>}
       <button className="primary" disabled={busy}>
         {busy ? '추가하는 중…' : '추가'}
+      </button>
+    </form>
+  )
+}
+
+function TeamNameForm({ team }: { team: Team }) {
+  const [name, setName] = useState(team.name)
+  const [busy, setBusy] = useState(false)
+  const changed = name.trim() !== team.name
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await updateDoc(doc(db, 'teams', team.id), { name: name.trim() })
+    } catch (err) {
+      alert(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="card inline-form" onSubmit={submit}>
+      <label>
+        팀 이름
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={30} required />
+      </label>
+      <button disabled={busy || !changed || !name.trim()}>{changed ? '저장' : '저장됨'}</button>
+    </form>
+  )
+}
+
+// 최고 관리자만: 새 팀을 만들면 최고 관리자가 그 팀의 관리자로 들어가고 바로 그 팀으로 바뀐다.
+function CreateTeamForm({ onCreated }: { onCreated: (teamId: string) => void }) {
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const { teamId } = await api.createTeam({ name: name.trim() })
+      setName('')
+      onCreated(teamId)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="card form" onSubmit={submit}>
+      <strong>새 팀 만들기</strong>
+      <p className="muted small">
+        최고 관리자는 모든 팀에 관리자로 들어가 있어, 화면 맨 위에서 팀을 바꿔 가며 모든 팀의 고객, 채팅, 팀원을 볼 수
+        있습니다. 새 팀의 팀원은 그 팀으로 바꾼 뒤 "+ 추가"로 넣으세요.
+      </p>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 지원팀" maxLength={30} aria-label="새 팀 이름" required />
+      {error && <p className="error">{error}</p>}
+      <button className="primary" disabled={busy || !name.trim()}>
+        {busy ? '만드는 중…' : '팀 만들기'}
       </button>
     </form>
   )

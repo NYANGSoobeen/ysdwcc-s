@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import type { Role } from './api.ts'
 import { auth, db } from './firebase.ts'
 
-export type Profile = { name: string; email: string; teamIds: string[] }
+export type Profile = { name: string; email: string; teamIds: string[]; superAdmin?: boolean }
 export type Team = { id: string; name: string; members: Record<string, Role> }
 
 export function useAuthUser() {
@@ -86,4 +86,22 @@ export function useMemberProfiles(uids: string[]) {
     return () => unsubscribes.forEach((u) => u())
   }, [key])
   return profiles
+}
+
+// 내가 속한 팀들의 이름 (팀 바꾸기 칸에 표시). 이름이 바뀌면 바로 반영된다.
+export function useTeamNames(teamIds: string[]) {
+  const [names, setNames] = useState<Record<string, string>>({})
+  const key = teamIds.join(',')
+  useEffect(() => {
+    if (!key) return
+    const unsubscribes = key.split(',').map((id) =>
+      onSnapshot(
+        doc(db, 'teams', id),
+        (snap) => setNames((prev) => ({ ...prev, [id]: (snap.get('name') as string) ?? '' })),
+        () => {},
+      ),
+    )
+    return () => unsubscribes.forEach((u) => u())
+  }, [key])
+  return names
 }

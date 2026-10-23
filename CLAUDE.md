@@ -24,6 +24,7 @@
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전이 나오면 하단 알림을 띄우고 누르면 업데이트한다 (`src/update.ts`).
 - **로그인과 계정:** 이메일/비밀번호 로그인. 계정은 관리자만 만든다 (콘솔에서 가입 기능을 끈다). "@" 없는 아이디는 `아이디@workphone.local`로 저장하며 실제 메일이 아니므로 비밀번호 분실 시 관리자가 초기화한다. 프로젝트에 팀이 없을 때만 로그인 화면에 "처음 시작하기"(첫 관리자 만들기)가 나온다.
 - **팀원 관리:** 팀 생성, 팀원 추가, 권한 변경, 삭제, 비밀번호 초기화는 모두 Functions(callable)로만 한다. 마지막 관리자는 강등하거나 삭제할 수 없다. 팀에서 삭제하면 보안 규칙상 즉시 접근이 막히고, 그 사람 앱은 로그아웃하면서 기기 캐시를 지운다. 속한 팀이 없어지면 Auth 계정도 지운다.
+- **여러 팀과 최고 관리자:** 처음 만든 관리자는 최고 관리자(`users.superAdmin`, `meta/setup.ownerUid`, Functions만 씀)다. 최고 관리자만 새 팀을 만들 수 있고(`createTeam`), 만든 팀에 관리자로 자동으로 들어가 모든 팀을 본다. 다른 관리자는 최고 관리자를 빼거나 강등할 수 없다. 팀이 2개 이상이면 화면 맨 위에 팀 바꾸기 칸이 나온다. 관리자는 팀원 탭에서 팀 이름을 바꾼다.
 - **용량 탭(관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
 - **휴대폰 연락처에 표시 (걸려 온 전화에 고객 이름):** 비용 없이 하기 위해 읽기 전용 **CardDAV 서버**(`functions/src/carddav.ts`, 함수 `carddav`)로 팀 고객을 폰 연락처의 별도 계정에 넣는다. 아이폰은 설정 → 연락처 계정 → CardDAV, 갤럭시는 DAVx⁵ 앱으로 구독한다. 이름은 `[업무] 이름`으로 보낸다. 접속 정보는 앱 "내 정보"에서 발급하며(비밀번호는 한 번만 표시, 서버에는 해시만 저장), 팀에서 제외되거나 끄면 빈 주소록을 돌려줘 폰에서 자동으로 지워진다. 서버 주소는 `https://carddav-<프로젝트 번호>.us-west1.run.app` (다르면 `VITE_CARDDAV_URL`). 배포 출력에 나오는 `cloudfunctions.net/carddav` 주소는 쓰지 않는다: 그 주소는 함수 이름 경로를 떼고 전달해서 응답 속 주소(href)가 틀어진다 (배포 후 확인함).
 - **아이폰 설치형 앱은 보류:** Apple 개발자 계정(연 $99)과 Mac이 필요해 비용 원칙에 맞지 않는다. 아이폰은 웹앱 + 연락처 구독으로 쓴다. 갤럭시 설치형 앱(Capacitor로 웹앱 감싸기 + Kotlin 전화 기능)은 아직 결정 전.
@@ -66,9 +67,9 @@
 ## Firestore 데이터 구조 초안
 
 ```
-users/{uid}                      name, email, teamIds[], platform, settings{}   (Functions가 생성, 본인은 name/platform/settings만 수정)
+users/{uid}                      name, email, teamIds[], superAdmin, platform, settings{}   (Functions가 생성, 본인은 name/platform/settings만 수정)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
-meta/setup                       첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
+meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)
 teams/{teamId}                   name, members{uid: "admin"|"editor"|"viewer"}, autoShare, shareNotes,
                                  contactsVersion (고객이 바뀔 때마다 Functions가 올림, CardDAV ctag용)
@@ -110,4 +111,5 @@ teams/{teamId}/messages/{msgId}  authorUid, body, mentions[uid], customerTags[cu
 - `npm run release`: 최신 코드 받기(git pull) → 설치 → 빌드 → 전체 배포. 사용자는 Windows cmd에서 이것만 실행한다.
 - Firebase 웹 설정은 `.env.production`, 프로젝트 연결은 `.firebaserc`에 커밋되어 있다 (공개 값). 따로 복사할 필요 없음.
 - 연락처 구독은 배포 후 실제 폰으로 한 번 확인한다 (테스트는 tsdav 클라이언트로만 함). 함수 주소가 다르면 `VITE_CARDDAV_URL`에 적는다.
+- 앱에서 부르는 함수(onCall)는 처음 만들어질 때만 "누구나 호출 가능"으로 설정되고 이후 배포로는 고쳐지지 않는다. 첫 배포에서 이 설정이 실패해 403이 나면 그 함수를 `firebase functions:delete`로 지우고 다시 배포한다.
 - 배포 전 콘솔 설정: Authentication → 이메일/비밀번호 사용, 사용자 가입(create) 끄기. 예산 알림 설정.
