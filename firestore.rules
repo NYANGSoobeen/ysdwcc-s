@@ -1,0 +1,94 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function members(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data.members;
+    }
+
+    function isMember(teamId) {
+      return signedIn() && request.auth.uid in members(teamId);
+    }
+
+    function canEdit(teamId) {
+      return isMember(teamId) && members(teamId)[request.auth.uid] in ['admin', 'editor'];
+    }
+
+    function isAdmin(teamId) {
+      return isMember(teamId) && members(teamId)[request.auth.uid] == 'admin';
+    }
+
+    function unchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다. 수정은 본인만.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /teams/{teamId} {
+      allow read: if isMember(teamId);
+      // 팀을 만든 사람이 유일한 관리자로 시작한다.
+      allow create: if signedIn()
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.members[request.auth.uid] == 'admin';
+      allow update, delete: if isAdmin(teamId);
+
+      match /messages/{msgId} {
+        allow read: if isMember(teamId);
+        allow create: if canEdit(teamId)
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update: if canEdit(teamId)
+          && resource.data.authorUid == request.auth.uid
+          && unchanged('authorUid')
+          && unchanged('createdAt');
+        // 삭제는 작성자만, 그리고 바로 영구 삭제한다 (첨부 사진은 Functions가 지운다).
+        allow delete: if isMember(teamId)
+          && resource.data.authorUid == request.auth.uid;
+      }
+    }
+
+    match /customers/{customerId} {
+      function customerTeam() {
+        return get(/databases/$(database)/documents/customers/$(customerId)).data.teamId;
+      }
+
+      allow read: if isMember(resource.data.teamId);
+      allow create: if canEdit(request.resource.data.teamId)
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if canEdit(resource.data.teamId)
+        && unchanged('teamId')
+        && unchanged('createdBy')
+        && unchanged('createdAt');
+      // 고객 삭제는 관리자 또는 담당자만. 메모와 수정 기록은 Functions가 함께 지운다.
+      allow delete: if isAdmin(resource.data.teamId)
+        || (canEdit(resource.data.teamId) && resource.data.ownerUid == request.auth.uid);
+
+      match /notes/{noteId} {
+        allow read: if isMember(customerTeam());
+        allow create: if canEdit(customerTeam())
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update: if canEdit(customerTeam())
+          && unchanged('authorUid')
+          && unchanged('createdAt')
+          && request.resource.data.editedBy == request.auth.uid;
+        allow delete: if isAdmin(customerTeam())
+          || (canEdit(customerTeam()) && resource.data.authorUid == request.auth.uid);
+
+        // 수정 기록은 추가만 가능하다. 메모가 삭제되면 Functions가 함께 지운다.
+        match /revisions/{revId} {
+          allow read: if isMember(customerTeam());
+          allow create: if canEdit(customerTeam())
+            && request.resource.data.editedBy == request.auth.uid;
+        }
+      }
+    }
+  }
+}

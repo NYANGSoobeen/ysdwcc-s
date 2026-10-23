@@ -1,0 +1,24 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function role(teamId) {
+      return firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid];
+    }
+
+    // 채팅 사진: 압축본과 썸네일. 메시지가 삭제되면 Functions가 폴더째 지운다.
+    match /teams/{teamId}/chat/{msgId}/{fileName} {
+      allow read: if request.auth != null
+        && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
+      allow create: if request.auth != null
+        && role(teamId) in ['admin', 'editor']
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.metadata.uploaderUid == request.auth.uid;
+      // 메시지 저장에 실패했을 때 올린 사람이 직접 정리할 수 있게 한다.
+      allow delete: if request.auth != null
+        && resource.metadata.uploaderUid == request.auth.uid;
+    }
+  }
+}
