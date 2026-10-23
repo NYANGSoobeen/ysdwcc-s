@@ -69,7 +69,7 @@ test('접속 정보로 주소록을 찾고, 내 팀 고객만 [업무] 이름으
   assert.equal((await db.doc('users/ed/private/contactsSync').get()).get('enabled'), true)
 
   const { book, cards } = await fetchCards()
-  assert.equal(book.displayName, '업무폰 고객')
+  assert.equal(book.displayName, '지원팀 고객')
   assert.equal(cards.length, 2)
   const kim = cards.find((c) => c.includes('UID:c1'))
   assert.match(kim, /FN:\[업무\] 김협력/)

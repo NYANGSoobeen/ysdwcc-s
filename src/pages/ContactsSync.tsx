@@ -48,7 +48,7 @@ export function ContactsSync({ uid }: { uid: string }) {
   }
 
   async function disable() {
-    if (!confirm('연락처 표시를 끌까요?\n폰이 다음에 동기화할 때 고객 연락처가 모두 사라집니다. 폰 설정에서 "업무폰" 연락처 계정도 지워 주세요.')) return
+    if (!confirm('연락처 표시를 끌까요?\n폰이 다음에 동기화할 때 고객 연락처가 모두 사라집니다. 폰 설정에서 "지원팀" 연락처 계정도 지워 주세요.')) return
     setBusy(true)
     setError('')
     try {
@@ -123,27 +123,27 @@ export function ContactsSync({ uid }: { uid: string }) {
           </li>
           <li><strong>기타 → CardDAV 계정 추가</strong>를 누릅니다.</li>
           <li>
-            <strong>서버, 사용자 이름, 암호</strong>를 위 정보로 붙여 넣고, 설명은 <strong>업무폰</strong>으로 적은 뒤
+            <strong>서버, 사용자 이름, 암호</strong>를 위 정보로 붙여 넣고, 설명은 <strong>지원팀</strong>으로 적은 뒤
             <strong> 다음</strong>을 누릅니다.
           </li>
-          <li>연락처 앱 → 왼쪽 위 <strong>목록</strong>에 "업무폰 고객"이 보이면 완료입니다. 처음에는 몇 분 걸릴 수 있습니다.</li>
+          <li>연락처 앱 → 왼쪽 위 <strong>목록</strong>에 "지원팀 고객"이 보이면 완료입니다. 처음에는 몇 분 걸릴 수 있습니다.</li>
           <li>
-            <strong>설정 → 앱 → 연락처 → 기본 계정</strong>은 <strong>iCloud</strong>(또는 내 폰)로 두세요. 업무폰 계정은
+            <strong>설정 → 앱 → 연락처 → 기본 계정</strong>은 <strong>iCloud</strong>(또는 내 폰)로 두세요. 지원팀 계정은
             읽기 전용이라 여기에 새 연락처를 저장할 수 없습니다.
           </li>
         </ol>
       ) : (
         <ol className="steps">
           <li>
-            <strong>DAVx⁵</strong> 앱을 설치합니다. F-Droid에서는 무료, Play 스토어에서는 유료입니다. 나중에 나올 갤럭시용
-            업무폰 앱에서는 이 과정 없이 바로 표시됩니다.
+            <strong>DAVx⁵</strong> 앱을 설치합니다. 갤럭시에는 외부 연락처를 구독하는 기능이 없어서, 이 앱이 고객 목록을 받아
+            삼성 연락처에 넣어 줍니다. Play 스토어에서는 유료(한 번 구매), F-Droid에서는 무료입니다.
           </li>
           <li>위에서 <strong>켜기</strong>를 눌러 접속 정보를 만듭니다.</li>
           <li>
             DAVx⁵에서 <strong>+ → URL 및 사용자 이름으로 로그인</strong>을 고르고, 기본 URL에 <strong>서버</strong>, 그리고
             사용자 이름과 암호를 붙여 넣습니다.
           </li>
-          <li>계정 이름을 <strong>업무폰</strong>으로 만들고, CardDAV 탭에서 <strong>업무폰 고객</strong>을 체크합니다.</li>
+          <li>계정 이름을 <strong>지원팀</strong>으로 만들고, CardDAV 탭에서 <strong>지원팀 고객</strong>을 체크합니다.</li>
           <li>삼성 연락처 앱에서 고객이 "[업무] 이름"으로 보이면 완료입니다.</li>
         </ol>
       )}

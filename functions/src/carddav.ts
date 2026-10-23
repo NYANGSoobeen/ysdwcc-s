@@ -3,7 +3,7 @@
 //
 // 경로 (함수 주소 기준)
 //   /                       주체(principal)이자 주소록 모음(addressbook-home)
-//   /book/                  주소록 하나 ("업무폰 고객")
+//   /book/                  주소록 하나 ("지원팀 고객")
 //   /book/{customerId}.vcf  고객 한 명
 //   /.well-known/carddav    → / 로 안내
 //
@@ -23,7 +23,7 @@ export type DavResponse = { status: number; headers: Record<string, string>; bod
 
 // 이름 앞에 붙여, 전화가 왔을 때 업무 전화인지 바로 알아보게 한다.
 export const NAME_PREFIX = '[업무] '
-const BOOK_NAME = '업무폰 고객'
+const BOOK_NAME = '지원팀 고객'
 const REALM = 'Workphone Contacts'
 const LAST_USED_INTERVAL_MS = 12 * 3600 * 1000
 
@@ -139,7 +139,7 @@ export function toVCard(id: string, data: FirebaseFirestore.DocumentData) {
   if (data.company) lines.push(`ORG:${escapeValue(String(data.company))}`)
   for (const phone of (data.phones ?? []) as string[]) lines.push(`TEL;TYPE=CELL:${phone}`)
   lines.push('CATEGORIES:업무')
-  lines.push(`NOTE:${escapeValue('업무폰 앱에서 동기화한 연락처입니다. 수정은 앱에서 하세요.')}`)
+  lines.push(`NOTE:${escapeValue('양산동원 지원팀 앱에서 동기화한 연락처입니다. 수정은 앱에서 하세요.')}`)
   lines.push('END:VCARD')
   return lines.join('\r\n') + '\r\n'
 }
@@ -195,7 +195,7 @@ function rootProps(prefix: string) {
   const self = `${prefix}/`
   return (
     '<d:resourcetype><d:collection/><d:principal/></d:resourcetype>' +
-    `<d:displayname>업무폰</d:displayname>` +
+    `<d:displayname>양산동원 지원팀</d:displayname>` +
     `<d:current-user-principal><d:href>${xmlEscape(self)}</d:href></d:current-user-principal>` +
     `<d:principal-URL><d:href>${xmlEscape(self)}</d:href></d:principal-URL>` +
     `<card:addressbook-home-set><d:href>${xmlEscape(self)}</d:href></card:addressbook-home-set>` +
@@ -262,7 +262,7 @@ export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
   }
 
   if (!['GET', 'HEAD', 'PROPFIND', 'REPORT'].includes(method)) {
-    return reply(403, '업무폰 연락처는 읽기 전용입니다. 수정은 앱에서 하세요.', {
+    return reply(403, '지원팀 연락처는 읽기 전용입니다. 수정은 앱에서 하세요.', {
       'Content-Type': 'text/plain; charset=utf-8',
     })
   }
@@ -318,5 +318,5 @@ export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
       ETag: card.etag,
     })
   }
-  return reply(200, method === 'HEAD' ? '' : '업무폰 연락처 서버입니다.', { 'Content-Type': 'text/plain; charset=utf-8' })
+  return reply(200, method === 'HEAD' ? '' : '양산동원 지원팀 연락처 서버입니다.', { 'Content-Type': 'text/plain; charset=utf-8' })
 }
