@@ -107,5 +107,7 @@ teams/{teamId}/messages/{msgId}  authorUid, body, mentions[uid], customerTags[cu
 
 - `npm run emulators` 후 다른 터미널에서 `npm run dev:emulators`: 로컬 에뮬레이터(Auth, Firestore, Storage, Functions)로 앱 실행
 - `npm test`: 보안 규칙과 Functions 테스트 (에뮬레이터에서 실행)
+- `npm run release`: 최신 코드 받기(git pull) → 설치 → 빌드 → 전체 배포. 사용자는 Windows cmd에서 이것만 실행한다.
+- Firebase 웹 설정은 `.env.production`, 프로젝트 연결은 `.firebaserc`에 커밋되어 있다 (공개 값). 따로 복사할 필요 없음.
 - 연락처 구독은 배포 후 실제 폰으로 한 번 확인한다 (테스트는 tsdav 클라이언트로만 함). 함수 주소가 다르면 `VITE_CARDDAV_URL`에 적는다.
 - 배포 전 콘솔 설정: Authentication → 이메일/비밀번호 사용, 사용자 가입(create) 끄기. 예산 알림 설정.
