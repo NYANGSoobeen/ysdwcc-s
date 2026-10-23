@@ -15,7 +15,10 @@ export function LoginPage() {
 
   return (
     <main className="login">
-      <h1>업무폰</h1>
+      <div className="login-brand">
+        <img src="/icons/icon-192.png" alt="" />
+        <h1>양산동원 지원팀</h1>
+      </div>
       {notice && <p className="notice">{notice}</p>}
       {needsSetup ? <SetupForm /> : <LoginForm />}
     </main>

@@ -225,9 +225,23 @@ h3 {
   gap: 20px;
 }
 
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.login-brand img {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  box-shadow: 0 8px 24px rgb(31 111 235 / 0.3);
+}
+
 .login h1 {
   text-align: center;
-  font-size: 28px;
+  font-size: 24px;
 }
 
 /* ── 앱 틀과 하단 탭 ── */

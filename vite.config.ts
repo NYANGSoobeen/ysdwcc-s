@@ -38,15 +38,18 @@ const config = {
       registerType: 'prompt',
       injectRegister: false,
       manifest: {
-        name: '업무폰',
-        short_name: '업무폰',
+        name: '양산동원 지원팀',
+        short_name: '양산동원지원팀',
         lang: 'ko',
         start_url: '/',
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#1f6feb',
         icons: [
-          { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          // 안쪽 내용이 안전 영역 안에 있어 안드로이드 원형/물방울 모양으로 잘려도 그대로 보인다.
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
