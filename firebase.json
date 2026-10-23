@@ -41,6 +41,9 @@
           }
         ]
       }
+    ],
+    "predeploy": [
+      "npm run build"
     ]
   },
   "firestore": {
