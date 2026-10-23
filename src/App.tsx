@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { logOutAndWipe } from './auth.ts'
 import { useAuthUser, useProfile, useTeam } from './hooks.ts'
 import { ChatPage } from './pages/ChatPage.tsx'
+import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
@@ -17,7 +18,7 @@ export function App() {
   return <SignedIn key={user.uid} user={user} />
 }
 
-type Tab = 'chat' | 'members' | 'usage' | 'profile'
+type Tab = 'customers' | 'chat' | 'members' | 'usage' | 'profile'
 
 function SignedIn({ user }: { user: User }) {
   const { profile, missing } = useProfile(user.uid)
@@ -25,7 +26,7 @@ function SignedIn({ user }: { user: User }) {
   const teamIds = profile?.teamIds ?? []
   const teamId = selectedTeamId && teamIds.includes(selectedTeamId) ? selectedTeamId : teamIds[0]
   const { team, denied } = useTeam(teamId)
-  const [tab, setTab] = useState<Tab>('chat')
+  const [tab, setTab] = useState<Tab>('customers')
 
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)
@@ -39,11 +40,12 @@ function SignedIn({ user }: { user: User }) {
 
   const myRole = team.members[user.uid]
   const isAdmin = myRole === 'admin'
-  const current = tab === 'usage' && !isAdmin ? 'chat' : tab
+  const current = tab === 'usage' && !isAdmin ? 'customers' : tab
 
   return (
     <div className="shell">
       <div className="shell-body">
+        {current === 'customers' && <CustomersPage team={team} uid={user.uid} />}
         {current === 'chat' && <ChatPage team={team} uid={user.uid} />}
         {current === 'members' && <MembersPage team={team} uid={user.uid} />}
         {current === 'usage' && <UsagePage team={team} />}
@@ -57,6 +59,7 @@ function SignedIn({ user }: { user: User }) {
         )}
       </div>
       <nav className="tabbar">
+        <TabButton active={current === 'customers'} onClick={() => setTab('customers')} icon="📇" label="고객" />
         <TabButton active={current === 'chat'} onClick={() => setTab('chat')} icon="💬" label="채팅" />
         <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
         {isAdmin && (

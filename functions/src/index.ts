@@ -3,8 +3,9 @@ import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { setGlobalOptions } from 'firebase-functions/v2'
-import { onDocumentDeleted } from 'firebase-functions/v2/firestore'
-import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https'
+import { onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
+import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https'
+import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 
 // Firestore와 같은 리전. 무료 사용량을 넘지 않도록 동시 실행 수를 제한한다.
 setGlobalOptions({ region: 'us-west1', maxInstances: 3 })
@@ -332,3 +333,71 @@ export const deleteMessagesInRange = onCall(async (req) => {
   }
   return result
 })
+
+// ── 휴대폰 연락처에 표시 (CardDAV) ───────────────────────────
+
+// 폰의 연락처 앱이 접속하는 주소. 앱 로그인과 별개인 접속 정보(Basic 인증)를 쓴다.
+export const carddav = onRequest({ invoker: 'public' }, async (req, res) => {
+  const result = await handleCardDav({
+    method: req.method,
+    path: req.path,
+    headers: req.headers,
+    body: req.rawBody?.toString('utf8') ?? '',
+  })
+  res.status(result.status).set(result.headers).send(result.body)
+})
+
+// 고객이 추가, 수정, 삭제되면 팀의 contactsVersion을 올려 폰이 주소록을 다시 받게 한다.
+export const onCustomerWrittenForContacts = onDocumentWritten('customers/{customerId}', async (event) => {
+  const before = event.data?.before?.data()?.teamId as string | undefined
+  const after = event.data?.after?.data()?.teamId as string | undefined
+  const db = getFirestore()
+  await Promise.all(
+    [...new Set([before, after].filter((t): t is string => !!t))].map((teamId) =>
+      db.doc(`teams/${teamId}`).update({ contactsVersion: FieldValue.increment(1) }).catch(() => {}),
+    ),
+  )
+})
+
+// 접속 정보를 새로 만든다. 예전 접속 정보는 끄므로, 그 폰에서는 고객 연락처가 사라진다.
+// 비밀번호는 이때 한 번만 보여 주고 서버에는 해시만 남긴다.
+export const enableContactsSync = onCall(async (req) => {
+  const uid = requireUid(req)
+  const db = getFirestore()
+  const teamIds = ((await db.doc(`users/${uid}`).get()).get('teamIds') ?? []) as string[]
+  if (teamIds.length === 0) throw new HttpsError('permission-denied', '팀에 속한 사람만 쓸 수 있습니다.')
+
+  await disableTokens(uid)
+  const { username, password } = newCredentials()
+  const batch = db.batch()
+  batch.set(db.doc(`carddavTokens/${username}`), {
+    uid,
+    secretHash: hashSecret(password),
+    disabled: false,
+    createdAt: FieldValue.serverTimestamp(),
+    lastUsedAt: null,
+  })
+  batch.set(db.doc(`users/${uid}/private/contactsSync`), {
+    enabled: true,
+    username,
+    createdAt: FieldValue.serverTimestamp(),
+  })
+  await batch.commit()
+  return { username, password }
+})
+
+// 끄기. 접속 정보를 지우지 않고 "꺼짐"으로 남겨, 폰이 다음에 동기화할 때 빈 주소록을 받아 고객 연락처를 지우게 한다.
+export const disableContactsSync = onCall(async (req) => {
+  const uid = requireUid(req)
+  await disableTokens(uid)
+  await getFirestore().doc(`users/${uid}/private/contactsSync`).set({ enabled: false, username: null }, { merge: true })
+  return { ok: true }
+})
+
+async function disableTokens(uid: string) {
+  const db = getFirestore()
+  const tokens = await db.collection('carddavTokens').where('uid', '==', uid).where('disabled', '==', false).get()
+  const batch = db.batch()
+  for (const t of tokens.docs) batch.update(t.ref, { disabled: true, disabledAt: FieldValue.serverTimestamp() })
+  if (!tokens.empty) await batch.commit()
+}

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { ROLE_LABELS } from '../api.ts'
 import { changePassword, errorMessage, logOutAndWipe, toLoginId } from '../auth.ts'
 import { db } from '../firebase.ts'
+import { ContactsSync } from './ContactsSync.tsx'
 import type { Profile, Team } from '../hooks.ts'
 
 type Props = {
@@ -33,6 +34,7 @@ export function ProfilePage({ user, profile, team, onSelectTeam }: Props) {
             <TeamSwitcher teamIds={profile.teamIds} current={team.id} onSelect={onSelectTeam} />
           )}
         </section>
+        <ContactsSync uid={user.uid} />
         <PasswordForm />
         <button
           type="button"

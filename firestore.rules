@@ -37,7 +37,14 @@ service cloud.firestore {
       allow read: if signedIn();
       allow update: if signedIn() && request.auth.uid == uid
         && onlyChanges(['name', 'platform', 'settings']);
+
+      // 연락처 동기화 상태 등 본인만 보는 정보. Functions만 쓴다.
+      match /private/{docId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+      }
     }
+
+    // carddavTokens(연락처 동기화 접속 정보)와 meta는 앱에서 접근할 수 없다 (규칙 없음 = 거부).
 
     match /teams/{teamId} {
       allow read: if isMember(teamId);

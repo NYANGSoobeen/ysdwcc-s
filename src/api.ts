@@ -42,6 +42,8 @@ export const api = {
     'resetMemberPassword',
   ),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
+  enableContactsSync: call<void, { username: string; password: string }>('enableContactsSync'),
+  disableContactsSync: call<void, { ok: true }>('disableContactsSync'),
   deleteMessagesInRange: call<
     { teamId: string; from: number; to: number; dryRun: boolean },
     RangeResult

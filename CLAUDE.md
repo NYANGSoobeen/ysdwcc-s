@@ -24,6 +24,9 @@
 - **로그인과 계정:** 이메일/비밀번호 로그인. 계정은 관리자만 만든다 (콘솔에서 가입 기능을 끈다). "@" 없는 아이디는 `아이디@workphone.local`로 저장하며 실제 메일이 아니므로 비밀번호 분실 시 관리자가 초기화한다. 프로젝트에 팀이 없을 때만 로그인 화면에 "처음 시작하기"(첫 관리자 만들기)가 나온다.
 - **팀원 관리:** 팀 생성, 팀원 추가, 권한 변경, 삭제, 비밀번호 초기화는 모두 Functions(callable)로만 한다. 마지막 관리자는 강등하거나 삭제할 수 없다. 팀에서 삭제하면 보안 규칙상 즉시 접근이 막히고, 그 사람 앱은 로그아웃하면서 기기 캐시를 지운다. 속한 팀이 없어지면 Auth 계정도 지운다.
 - **용량 탭(관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
+- **휴대폰 연락처에 표시 (걸려 온 전화에 고객 이름):** 비용 없이 하기 위해 읽기 전용 **CardDAV 서버**(`functions/src/carddav.ts`, 함수 `carddav`)로 팀 고객을 폰 연락처의 별도 계정에 넣는다. 아이폰은 설정 → 연락처 계정 → CardDAV, 갤럭시는 DAVx⁵ 앱으로 구독한다. 이름은 `[업무] 이름`으로 보낸다. 접속 정보는 앱 "내 정보"에서 발급하며(비밀번호는 한 번만 표시, 서버에는 해시만 저장), 팀에서 제외되거나 끄면 빈 주소록을 돌려줘 폰에서 자동으로 지워진다. 서버 주소는 `https://carddav-<프로젝트 번호>.us-west1.run.app` (다르면 `VITE_CARDDAV_URL`).
+- **아이폰 설치형 앱은 보류:** Apple 개발자 계정(연 $99)과 Mac이 필요해 비용 원칙에 맞지 않는다. 아이폰은 웹앱 + 연락처 구독으로 쓴다. 갤럭시 설치형 앱(Capacitor로 웹앱 감싸기 + Kotlin 전화 기능)은 아직 결정 전.
+- **고객 화면:** 목록(이름, 회사, 번호 검색), "오늘까지 연락할 고객", 추가(같은 번호면 기존 고객으로 연결), 상세(전화 걸기 후 돌아오면 메모 창, 담당자 넘기기, 다음 연락), 상담 메모(종류, 수정 기록, 삭제).
 - **웹앱 한계:** 웹앱은 폰 연락처를 일괄로 읽을 수 없다. 연락처 불러오기와 전화 관련 기능은 설치형 앱에서만 한다.
 
 ## 기능 목록
@@ -52,7 +55,7 @@
 | 개인 연락처 | 폰 기본 연락처 (앱은 읽기만) | 그대로 |
 | 고객 연락처, 상담 메모, 채팅 | Firestore | 기기에서 삭제, 팀에는 유지 |
 | 채팅 사진 | Cloud Storage `teams/{teamId}/chat/{msgId}/` (압축본 + 썸네일, 메시지 문서에는 경로만) | 기기 캐시 삭제, 팀에는 유지 |
-| "휴대폰 연락처에 표시"로 동기화한 고객 | 앱 전용 연락처 계정 | 계정째 삭제 |
+| "휴대폰 연락처에 표시"로 동기화한 고객 | 폰의 CardDAV 연락처 계정 (읽기 전용) | 팀 제외/끄기 시 빈 주소록이 되어 자동 삭제 |
 | "내 폰에도 저장"한 고객 | 폰 기본 연락처 (일반 연락처) | 그대로 |
 
 - **삭제는 즉시 영구 삭제:** 고객, 메모, 채팅 메시지를 지우면 보관 없이 바로 지운다. 하위 데이터(메모, 수정 기록)와 채팅 사진은 Cloud Functions(`functions/src/index.ts`)가 함께 지운다. 되돌릴 수 없으므로 화면에서 확인 창을 띄운다.
@@ -63,8 +66,11 @@
 
 ```
 users/{uid}                      name, email, teamIds[], platform, settings{}   (Functions가 생성, 본인은 name/platform/settings만 수정)
+users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
 meta/setup                       첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
-teams/{teamId}                   name, members{uid: "admin"|"editor"|"viewer"}, autoShare, shareNotes
+carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)
+teams/{teamId}                   name, members{uid: "admin"|"editor"|"viewer"}, autoShare, shareNotes,
+                                 contactsVersion (고객이 바뀔 때마다 Functions가 올림, CardDAV ctag용)
 customers/{customerId}           teamId, name, company, phones[] (E.164), ownerUid,
                                  nextContactAt, nextContactNote, createdBy, createdAt, updatedAt
 customers/{id}/notes/{noteId}    kind ("수신 통화"|"발신 통화"|"방문 미팅"|...), body, authorUid,
@@ -100,4 +106,5 @@ teams/{teamId}/messages/{msgId}  authorUid, body, mentions[uid], customerTags[cu
 
 - `npm run emulators` 후 다른 터미널에서 `npm run dev:emulators`: 로컬 에뮬레이터(Auth, Firestore, Storage, Functions)로 앱 실행
 - `npm test`: 보안 규칙과 Functions 테스트 (에뮬레이터에서 실행)
+- 연락처 구독은 배포 후 실제 폰으로 한 번 확인한다 (테스트는 tsdav 클라이언트로만 함). 함수 주소가 다르면 `VITE_CARDDAV_URL`에 적는다.
 - 배포 전 콘솔 설정: Authentication → 이메일/비밀번호 사용, 사용자 가입(create) 끄기. 예산 알림 설정.
