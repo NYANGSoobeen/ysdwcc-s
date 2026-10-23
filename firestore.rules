@@ -27,19 +27,24 @@ service cloud.firestore {
       return request.resource.data[field] == resource.data[field];
     }
 
-    // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다. 수정은 본인만.
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다.
+    // 프로필은 Functions가 만들고, 본인은 이름과 설정만 바꿀 수 있다 (teamIds는 바꿀 수 없음).
     match /users/{uid} {
       allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid
+        && onlyChanges(['name', 'platform', 'settings']);
     }
 
     match /teams/{teamId} {
       allow read: if isMember(teamId);
-      // 팀을 만든 사람이 유일한 관리자로 시작한다.
-      allow create: if signedIn()
-        && request.resource.data.members.keys().hasOnly([request.auth.uid])
-        && request.resource.data.members[request.auth.uid] == 'admin';
-      allow update, delete: if isAdmin(teamId);
+      // 팀 생성과 팀원 추가, 권한 변경, 삭제는 Functions만 한다 (Auth 계정과 함께 바뀌어야 함).
+      // 관리자는 팀 이름과 공유 설정만 직접 바꿀 수 있다.
+      allow update: if isAdmin(teamId)
+        && onlyChanges(['name', 'autoShare', 'shareNotes']);
 
       match /messages/{msgId} {
         allow read: if isMember(teamId);

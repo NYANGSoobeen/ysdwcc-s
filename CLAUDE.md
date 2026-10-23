@@ -20,6 +20,10 @@
   - 앱에서 건 전화(`tel:`)는 앱으로 돌아오면 메모 창을 띄운다 (화면 6)
   - 받은 전화는 "방금 받은 전화 메모하기" 버튼으로 기록한다 (화면 7)
   - Call Directory Extension으로 전화 올 때 고객 이름을 표시한다
+- **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전이 나오면 하단 알림을 띄우고 누르면 업데이트한다 (`src/update.ts`).
+- **로그인과 계정:** 이메일/비밀번호 로그인. 계정은 관리자만 만든다 (콘솔에서 가입 기능을 끈다). "@" 없는 아이디는 `아이디@workphone.local`로 저장하며 실제 메일이 아니므로 비밀번호 분실 시 관리자가 초기화한다. 프로젝트에 팀이 없을 때만 로그인 화면에 "처음 시작하기"(첫 관리자 만들기)가 나온다.
+- **팀원 관리:** 팀 생성, 팀원 추가, 권한 변경, 삭제, 비밀번호 초기화는 모두 Functions(callable)로만 한다. 마지막 관리자는 강등하거나 삭제할 수 없다. 팀에서 삭제하면 보안 규칙상 즉시 접근이 막히고, 그 사람 앱은 로그아웃하면서 기기 캐시를 지운다. 속한 팀이 없어지면 Auth 계정도 지운다.
+- **용량 탭(관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
 - **웹앱 한계:** 웹앱은 폰 연락처를 일괄로 읽을 수 없다. 연락처 불러오기와 전화 관련 기능은 설치형 앱에서만 한다.
 
 ## 기능 목록
@@ -58,7 +62,8 @@
 ## Firestore 데이터 구조 초안
 
 ```
-users/{uid}                      name, teamIds[], platform, settings{}
+users/{uid}                      name, email, teamIds[], platform, settings{}   (Functions가 생성, 본인은 name/platform/settings만 수정)
+meta/setup                       첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 teams/{teamId}                   name, members{uid: "admin"|"editor"|"viewer"}, autoShare, shareNotes
 customers/{customerId}           teamId, name, company, phones[] (E.164), ownerUid,
                                  nextContactAt, nextContactNote, createdBy, createdAt, updatedAt
@@ -66,11 +71,12 @@ customers/{id}/notes/{noteId}    kind ("수신 통화"|"발신 통화"|"방문 �
                                  createdAt, editedBy, editedAt, editCount
 customers/{id}/notes/{id}/revisions/{revId}   body, editedBy, editedAt
 teams/{teamId}/messages/{msgId}  authorUid, body, mentions[uid], customerTags[customerId],
-                                 replyTo, attachments[{path, thumbPath, width, height}],
-                                 createdAt, editedAt
+                                 replyTo, attachments[{path, thumbPath, width, height, size, thumbSize}],
+                                 hasPhotos (사진 모아보기 조회용), createdAt, editedAt
 ```
 
 - 보안 규칙: 팀 멤버만 해당 팀의 `customers`, `messages`에 접근. `viewer`는 읽기만. 메시지 수정/삭제는 작성자만. 고객 삭제는 관리자 또는 담당자(`ownerUid`)만, 메모 삭제는 관리자 또는 작성자만. Storage 규칙도 `teams/{teamId}.members`를 조회해 같은 기준을 적용한다.
+- 팀 문서는 관리자가 `name`, `autoShare`, `shareNotes`만 직접 바꿀 수 있다. `members`는 Functions만 바꾼다.
 - 같은 번호의 고객이 팀에 이미 있으면 새로 만들지 않고 기존 고객에 연결한다 (가져오기, 분류 창 모두).
 - 검색: 채팅과 고객 검색은 초기에는 클라이언트 필터로 시작하고, 규모가 커지면 검색 서비스 도입을 검토한다.
 
@@ -89,3 +95,9 @@ teams/{teamId}/messages/{msgId}  authorUid, body, mentions[uid], customerTags[cu
 - 통화 녹음과 통신사 앱(익시오, 에이닷) 요약을 "공유하기"로 메모에 붙이는 기능 포함 여부, 그리고 회사 녹음 방침.
 - 휴가 모드 (고객 전화가 오면 지정 동료에게 대신 연락 알림) 포함 여부.
 - 안드로이드와 아이폰을 각각 네이티브로 만들지, 공통 부분을 크로스플랫폼(예: Kotlin Multiplatform, Flutter)으로 묶을지.
+
+## 개발과 테스트
+
+- `npm run emulators` 후 다른 터미널에서 `npm run dev:emulators`: 로컬 에뮬레이터(Auth, Firestore, Storage, Functions)로 앱 실행
+- `npm test`: 보안 규칙과 Functions 테스트 (에뮬레이터에서 실행)
+- 배포 전 콘솔 설정: Authentication → 이메일/비밀번호 사용, 사용자 가입(create) 끄기. 예산 알림 설정.

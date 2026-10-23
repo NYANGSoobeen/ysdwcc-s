@@ -1,5 +1,5 @@
 import { collection, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
-import { deleteObject, ref, uploadBytes } from 'firebase/storage'
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from './firebase.ts'
 
 export type Attachment = {
@@ -7,6 +7,8 @@ export type Attachment = {
   thumbPath: string
   width: number
   height: number
+  size: number
+  thumbSize: number
 }
 
 const PHOTO_MAX_SIDE = 1600
@@ -32,7 +34,14 @@ export async function sendMessage(teamId: string, body: string, photos: File[] =
       uploaded.push(path)
       await uploadBytes(ref(storage, thumbPath), thumb.blob, metadata)
       uploaded.push(thumbPath)
-      attachments.push({ path, thumbPath, width: photo.width, height: photo.height })
+      attachments.push({
+        path,
+        thumbPath,
+        width: photo.width,
+        height: photo.height,
+        size: photo.blob.size,
+        thumbSize: thumb.blob.size,
+      })
     }
 
     await setDoc(messageRef, {
@@ -42,6 +51,8 @@ export async function sendMessage(teamId: string, body: string, photos: File[] =
       customerTags: [],
       replyTo: null,
       attachments,
+      // 사진 모아보기에서 사진이 있는 메시지만 조회하기 위한 표시
+      hasPhotos: attachments.length > 0,
       createdAt: serverTimestamp(),
       editedAt: null,
     })
@@ -73,4 +84,17 @@ async function resizeToJpeg(file: File, maxSide: number) {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진 변환 실패'))), 'image/jpeg', JPEG_QUALITY),
   )
   return { blob, width, height }
+}
+
+const urlCache = new Map<string, Promise<string>>()
+
+// 같은 사진의 주소를 여러 번 요청하지 않도록 기억해 둔다.
+export function photoUrl(path: string) {
+  let url = urlCache.get(path)
+  if (!url) {
+    url = getDownloadURL(ref(storage, path))
+    url.catch(() => urlCache.delete(path))
+    urlCache.set(path, url)
+  }
+  return url
 }

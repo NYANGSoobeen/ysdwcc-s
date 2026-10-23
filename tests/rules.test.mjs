@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes } from 'firebase/storage'
 
 const PROJECT = 'demo-workphone'
@@ -71,9 +71,30 @@ test('고객을 다른 팀으로 옮길 수 없다', async () => {
   await assertFails(updateDoc(doc(fs('admin'), 'customers/c1'), { teamId: 't2' }))
 })
 
-test('팀은 만든 사람이 유일한 관리자로 시작한다', async () => {
-  await assertSucceeds(setDoc(doc(fs('u9'), 'teams/t9'), { name: 'x', members: { u9: 'admin' } }))
-  await assertFails(setDoc(doc(fs('u8'), 'teams/t8'), { name: 'x', members: { u8: 'admin', other: 'admin' } }))
+test('팀 생성과 팀원 변경은 앱에서 직접 못 하고 서버 함수로만 한다', async () => {
+  await assertFails(setDoc(doc(fs('u9'), 'teams/t9'), { name: 'x', members: { u9: 'admin' } }))
+  await assertFails(updateDoc(doc(fs('admin'), 'teams/t1'), { 'members.outsider': 'editor' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1'), { 'members.ed': 'admin' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1'), { name: '바꾼 이름' }))
+  await assertSucceeds(updateDoc(doc(fs('admin'), 'teams/t1'), { name: '바꾼 이름' }))
+})
+
+test('프로필은 본인이 이름만 바꿀 수 있고 소속 팀은 못 바꾼다', async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', email: 'ed@x.com', teamIds: ['t1'] }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { name: '새 이름' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { teamIds: ['t1', 't2'] }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'users/ed'), { name: '남의 이름' }))
+  await assertFails(setDoc(doc(fs('new'), 'users/new'), { name: 'x', teamIds: ['t1'] }))
+})
+
+test('팀에서 빠지면 바로 팀 데이터에 접근할 수 없다', async () => {
+  await assertSucceeds(getDoc(doc(fs('ed2'), 'teams/t1/messages/m1')))
+  await env.withSecurityRulesDisabled((ctx) =>
+    updateDoc(doc(ctx.firestore(), 'teams/t1'), { 'members.ed2': deleteField() }))
+  await assertFails(getDoc(doc(fs('ed2'), 'teams/t1/messages/m1')))
+  await assertFails(getDoc(doc(fs('ed2'), 'customers/c1')))
+  await assertFails(getDoc(doc(fs('ed2'), 'teams/t1')))
 })
 
 test('채팅 사진: editor만 올리고, 팀원만 보고, 크기와 형식 제한', async () => {
