@@ -125,3 +125,22 @@ test('갤럭시 앱의 여러 팀 고객 조회: 내 팀들만 한 번에 읽을
   assert.equal(both.size, 2)
   await assertFails(getDocs(query(collection(db, 'customers'), where('teamId', 'in', ['t1', 't3']))))
 })
+
+test('스케줄: 팀원만 보고, 올리기/삭제는 편집 이상, 스티커는 보기 권한도 가능', async () => {
+  const sched = (db) => doc(db, 'teams/t1/schedule/current')
+  const data = { uploadId: 'u1', fileName: '10월.pdf', images: [], marks: [], authorId: 'ed' }
+  await assertFails(setDoc(sched(fs('viewer')), { ...data, authorId: 'viewer' }))
+  await assertFails(setDoc(sched(fs('ed')), { ...data, authorId: 'someone' }))
+  await assertSucceeds(setDoc(sched(fs('ed')), data))
+  await assertFails(getDoc(sched(fs('outsider'))))
+  await assertSucceeds(getDoc(sched(fs('viewer'))))
+
+  const mark = [{ p: 0, x: 0.5, y: 0.5, w: 0.1, h: 0.05, t: 'A0' }]
+  await assertSucceeds(updateDoc(sched(fs('viewer')), { marks: mark, marksAt: 1, marksBy: 'viewer' }))
+  await assertFails(updateDoc(sched(fs('viewer')), { marks: [], marksAt: 2, marksBy: 'ed' }), '남의 이름으로 스티커')
+  await assertFails(updateDoc(sched(fs('viewer')), { fileName: '바꾼 이름' }))
+  await assertFails(updateDoc(sched(fs('outsider')), { marks: [], marksAt: 3, marksBy: 'outsider' }))
+  await assertSucceeds(updateDoc(sched(fs('ed2')), { fileName: '11월.pdf' }))
+  await assertFails(deleteDoc(sched(fs('viewer'))))
+  await assertSucceeds(deleteDoc(sched(fs('ed'))))
+})

@@ -53,6 +53,19 @@ service cloud.firestore {
       allow update: if isAdmin(teamId)
         && onlyChanges(['name', 'autoShare', 'shareNotes']);
 
+      // 근무표(스케줄): 팀마다 문서 하나(current). 올리기·이름 변경·삭제는 편집 이상,
+      // 수정 표시 스티커(marks)는 팀원 모두 붙이고 뗄 수 있다.
+      match /schedule/{docId} {
+        allow read: if isMember(teamId);
+        allow create: if canEdit(teamId)
+          && request.resource.data.authorId == request.auth.uid;
+        allow update: if canEdit(teamId)
+          || (isMember(teamId)
+            && onlyChanges(['marks', 'marksAt', 'marksBy'])
+            && request.resource.data.marksBy == request.auth.uid);
+        allow delete: if canEdit(teamId);
+      }
+
       match /messages/{msgId} {
         allow read: if isMember(teamId);
         allow create: if canEdit(teamId)

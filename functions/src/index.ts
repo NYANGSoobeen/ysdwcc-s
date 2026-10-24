@@ -28,6 +28,15 @@ export const onMessageDeleted = onDocumentDeleted(
   },
 )
 
+// 스케줄은 팀마다 하나(teams/{teamId}/schedule/current). 새로 올리거나 지우면
+// 이전 스케줄의 원본, 쪽 그림을 지운다 (스티커는 문서 안에 있어 함께 사라진다).
+export const onScheduleWritten = onDocumentWritten('teams/{teamId}/schedule/{docId}', async (event) => {
+  const before = event.data?.before?.data()?.uploadId as string | undefined
+  const after = event.data?.after?.data()?.uploadId as string | undefined
+  if (!before || before === after || !/^[A-Za-z0-9_-]+$/.test(before)) return
+  await getStorage().bucket().deleteFiles({ prefix: `teams/${event.params.teamId}/schedule/${before}/` })
+})
+
 // Firestore는 문서를 지워도 하위 컬렉션이 남으므로, 고객을 지우면 메모와 수정 기록을 함께 지운다.
 export const onCustomerDeleted = onDocumentDeleted('customers/{customerId}', async (event) => {
   const db = getFirestore()
@@ -300,8 +309,15 @@ export const resetMemberPassword = onCall(async (req) => {
 
 // ── 용량 관리 ────────────────────────────────────────────────
 
+// 용량 관리(용량 보기, 기간별 채팅 삭제)는 최고 관리자만 한다.
+async function requireSuperAdminOf(req: CallableRequest, teamId: unknown) {
+  const result = await requireAdmin(req, teamId)
+  if (!(await isSuperAdmin(result.uid))) throw new HttpsError('permission-denied', '최고 관리자만 할 수 있습니다.')
+  return result
+}
+
 export const getUsage = onCall(async (req) => {
-  const { teamId, members } = await requireAdmin(req, req.data?.teamId)
+  const { teamId, members } = await requireSuperAdminOf(req, req.data?.teamId)
   const db = getFirestore()
   const messages = db.collection(`teams/${teamId}/messages`)
 
@@ -314,16 +330,22 @@ export const getUsage = onCall(async (req) => {
 
   let bytes = 0
   let photos = 0
+  let scheduleBytes = 0
   const months = new Map<string, { bytes: number; photos: number }>()
   for (const file of files) {
     const size = Number(file.metadata.size ?? 0)
+    bytes += size
+    // 스케줄 파일(원본 PDF, 쪽 그림)은 채팅 사진과 따로 센다.
+    if (file.name.startsWith(`teams/${teamId}/schedule/`)) {
+      scheduleBytes += size
+      continue
+    }
     const isPhoto = !file.name.endsWith('_thumb.jpg')
     const month = String(file.metadata.timeCreated ?? '').slice(0, 7) || '알 수 없음'
     const entry = months.get(month) ?? { bytes: 0, photos: 0 }
     entry.bytes += size
     if (isPhoto) entry.photos += 1
     months.set(month, entry)
-    bytes += size
     if (isPhoto) photos += 1
   }
 
@@ -331,6 +353,7 @@ export const getUsage = onCall(async (req) => {
     storage: {
       bytes,
       photos,
+      scheduleBytes,
       freeBytes: FREE_STORAGE_BYTES,
       byMonth: [...months.entries()]
         .map(([month, v]) => ({ month, ...v }))
@@ -347,7 +370,7 @@ export const getUsage = onCall(async (req) => {
 
 // 기간을 정해 채팅을 한꺼번에 영구 삭제한다. dryRun이면 지울 양만 알려 준다.
 export const deleteMessagesInRange = onCall(async (req) => {
-  const { teamId } = await requireAdmin(req, req.data?.teamId)
+  const { teamId } = await requireSuperAdminOf(req, req.data?.teamId)
   const from = millis(req.data?.from, '시작 날짜')
   const to = millis(req.data?.to, '끝 날짜')
   if (from >= to) throw new HttpsError('invalid-argument', '시작 날짜가 끝 날짜보다 앞서야 합니다.')

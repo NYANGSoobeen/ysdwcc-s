@@ -7,6 +7,7 @@ import { StorageImage } from '../components/StorageImage.tsx'
 import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
+import { MenuButton } from '../menu.tsx'
 
 const PAGE_SIZE = 50
 const MAX_PHOTOS = 10
@@ -84,7 +85,7 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
   return (
     <div className="chat">
       <header className="page-header">
-        <span />
+        <MenuButton />
         <h2>{team.name}</h2>
         <button type="button" className="ghost" onClick={() => setShowGallery(true)}>
           사진

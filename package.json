@@ -11,7 +11,8 @@
     "emulators": "npm --prefix functions run build && firebase emulators:start --project demo-workphone",
     "dev:emulators": "vite --mode emulators",
     "release": "git pull && npm install && npm --prefix functions install && npm run build && firebase deploy",
-    "android:apk": "npm run build && cap sync android && cd android && gradlew assembleRelease && cd .. && node -e \"require('fs').copyFileSync('android/app/build/outputs/apk/release/app-release.apk','public/download/yangsan-support.apk')\""
+    "android:apk": "npm run build && cap sync android && cd android && gradlew assembleRelease && cd .. && node -e \"require('fs').copyFileSync('android/app/build/outputs/apk/release/app-release.apk','public/download/yangsan-support.apk')\"",
+    "storage:cors": "gcloud storage buckets update gs://ysdwcc-s.firebasestorage.app --cors-file=cors.json"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
@@ -28,6 +29,7 @@
   "dependencies": {
     "@capacitor/core": "^8.5.3",
     "firebase": "^13.1.0",
+    "pdfjs-dist": "^3.11.174",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   }

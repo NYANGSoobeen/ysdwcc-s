@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, formatBytes, type RangeResult, type Usage } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import type { Team } from '../hooks.ts'
+import { MenuButton } from '../menu.tsx'
 
 export function UsagePage({ team }: { team: Team }) {
   const [usage, setUsage] = useState<Usage | null>(null)
@@ -29,7 +30,7 @@ export function UsagePage({ team }: { team: Team }) {
   return (
     <div className="page">
       <header className="page-header">
-        <span />
+        <MenuButton />
         <h2>용량 관리</h2>
         <button type="button" className="ghost" onClick={refresh} disabled={loading}>
           새로고침
@@ -41,7 +42,7 @@ export function UsagePage({ team }: { team: Team }) {
         {usage && (
           <>
             <section className="card">
-              <h3>사진 저장 공간</h3>
+              <h3>파일 저장 공간</h3>
               <p className="big">
                 {formatBytes(usage.storage.bytes)}
                 <span className="muted"> / 무료 {formatBytes(usage.storage.freeBytes)}</span>
@@ -50,7 +51,9 @@ export function UsagePage({ team }: { team: Team }) {
                 <div style={{ width: `${Math.min(100, Math.max(ratio * 100, 0.5))}%` }} />
               </div>
               <p className="muted small">
-                사진 {usage.storage.photos.toLocaleString()}장 · 무료 공간의 {(ratio * 100).toFixed(1)}% 사용
+                채팅 사진 {usage.storage.photos.toLocaleString()}장
+                {usage.storage.scheduleBytes > 0 && ` · 스케줄 ${formatBytes(usage.storage.scheduleBytes)}`} · 무료 공간의{' '}
+                {(ratio * 100).toFixed(1)}% 사용
                 {ratio > 0.8 && ' · 무료 한도에 가까워졌습니다. 오래된 채팅을 정리하세요.'}
               </p>
             </section>
@@ -67,7 +70,7 @@ export function UsagePage({ team }: { team: Team }) {
 
             {usage.storage.byMonth.length > 0 && (
               <section className="card">
-                <h3>월별 사진 용량</h3>
+                <h3>월별 채팅 사진 용량</h3>
                 <ul className="months">
                   {usage.storage.byMonth.map((m) => (
                     <li key={m.month}>

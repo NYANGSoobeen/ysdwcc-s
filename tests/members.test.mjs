@@ -187,3 +187,38 @@ test('최고 관리자 표시가 생기기 전에 만든 프로젝트: 첫 팀 �
   // 한 명이 정해지면 같은 팀의 다른 관리자는 최고 관리자가 되지 않는다
   assert.deepEqual(await fn.getMyAccess.run(as(second, {})), { superAdmin: false })
 })
+
+test('용량 관리는 최고 관리자만 (다른 팀 관리자는 불가)', async () => {
+  const { uid: lead } = await fn.addMember.run(
+    as(adminUid, { teamId, name: '팀장2', email: 'lead2@workphone.local', password: 'pass123', role: 'admin' }),
+  )
+  await expectError(fn.getUsage.run(as(lead, { teamId })), 'permission-denied')
+  await expectError(
+    fn.deleteMessagesInRange.run(as(lead, { teamId, from: 0, to: Date.now(), dryRun: true })),
+    'permission-denied',
+  )
+  await fn.getUsage.run(as(adminUid, { teamId }))
+})
+
+test('스케줄: 새로 올리거나 지우면 이전 파일을 지우고, 용량에서는 따로 센다', async () => {
+  const put = (path, bytes) => bucket.file(path).save(Buffer.alloc(bytes))
+  await put(`teams/${teamId}/schedule/old/p1.png`, 1000)
+  await put(`teams/${teamId}/schedule/old/original.pdf`, 500)
+  await put(`teams/${teamId}/schedule/new/p1.png`, 700)
+
+  const usage = await fn.getUsage.run(as(adminUid, { teamId }))
+  assert.equal(usage.storage.scheduleBytes, 2200)
+
+  const snap = (data) => ({ data: () => data })
+  const params = { teamId, docId: 'current' }
+  // 교체: old → new
+  await fn.onScheduleWritten.run({ params, data: { before: snap({ uploadId: 'old' }), after: snap({ uploadId: 'new' }) } })
+  assert.equal((await bucket.getFiles({ prefix: `teams/${teamId}/schedule/old/` }))[0].length, 0)
+  assert.equal((await bucket.getFiles({ prefix: `teams/${teamId}/schedule/new/` }))[0].length, 1)
+  // 스티커만 바뀜: 그대로
+  await fn.onScheduleWritten.run({ params, data: { before: snap({ uploadId: 'new' }), after: snap({ uploadId: 'new' }) } })
+  assert.equal((await bucket.getFiles({ prefix: `teams/${teamId}/schedule/new/` }))[0].length, 1)
+  // 삭제
+  await fn.onScheduleWritten.run({ params, data: { before: snap({ uploadId: 'new' }), after: snap(undefined) } })
+  assert.equal((await bucket.getFiles({ prefix: `teams/${teamId}/schedule/` }))[0].length, 0)
+})

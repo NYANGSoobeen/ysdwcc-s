@@ -1,0 +1,88 @@
+import { createContext, useContext, useEffect } from 'react'
+
+// 왼쪽 위 ☰ 버튼으로 여는 메뉴. 기능이 늘어나면 MENU_ITEMS에 추가한다.
+export type Tab = 'customers' | 'chat' | 'schedule' | 'members' | 'usage' | 'profile'
+
+export type MenuItem = { tab: Tab; icon: string; label: string; superAdminOnly?: boolean; section: 'main' | 'extra' | 'admin' }
+
+export const MENU_ITEMS: MenuItem[] = [
+  { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
+  { tab: 'chat', icon: '💬', label: '채팅', section: 'main' },
+  { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
+  { tab: 'members', icon: '👥', label: '팀원', section: 'main' },
+  { tab: 'profile', icon: '⚙️', label: '내 정보', section: 'main' },
+  { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
+]
+
+export const MenuContext = createContext<() => void>(() => {})
+
+export function MenuButton() {
+  const open = useContext(MenuContext)
+  return (
+    <button type="button" className="ghost menu-button" onClick={open} aria-label="메뉴 열기">
+      ☰
+    </button>
+  )
+}
+
+type DrawerProps = {
+  open: boolean
+  current: Tab
+  superAdmin: boolean
+  teamName: string
+  userName: string
+  onSelect: (tab: Tab) => void
+  onClose: () => void
+}
+
+export function MenuDrawer({ open, current, superAdmin, teamName, userName, onSelect, onClose }: DrawerProps) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  const items = MENU_ITEMS.filter((i) => !i.superAdminOnly || superAdmin)
+  const section = (name: MenuItem['section']) => items.filter((i) => i.section === name)
+
+  return (
+    <div className={open ? 'drawer-root open' : 'drawer-root'} aria-hidden={!open}>
+      <div className="drawer-backdrop" onClick={onClose} />
+      <nav className="drawer" aria-label="메뉴">
+        <div className="drawer-head">
+          <img src="/icons/icon-192.png" alt="" />
+          <div>
+            <strong>양산동원 지원팀</strong>
+            <span className="muted small">
+              {teamName} · {userName}
+            </span>
+          </div>
+        </div>
+        {(['main', 'extra', 'admin'] as const).map((name) =>
+          section(name).length === 0 ? null : (
+            <ul key={name} className="drawer-list">
+              {name === 'admin' && <li className="drawer-label">최고 관리자</li>}
+              {section(name).map((item) => (
+                <li key={item.tab}>
+                  <button
+                    type="button"
+                    className={item.tab === current ? 'drawer-item active' : 'drawer-item'}
+                    onClick={() => {
+                      onSelect(item.tab)
+                      onClose()
+                    }}
+                    tabIndex={open ? 0 : -1}
+                  >
+                    <span aria-hidden="true">{item.icon}</span>
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ),
+        )}
+      </nav>
+    </div>
+  )
+}

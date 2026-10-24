@@ -7,6 +7,20 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid];
     }
 
+    // 근무표(스케줄): 쪽 그림(PNG/JPEG)과 원본 PDF(1MB 이하만). 교체·삭제 시 Functions가 폴더째 지운다.
+    match /teams/{teamId}/schedule/{uploadId}/{fileName} {
+      allow read: if request.auth != null
+        && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
+      allow create: if request.auth != null
+        && role(teamId) in ['admin', 'editor']
+        && request.resource.metadata.uploaderUid == request.auth.uid
+        && ((request.resource.contentType.matches('image/(png|jpeg)') && request.resource.size < 12 * 1024 * 1024)
+          || (request.resource.contentType == 'application/pdf' && request.resource.size <= 1024 * 1024));
+      // 저장이 중간에 실패했을 때 올린 사람이 직접 정리할 수 있게 한다.
+      allow delete: if request.auth != null
+        && resource.metadata.uploaderUid == request.auth.uid;
+    }
+
     // 채팅 사진: 압축본과 썸네일. 메시지가 삭제되면 Functions가 폴더째 지운다.
     match /teams/{teamId}/chat/{msgId}/{fileName} {
       allow read: if request.auth != null

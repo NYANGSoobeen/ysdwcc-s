@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import { api } from './api.ts'
 import { logOutAndWipe } from './auth.ts'
 import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
+import { MenuContext, MenuDrawer, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
+import { SchedulePage } from './pages/SchedulePage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 
 const TEAM_KEY = 'selected-team'
@@ -30,8 +32,6 @@ export function App() {
   return <SignedIn key={user.uid} user={user} />
 }
 
-type Tab = 'customers' | 'chat' | 'members' | 'usage' | 'profile'
-
 function SignedIn({ user }: { user: User }) {
   const { profile, missing } = useProfile(user.uid)
   const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(savedTeam)
@@ -40,6 +40,7 @@ function SignedIn({ user }: { user: User }) {
   const { team, denied } = useTeam(teamId)
   const teamNames = useTeamNames(teamIds)
   const [tab, setTab] = useState<Tab>('customers')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   function selectTeam(id: string) {
     setSelectedTeamId(id)
@@ -71,11 +72,12 @@ function SignedIn({ user }: { user: User }) {
   if (denied) return <Loading message="팀 정보를 확인하는 중…" />
   if (!profile || !team) return <Loading />
 
-  const myRole = team.members[user.uid]
-  const isAdmin = myRole === 'admin'
-  const current = tab === 'usage' && !isAdmin ? 'customers' : tab
+  // 용량 관리는 최고 관리자만 본다 (서버 함수도 최고 관리자만 허용).
+  const superAdmin = profile.superAdmin === true
+  const current = tab === 'usage' && !superAdmin ? 'customers' : tab
 
   return (
+    <MenuContext.Provider value={() => setMenuOpen(true)}>
     <div className="shell">
       {teamIds.length > 1 && (
         <div className="teambar">
@@ -94,8 +96,9 @@ function SignedIn({ user }: { user: User }) {
       <div className="shell-body">
         {current === 'customers' && <CustomersPage team={team} uid={user.uid} />}
         {current === 'chat' && <ChatPage team={team} uid={user.uid} />}
+        {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
         {current === 'members' && (
-          <MembersPage team={team} uid={user.uid} superAdmin={profile.superAdmin === true} onSelectTeam={selectTeam} />
+          <MembersPage team={team} uid={user.uid} superAdmin={superAdmin} onSelectTeam={selectTeam} />
         )}
         {current === 'usage' && <UsagePage team={team} />}
         {current === 'profile' && (
@@ -105,13 +108,21 @@ function SignedIn({ user }: { user: User }) {
       <nav className="tabbar">
         <TabButton active={current === 'customers'} onClick={() => setTab('customers')} icon="📇" label="고객" />
         <TabButton active={current === 'chat'} onClick={() => setTab('chat')} icon="💬" label="채팅" />
+        <TabButton active={current === 'schedule'} onClick={() => setTab('schedule')} icon="📅" label="스케줄" />
         <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
-        {isAdmin && (
-          <TabButton active={current === 'usage'} onClick={() => setTab('usage')} icon="📦" label="용량" />
-        )}
         <TabButton active={current === 'profile'} onClick={() => setTab('profile')} icon="⚙️" label="내 정보" />
       </nav>
+      <MenuDrawer
+        open={menuOpen}
+        current={current}
+        superAdmin={superAdmin}
+        teamName={team.name}
+        userName={profile.name}
+        onSelect={setTab}
+        onClose={() => setMenuOpen(false)}
+      />
     </div>
+    </MenuContext.Provider>
   )
 }
 

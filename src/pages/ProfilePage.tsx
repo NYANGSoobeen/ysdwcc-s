@@ -6,6 +6,7 @@ import { changePassword, errorMessage, logOutAndWipe, toLoginId } from '../auth.
 import { db } from '../firebase.ts'
 import { ContactsSync } from './ContactsSync.tsx'
 import type { Profile, Team } from '../hooks.ts'
+import { MenuButton } from '../menu.tsx'
 
 type Props = {
   user: User
@@ -17,7 +18,7 @@ export function ProfilePage({ user, profile, team }: Props) {
   return (
     <div className="page">
       <header className="page-header">
-        <span />
+        <MenuButton />
         <h2>내 정보</h2>
         <span />
       </header>

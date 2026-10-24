@@ -4,6 +4,7 @@ import { api, ROLE_LABELS, type Role } from '../api.ts'
 import { errorMessage, toEmail, toLoginId } from '../auth.ts'
 import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
+import { MenuButton } from '../menu.tsx'
 
 const ROLE_HELP: Record<Role, string> = {
   admin: '팀원 관리, 용량 관리, 모든 기능',
@@ -28,7 +29,7 @@ export function MembersPage({ team, uid, superAdmin, onSelectTeam }: Props) {
   return (
     <div className="page">
       <header className="page-header">
-        <span />
+        <MenuButton />
         <h2>팀원 {uids.length}명</h2>
         {isAdmin ? (
           <button type="button" className="ghost" onClick={() => setAdding(!adding)}>

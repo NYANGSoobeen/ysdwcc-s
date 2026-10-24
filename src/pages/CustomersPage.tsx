@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { CustomerDetail } from './CustomerDetail.tsx'
+import { MenuButton } from '../menu.tsx'
 
 export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
   const [customers, setCustomers] = useState<Customer[] | null>(null)
@@ -51,7 +52,7 @@ export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
   return (
     <div className="page">
       <header className="page-header">
-        <span />
+        <MenuButton />
         <h2>고객 {customers ? customers.length : ''}</h2>
         {canWrite ? (
           <button type="button" className="ghost" onClick={() => setAdding(!adding)}>

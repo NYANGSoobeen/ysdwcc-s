@@ -13,6 +13,7 @@ export type Usage = {
   storage: {
     bytes: number
     photos: number
+    scheduleBytes: number
     freeBytes: number
     byMonth: { month: string; bytes: number; photos: number }[]
   }
