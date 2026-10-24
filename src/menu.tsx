@@ -1,9 +1,16 @@
 import { createContext, useContext, useEffect } from 'react'
 
 // 왼쪽 위 ☰ 버튼으로 여는 메뉴. 기능이 늘어나면 MENU_ITEMS에 추가한다.
-export type Tab = 'customers' | 'chat' | 'schedule' | 'members' | 'usage' | 'profile'
+export type Tab = 'customers' | 'chat' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
 
-export type MenuItem = { tab: Tab; icon: string; label: string; superAdminOnly?: boolean; section: 'main' | 'extra' | 'admin' }
+export type MenuItem = {
+  tab: Tab
+  icon: string
+  label: string
+  adminOnly?: boolean
+  superAdminOnly?: boolean
+  section: 'main' | 'extra' | 'admin'
+}
 
 export const MENU_ITEMS: MenuItem[] = [
   { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
@@ -11,6 +18,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
   { tab: 'members', icon: '👥', label: '팀원', section: 'main' },
   { tab: 'profile', icon: '⚙️', label: '내 정보', section: 'main' },
+  { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },
   { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
 ]
 
@@ -28,6 +36,7 @@ export function MenuButton() {
 type DrawerProps = {
   open: boolean
   current: Tab
+  isAdmin: boolean
   superAdmin: boolean
   teamName: string
   userName: string
@@ -35,7 +44,7 @@ type DrawerProps = {
   onClose: () => void
 }
 
-export function MenuDrawer({ open, current, superAdmin, teamName, userName, onSelect, onClose }: DrawerProps) {
+export function MenuDrawer({ open, current, isAdmin, superAdmin, teamName, userName, onSelect, onClose }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -43,7 +52,7 @@ export function MenuDrawer({ open, current, superAdmin, teamName, userName, onSe
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  const items = MENU_ITEMS.filter((i) => !i.superAdminOnly || superAdmin)
+  const items = MENU_ITEMS.filter((i) => (!i.superAdminOnly || superAdmin) && (!i.adminOnly || isAdmin))
   const section = (name: MenuItem['section']) => items.filter((i) => i.section === name)
 
   return (
@@ -62,7 +71,7 @@ export function MenuDrawer({ open, current, superAdmin, teamName, userName, onSe
         {(['main', 'extra', 'admin'] as const).map((name) =>
           section(name).length === 0 ? null : (
             <ul key={name} className="drawer-list">
-              {name === 'admin' && <li className="drawer-label">최고 관리자</li>}
+              {name === 'admin' && <li className="drawer-label">관리자 전용</li>}
               {section(name).map((item) => (
                 <li key={item.tab}>
                   <button

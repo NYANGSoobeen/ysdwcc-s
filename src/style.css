@@ -465,6 +465,24 @@ h3 {
   padding-top: 0;
 }
 
+/* ── 관리자 ── */
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-section h3 {
+  margin: 0;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 /* ── 팀원 ── */
 .list {
   list-style: none;

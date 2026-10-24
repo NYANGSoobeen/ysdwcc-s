@@ -105,3 +105,25 @@ export function useTeamNames(teamIds: string[]) {
   }, [key])
   return names
 }
+
+// 최고 관리자 화면의 "모든 팀" 목록: 팀 이름과 팀원 수
+export function useTeamsSummary(teamIds: string[]) {
+  const [teams, setTeams] = useState<Record<string, { name: string; memberCount: number }>>({})
+  const key = teamIds.join(',')
+  useEffect(() => {
+    if (!key) return
+    const unsubscribes = key.split(',').map((id) =>
+      onSnapshot(
+        doc(db, 'teams', id),
+        (snap) =>
+          setTeams((prev) => ({
+            ...prev,
+            [id]: { name: (snap.get('name') as string) ?? '', memberCount: Object.keys(snap.get('members') ?? {}).length },
+          })),
+        () => {},
+      ),
+    )
+    return () => unsubscribes.forEach((u) => u())
+  }, [key])
+  return teams
+}

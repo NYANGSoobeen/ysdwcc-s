@@ -5,6 +5,7 @@ import { logOutAndWipe } from './auth.ts'
 import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { MenuContext, MenuDrawer, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
+import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
@@ -74,7 +75,9 @@ function SignedIn({ user }: { user: User }) {
 
   // 용량 관리는 최고 관리자만 본다 (서버 함수도 최고 관리자만 허용).
   const superAdmin = profile.superAdmin === true
-  const current = tab === 'usage' && !superAdmin ? 'customers' : tab
+  // 관리자 화면은 이 팀의 관리자만 (팀을 바꿨는데 그 팀 관리자가 아니면 고객 화면으로)
+  const isAdmin = team.members[user.uid] === 'admin'
+  const current = (tab === 'usage' && !superAdmin) || (tab === 'admin' && !isAdmin) ? 'customers' : tab
 
   return (
     <MenuContext.Provider value={() => setMenuOpen(true)}>
@@ -97,8 +100,16 @@ function SignedIn({ user }: { user: User }) {
         {current === 'customers' && <CustomersPage team={team} uid={user.uid} />}
         {current === 'chat' && <ChatPage team={team} uid={user.uid} />}
         {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
-        {current === 'members' && (
-          <MembersPage team={team} uid={user.uid} superAdmin={superAdmin} onSelectTeam={selectTeam} />
+        {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('admin')} />}
+        {current === 'admin' && (
+          <AdminPage
+            team={team}
+            uid={user.uid}
+            superAdmin={superAdmin}
+            teamIds={teamIds}
+            onSelectTeam={selectTeam}
+            onOpenUsage={() => setTab('usage')}
+          />
         )}
         {current === 'usage' && <UsagePage team={team} />}
         {current === 'profile' && (
@@ -115,6 +126,7 @@ function SignedIn({ user }: { user: User }) {
       <MenuDrawer
         open={menuOpen}
         current={current}
+        isAdmin={isAdmin}
         superAdmin={superAdmin}
         teamName={team.name}
         userName={profile.name}
