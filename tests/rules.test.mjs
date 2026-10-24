@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes } from 'firebase/storage'
 
 const PROJECT = 'demo-workphone'
@@ -112,4 +112,16 @@ test('본인이 최고 관리자 표시를 스스로 붙일 수 없다', async (
   await env.withSecurityRulesDisabled((ctx) =>
     setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', email: 'ed@x.com', teamIds: ['t1'] }))
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { superAdmin: true }))
+})
+
+test('갤럭시 앱의 여러 팀 고객 조회: 내 팀들만 한 번에 읽을 수 있다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'teams/t2'), { name: '2팀', members: { ed: 'viewer', other: 'admin' } })
+    await setDoc(doc(ctx.firestore(), 'teams/t3'), { name: '3팀', members: { other: 'admin' } })
+    await setDoc(doc(ctx.firestore(), 'customers/c2'), { teamId: 't2', name: '2팀 고객', createdBy: 'other' })
+  })
+  const db = fs('ed')
+  const both = await assertSucceeds(getDocs(query(collection(db, 'customers'), where('teamId', 'in', ['t1', 't2']))))
+  assert.equal(both.size, 2)
+  await assertFails(getDocs(query(collection(db, 'customers'), where('teamId', 'in', ['t1', 't3']))))
 })

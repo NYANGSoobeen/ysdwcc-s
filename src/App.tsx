@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api.ts'
 import { logOutAndWipe } from './auth.ts'
 import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
+import { useNativeContactsSync } from './native.ts'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
@@ -56,6 +57,9 @@ function SignedIn({ user }: { user: User }) {
       api.getMyAccess().catch(() => {})
     }
   }, [profile, myRoleHere])
+
+  // 갤럭시 앱: 폰 연락처의 "지원팀" 계정을 내 모든 팀의 고객과 맞춘다.
+  useNativeContactsSync(teamIds)
 
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)

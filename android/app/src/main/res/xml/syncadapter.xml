@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱이 고객 연락처를 넣기만 하고, 폰에서 고친 내용을 올리지는 않는다 (읽기 전용). -->
+<sync-adapter xmlns:android="http://schemas.android.com/apk/res/android"
+    android:contentAuthority="com.android.contacts"
+    android:accountType="kr.yangsan.support.account"
+    android:supportsUploading="false"
+    android:userVisible="false" />

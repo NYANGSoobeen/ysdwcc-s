@@ -54,6 +54,8 @@ const config = {
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // 갤럭시 앱 설치 파일은 서비스 워커가 가로채지 않고 서버에서 바로 받게 한다.
+        navigateFallbackDenylist: [/^\/download\//],
         cleanupOutdatedCaches: true,
       },
     }),

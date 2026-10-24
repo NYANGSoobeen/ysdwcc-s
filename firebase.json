@@ -40,6 +40,19 @@
             "value": "public, max-age=31536000, immutable"
           }
         ]
+      },
+      {
+        "source": "/download/**",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/vnd.android.package-archive"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
       }
     ],
     "predeploy": [

@@ -1001,6 +1001,24 @@ li + li > .row-button {
   line-height: 1.5;
 }
 
+.download-button {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+details.small summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
 /* ── 업데이트 알림 ── */
 #update-banner {
   position: fixed;

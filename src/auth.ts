@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth'
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore'
 import { auth, db } from './firebase.ts'
+import { clearNativeContacts } from './native.ts'
 
 // 이메일이 없는 직원도 쓸 수 있게, "@"가 없는 아이디는 이 도메인을 붙여 계정을 만든다.
 // 실제로 메일이 가는 주소가 아니므로 비밀번호 분실 시 관리자가 초기화한다.
@@ -41,6 +42,8 @@ export async function logOutAndWipe(notice?: string) {
   } catch {
     // 저장소를 못 쓰는 환경이면 안내만 생략한다.
   }
+  // 갤럭시 앱이면 폰 연락처에 넣은 고객도 지운다 (데이터 저장 규칙: 계정째 삭제).
+  await clearNativeContacts()
   await signOut(auth).catch(() => {})
   await terminate(db)
   await clearIndexedDbPersistence(db).catch(() => {})
