@@ -323,11 +323,19 @@ h3 {
 
 .page-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* 스크롤되는 세로 목록 안의 카드가 화면 높이에 맞춰 찌그러지며 잘리지 않게 한다. */
+.page-body > *,
+.messages > *,
+.drawer > * {
+  flex-shrink: 0;
 }
 
 /* ── 왼쪽 메뉴 (☰) ── */
@@ -625,8 +633,23 @@ h3 {
   gap: 8px;
 }
 
-.date-range input {
+.date-range label {
   min-width: 0;
+}
+
+/* 아이폰 사파리는 날짜 칸에 기본 최소 너비가 있어 카드 밖으로 삐져나온다. */
+.date-range input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
 }
 
 /* ── 채팅 ── */
