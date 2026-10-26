@@ -93,7 +93,7 @@ function MenuList(props: MenuListProps) {
         <div>
           <strong>양산동원 지원팀</strong>
           <span className="muted small">
-            {teamName} · {userName}
+            {teamName} · <span className="me-name">{userName}</span>
           </span>
         </div>
       </div>

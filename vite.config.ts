@@ -59,6 +59,18 @@ const config = {
         // pdf.js(약 1.3MB)는 스케줄을 올릴 때만 받는다 (업데이트마다 내려받지 않게).
         globIgnores: ['**/pdf-*.js', '**/pdf.worker*.js'],
         cleanupOutdatedCaches: true,
+        // 구글 글꼴은 한 번 받으면 기기에 저장해 두고 다시 받지 않는다 (오프라인에서도 같은 글꼴).
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts',
+              expiration: { maxEntries: 200, maxAgeSeconds: 365 * 24 * 3600 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

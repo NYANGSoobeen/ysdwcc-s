@@ -19,7 +19,11 @@
   /* 채팅방 바탕: Rock Blue를 Merino 쪽으로 누그러뜨린 색 (카톡 하늘색 자리) */
   --chat-bg: #bed3dc;
   --shadow: 22 88 123;
-  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  /* 글꼴 (index.html에서 구글 폰트를 불러온다). 받기 전이나 오프라인에서는 폰 기본 글꼴로 보인다. */
+  --font-sans: 'Noto Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  --font-serif: 'Noto Serif KR', 'AppleMyungjo', serif;
+  font-family: var(--font-sans);
+  font-size: 16px;
   color: var(--text);
   background: var(--bg);
   -webkit-text-size-adjust: 100%;
@@ -136,10 +140,13 @@ button.link.danger {
   color: var(--danger);
 }
 
+/* 제목·화면 이름은 명조 느낌 (Noto Serif KR) */
 h1,
 h2,
 h3 {
   margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 700;
 }
 
 h3 {
@@ -152,7 +159,7 @@ h3 {
 }
 
 .small {
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .center {
@@ -837,9 +844,10 @@ input[type='date']::-webkit-date-and-time-value {
 .bubble p {
   margin: 0;
   padding: 8px 12px;
+  font-size: 14.5px;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  line-height: 1.4;
 }
 
 .meta {
@@ -2245,4 +2253,35 @@ textarea:focus-visible {
   color: var(--merino);
   font-size: 14px;
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.2);
+}
+
+/* ── 글꼴 크기 ── */
+/* 메뉴 글씨 14px (누르는 칸 높이는 그대로) */
+.drawer-item,
+.shell.desktop .sidebar .drawer-item {
+  font-size: 14px;
+}
+
+/* 메뉴 위 앱 이름과 내 이름: 명조 */
+.drawer-head strong {
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+
+.drawer-head .me-name {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* 작은 안내 글씨는 10.5~12.5px */
+.meta,
+.app-version {
+  font-size: 10.5px;
+}
+
+.author,
+.badge,
+.drawer-label {
+  font-size: 12px;
 }
