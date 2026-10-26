@@ -4,6 +4,7 @@
 
 - 화면 목업 (화면 번호 1~11): https://claude.ai/artifact/Nf3MKtZBdjBizFweVcGeKV
 - 팀원 안내 문서: https://claude.ai/artifact/Ukf7MJKokz2oCo7wUmDBHU
+- **답변 언어: 항상 한국어.** 사용자와 앱 사용자 모두 한국인이다. 설명, 안내, 진행 상황, 오류 설명까지 모두 한국어로 쓴다 (명령어와 코드, 파일 이름만 원래대로).
 - 지금은 기획에서 개발로 넘어가는 단계. 아래 "정해진 것"은 바꾸기 전에 사용자에게 확인한다.
 
 ## 정해진 것
