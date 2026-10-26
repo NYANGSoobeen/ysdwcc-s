@@ -38,6 +38,22 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
 
+    // 채팅 메시지 수정: 작성자는 글(수정, 삭제 표시)을, 팀원은 누구나 자기 스티커(공감)만 바꾼다.
+    // reactions = { uid: "👍" } — 남의 스티커는 건드릴 수 없다.
+    function canUpdateMessage(teamId) {
+      return (canEdit(teamId)
+          && resource.data.authorUid == request.auth.uid
+          && unchanged('authorUid')
+          && unchanged('createdAt')
+          && request.resource.data.get('reactions', {}) == resource.data.get('reactions', {}))
+        || (isMember(teamId)
+          && onlyChanges(['reactions'])
+          && request.resource.data.reactions
+            .diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])
+          && (!(request.auth.uid in request.resource.data.reactions)
+            || request.resource.data.reactions[request.auth.uid] in ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅']));
+    }
+
     // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다.
     // (사용 중지된 사람도 자기 문서는 읽어야 중지 이유를 보고 로그아웃할 수 있다.)
     // 프로필은 Functions가 만들고, 본인은 이름과 설정만 바꿀 수 있다
@@ -79,10 +95,7 @@ service cloud.firestore {
         allow read: if isMember(teamId);
         allow create: if canEdit(teamId)
           && request.resource.data.authorUid == request.auth.uid;
-        allow update: if canEdit(teamId)
-          && resource.data.authorUid == request.auth.uid
-          && unchanged('authorUid')
-          && unchanged('createdAt');
+        allow update: if canUpdateMessage(teamId);
         // 삭제는 작성자만, 그리고 바로 영구 삭제한다 (첨부 사진은 Functions가 지운다).
         allow delete: if isMember(teamId)
           && resource.data.authorUid == request.auth.uid;
@@ -111,10 +124,7 @@ service cloud.firestore {
           allow read: if isMember(teamId);
           allow create: if canEdit(teamId)
             && request.resource.data.authorUid == request.auth.uid;
-          allow update: if canEdit(teamId)
-            && resource.data.authorUid == request.auth.uid
-            && unchanged('authorUid')
-            && unchanged('createdAt');
+          allow update: if canUpdateMessage(teamId);
           allow delete: if isMember(teamId)
             && resource.data.authorUid == request.auth.uid;
         }

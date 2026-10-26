@@ -192,3 +192,18 @@ test('채팅방: 편집 이상이 만들고, 만든 사람·관리자만 이름 
   await assertFails(deleteDoc(doc(fs('ed2'), 'teams/t1/channels/r1')))
   await assertSucceeds(deleteDoc(doc(fs('ed'), 'teams/t1/channels/r1')))
 })
+
+test('채팅 스티커(공감): 팀원 누구나 자기 것만 붙이고 떼며, 글은 작성자만 고친다', async () => {
+  // m1은 ed가 쓴 글
+  await assertSucceeds(updateDoc(doc(fs('viewer'), 'teams/t1/messages/m1'), { 'reactions.viewer': '👍' }))
+  await assertSucceeds(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'reactions.ed2': '❤️' }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'reactions.viewer': '😂' }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'reactions.ed2': '💩' }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'reactions.ed2': '👍', body: '남의 글 고치기' }))
+  await assertFails(updateDoc(doc(fs('outsider'), 'teams/t1/messages/m1'), { 'reactions.outsider': '👍' }))
+  await assertSucceeds(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'reactions.ed2': deleteField() }))
+  // 작성자: 글 수정·삭제 표시는 되지만 남의 스티커는 못 지운다
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/messages/m1'), { body: '고침', editedAt: 2 }))
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/messages/m1'), { reactions: {} }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/messages/m1'), { deleted: true, body: '', attachments: [] }))
+})

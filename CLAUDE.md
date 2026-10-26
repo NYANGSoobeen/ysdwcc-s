@@ -21,7 +21,7 @@
   - 앱에서 건 전화(`tel:`)는 앱으로 돌아오면 메모 창을 띄운다 (화면 6)
   - 받은 전화는 "방금 받은 전화 메모하기" 버튼으로 기록한다 (화면 7)
   - Call Directory Extension으로 전화 올 때 고객 이름을 표시한다
-- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원 지원팀"). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
+- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 위, 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
 - **앱 색상:** Merino `#F5EEDD`(바탕) · Rock Blue `#84B3CE`(보조) · Venice Blue `#16587B`(주색, 버튼·내 말풍선·메뉴 바탕). `src/style.css` 맨 위 `:root` 토큰에서 바꾼다 (어두운 모드는 Venice 계열 바탕 + Rock Blue 강조). 메뉴(☰, PC 왼쪽 메뉴)는 Venice Blue 바탕에 Merino 글씨. 채팅방 바탕은 Rock Blue를 Merino 쪽으로 누그러뜨린 `#BED3DC`(`--chat-bg`), 남의 말풍선은 미색, 내 말풍선은 Venice Blue, 날짜 줄은 짙은 남색 반투명.
 - **글꼴:** 본문 Noto Sans KR(400·500·700, 기본 16px), 제목·화면 이름·내 이름 Noto Serif KR(500·700, 내 이름 14px), 채팅 말풍선 14.5px·줄 간격 1.55, 메뉴 14px, 작은 안내 10.5~12.5px. 구글 폰트를 `index.html`에서 불러오고 서비스 워커가 기기에 저장(`google-fonts` 캐시). 입력칸은 아이폰 확대 방지로 16px 유지. 토큰은 `style.css`의 `--font-sans`, `--font-serif`.
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전이 나오면 하단 알림을 띄우고 누르면 업데이트한다 (`src/update.ts`).
@@ -61,6 +61,12 @@
   - 화면: 휴대폰 채팅 탭 = 방 목록(방 안에서 탭을 한 번 더 누르면 목록), 방 머리줄 ‹ 목록, ⋯(사진 모아보기, 이름 바꾸기, 삭제). ☰·PC 왼쪽 메뉴에 "단체 채팅" 묶음(방 목록 + 새 채팅방). 보던 방은 sessionStorage `chat-channel`.
   - 불러오기(`src/useMessages.ts`): 최근 100개는 실시간, 위로 올리면 이전 100개를 한 번만 읽어 앞에 붙이고 보던 자리 유지. 100개 밖으로 밀려난 메시지는 화면에 남긴다. 새 메시지는 맨 아래를 보고 있을 때만 따라 내려가고, 위에서 읽는 중이면 "새 메시지 ↓" 버튼.
   - 말 묶음: 같은 사람이 같은 분(시:분)에 보낸 말은 이름·동그라미(이름 첫 글자)는 첫 말에만, 시간은 마지막 말에만. 날짜가 바뀌면 날짜 줄.
+- **메시지 메뉴와 답장 (공통 기능 4-2):** 메시지를 길게 누르기/오른쪽 클릭 → ↩️ 답장, 📋 복사, ✏️ 수정(내 것), 💾 사진 저장, 🔗 링크 복사(글에 주소가 있을 때), 🏷️ 스티커 붙이기, 🗑️ 삭제(내 것).
+  - 답장: `replyTo {id, authorUid, text(원문 앞 80자)}`를 메시지에 같이 저장해 원문을 안 불러와도 미리보기. 누르면 원문으로 이동해 반짝이고, 아직 안 불러온 옛 원문이면 100개씩 더 불러와 찾는다(최대 3000개).
+  - 수정: 입력칸에 원래 글을 채워 고친다 → `editedAt`, 말풍선 옆 "수정됨".
+  - 삭제: 글·사진은 바로 영구 삭제(사진 파일은 올린 사람이 지움)하고 `deleted: true`인 빈 메시지가 "삭제된 메시지입니다"로 남는다 (대화 흐름 유지). 용량 관리의 기간 삭제는 문서째 지운다.
+  - 스티커(공감): `reactions {uid: 이모지}`, 한 사람에 하나(👍 ❤️ 😂 😮 😢 🙏 ✅, `REACTIONS`). 팀원 누구나(보기 권한 포함) 자기 것만 바꿀 수 있다(규칙 `canUpdateMessage`). 말풍선 아래 개수 표시, 누르면 내 것 붙이기/떼기.
+  - 글 속 주소는 눌러서 새 탭으로 열린다.
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문).
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **용량 탭(최고 관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
@@ -127,7 +133,8 @@ teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null)
 teams/{teamId}/channels/{channelId}  name, createdBy, createdAt   (단체 채팅방, main은 기본 방 이름만)
 teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모양
 teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], customerTags[customerId],
-                                 replyTo, attachments[{path, thumbPath, width, height, size, thumbSize}],
+                                 replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}],
+                                 reactions{uid: 이모지}, deleted, editedAt,
                                  hasPhotos (사진 모아보기 조회용), createdAt, editedAt
 ```
 

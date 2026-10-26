@@ -40,7 +40,7 @@ const config = {
       registerType: 'prompt',
       injectRegister: false,
       manifest: {
-        name: '양산동원 지원팀',
+        name: '양산동원로얄CC 지원팀',
         short_name: '양산동원지원팀',
         lang: 'ko',
         start_url: '/',

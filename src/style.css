@@ -2262,10 +2262,11 @@ textarea:focus-visible {
   font-size: 14px;
 }
 
-/* 메뉴 위 앱 이름과 내 이름: 명조 */
+/* 메뉴 위 앱 이름과 내 이름: 명조. 이름이 길면 띄어쓰기에서만 줄을 바꾼다 (양산동원로얄CC / 지원팀) */
 .drawer-head strong {
   font-family: var(--font-serif);
   font-weight: 700;
+  word-break: keep-all;
 }
 
 .drawer-head .me-name {
@@ -2284,4 +2285,137 @@ textarea:focus-visible {
 .badge,
 .drawer-label {
   font-size: 12px;
+}
+
+/* ── 메시지 메뉴와 답장 (4-2) ── */
+.item-menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.item-menu-emoji {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 26px;
+}
+
+.item-menu-emoji:hover {
+  background: var(--bg);
+}
+
+.bubble.deleted p {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.message.mine .bubble.deleted {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+/* 답장: 말풍선 위쪽의 원문 미리보기 (누르면 원문으로) */
+.reply-quote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 12px 6px;
+  border: 0;
+  border-bottom: 1px solid rgb(0 0 0 / 0.08);
+  border-radius: 0;
+  background: rgb(0 0 0 / 0.04);
+  color: inherit;
+  text-align: left;
+  white-space: normal;
+  font-size: 12.5px;
+}
+
+.reply-quote span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  opacity: 0.8;
+}
+
+.message.mine .reply-quote {
+  border-bottom-color: rgb(255 255 255 / 0.2);
+  background: rgb(255 255 255 / 0.1);
+}
+
+.bubble a {
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+/* 말풍선 아래 스티커(공감) */
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.message:not(.mine) > .reactions {
+  grid-column: 2;
+}
+
+.message.mine > .reactions {
+  justify-content: flex-end;
+}
+
+.reaction {
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.reaction.mine {
+  border-color: var(--accent);
+  background: var(--notice-bg);
+}
+
+/* 입력칸 위 "답장 / 수정 중" 줄 */
+.composer-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 6px 4px 6px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.composer-context > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 12.5px;
+}
+
+.composer-context span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.meta span + span {
+  margin-left: 4px;
 }

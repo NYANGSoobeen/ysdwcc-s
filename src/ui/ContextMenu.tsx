@@ -8,6 +8,8 @@ export type MenuAction = {
   label: string
   icon?: string
   danger?: boolean
+  // true면 아이콘만 한 줄로 늘어놓는다 (스티커 고르기)
+  compact?: boolean
   onSelect: () => void
 }
 
@@ -161,9 +163,31 @@ export function ContextMenuHost() {
       style={sheet ? undefined : { left: pos?.left ?? menu.x, top: pos?.top ?? menu.y, visibility: pos ? 'visible' : 'hidden' }}
     >
       {menu.title && <div className="item-menu-title">{menu.title}</div>}
-      {menu.actions.map((a) => (
+      {menu.actions.some((a) => a.compact) && (
+        <div className="item-menu-row">
+          {menu.actions
+            .filter((a) => a.compact)
+            .map((a) => (
+              <button
+                key={a.icon}
+                type="button"
+                role="menuitem"
+                className="item-menu-emoji"
+                aria-label={`${a.icon} ${a.label}`}
+                title={a.label}
+                onClick={() => {
+                  closeMenu()
+                  a.onSelect()
+                }}
+              >
+                {a.icon}
+              </button>
+            ))}
+        </div>
+      )}
+      {menu.actions.filter((a) => !a.compact).map((a) => (
         <button
-          key={a.label}
+          key={`${a.icon}${a.label}`}
           type="button"
           role="menuitem"
           className={a.danger ? 'item-menu-item danger' : 'item-menu-item'}

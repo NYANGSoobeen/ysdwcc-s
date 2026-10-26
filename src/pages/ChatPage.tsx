@@ -4,19 +4,26 @@ import {
   createChannel,
   deleteChannel,
   deleteMessage,
+  editMessage,
   MAIN_CHANNEL,
   messagesRef,
+  photoUrl,
+  REACTIONS,
   renameChannel,
+  replyPreview,
   sendMessage,
+  setReaction,
   type Channel,
+  type ReplyTo,
 } from '../chat.ts'
+import { fileName, saveFile } from '../download.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { useMessages, type Message } from '../useMessages.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { MenuButton } from '../menu.tsx'
-import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
+import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
@@ -108,7 +115,7 @@ function ChatRoomList({ team, uid, channels, onOpen }: { team: Team; uid: string
 
 function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string; room: Channel; onBack?: () => void; onLeft: () => void }) {
   const ref = useMemo(() => messagesRef(team.id, room.id), [team.id, room.id])
-  const { messages, hasMore, loaded, loadingOlder, loadOlder } = useMessages(ref)
+  const { messages, hasMore, loaded, loadingOlder, loadOlder, peek } = useMessages(ref)
   const [showGallery, setShowGallery] = useState(false)
   const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
   const profiles = useMemberProfiles(Object.keys(team.members))
@@ -120,6 +127,11 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   const stickToBottom = useRef(true)
   // 이전 메시지를 앞에 붙일 때 보던 자리를 유지하기 위한 값
   const restore = useRef<{ height: number; top: number } | null>(null)
+  // 답장할 말 / 고치는 중인 내 말 (입력칸 위에 표시)
+  const [replyTo, setReplyTo] = useState<ReplyTo | null>(null)
+  const [editing, setEditing] = useState<Message | null>(null)
+  // 답장 원문으로 이동했을 때 잠깐 반짝일 말
+  const [flashId, setFlashId] = useState<string | null>(null)
   const [newBelow, setNewBelow] = useState(false)
   const lastId = messages.at(-1)?.id
 
@@ -257,13 +269,47 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
 
   async function remove(message: Message) {
     const photoNote = message.attachments.length ? ` 사진 ${message.attachments.length}장도 함께 지워집니다.` : ''
-    if (!(await ask({ message: `이 메시지를 삭제할까요? 되돌릴 수 없습니다.${photoNote}`, ok: '삭제', danger: true }))) return
+    const ok = await ask({
+      message: `이 메시지를 삭제할까요? 내용은 영구 삭제되고 "삭제된 메시지입니다"로 보입니다.${photoNote}`,
+      ok: '삭제',
+      danger: true,
+    })
+    if (!ok) return
     try {
-      await deleteMessage(team.id, room.id, message.id)
+      await deleteMessage(team.id, room.id, message)
     } catch (err) {
       toast(errorMessage(err), { error: true })
     }
   }
+
+  async function react(message: Message, emoji: string | null) {
+    try {
+      await setReaction(team.id, room.id, message.id, uid, emoji)
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+
+  // 답장 원문으로 이동: 불러온 메시지에 없으면 이전 메시지를 100개씩 더 불러와 찾는다 (최대 3000개).
+  async function jumpTo(id: string) {
+    for (let i = 0; i < 30 && !peek().some((m) => m.id === id); i++) {
+      if (!(await loadOlder())) break
+    }
+    if (!peek().some((m) => m.id === id)) {
+      toast('원문을 찾지 못했어요. 삭제되었을 수 있어요.', { error: true })
+      return
+    }
+    stickToBottom.current = false
+    setFlashId(null)
+    requestAnimationFrame(() => setFlashId(id))
+  }
+
+  useEffect(() => {
+    if (!flashId) return
+    listRef.current?.querySelector(`[data-msg="${flashId}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const t = setTimeout(() => setFlashId(null), 2500)
+    return () => clearTimeout(t)
+  }, [flashId])
 
   function openPhoto(message: Message, index: number) {
     const author = profiles[message.authorUid]?.name ?? '나간 팀원'
@@ -359,9 +405,23 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
                 author={profiles[m.authorUid]?.name ?? '나간 팀원'}
                 showAuthor={!mine && !groupedWithPrev}
                 time={groupedWithNext ? '' : m.pending ? '보내는 중' : (date?.toLocaleTimeString('ko-KR', { timeStyle: 'short' }) ?? '')}
-                highlight={currentMatch === m.id}
+                highlight={currentMatch === m.id || flashId === m.id}
+                uid={uid}
+                canWrite={canWrite}
+                profiles={profiles}
+                original={m.replyTo ? messages.find((x) => x.id === m.replyTo!.id) : undefined}
                 onOpenPhoto={(i) => openPhoto(m, i)}
                 onDelete={() => void remove(m)}
+                onReply={() => {
+                  setEditing(null)
+                  setReplyTo({ id: m.id, authorUid: m.authorUid, text: replyPreview(m) })
+                }}
+                onEdit={() => {
+                  setReplyTo(null)
+                  setEditing(m)
+                }}
+                onReact={(emoji) => void react(m, emoji)}
+                onJump={(id) => void jumpTo(id)}
               />
             </div>
           )
@@ -376,8 +436,17 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
         <Composer
           teamId={team.id}
           channelId={room.id}
+          replyTo={replyTo}
+          replyName={replyTo ? (profiles[replyTo.authorUid]?.name ?? '나간 팀원') : ''}
+          editing={editing}
+          onCancel={() => {
+            setReplyTo(null)
+            setEditing(null)
+          }}
           onSent={() => {
             stickToBottom.current = true
+            setReplyTo(null)
+            setEditing(null)
           }}
         />
       ) : (
@@ -389,6 +458,8 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   )
 }
 
+const URL_RE = /https?:\/\/[^\s<>"']+/g
+
 function MessageItem(props: {
   message: Message
   mine: boolean
@@ -397,40 +468,144 @@ function MessageItem(props: {
   showAuthor: boolean
   time: string
   highlight: boolean
+  uid: string
+  canWrite: boolean
+  profiles: Record<string, { name: string }>
+  original?: Message
   onOpenPhoto: (index: number) => void
   onDelete: () => void
+  onReply: () => void
+  onEdit: () => void
+  onReact: (emoji: string | null) => void
+  onJump: (id: string) => void
 }) {
-  const { message: m, mine } = props
+  const { message: m, mine, uid, profiles } = props
+  const links = m.body.match(URL_RE) ?? []
+  const myReaction = m.reactions[uid] ?? null
+
+  function pickSticker(x: number, y: number) {
+    openMenu(
+      [
+        ...REACTIONS.map((emoji) => ({
+          icon: emoji,
+          compact: true,
+          label: emoji === myReaction ? '떼기' : '붙이기',
+          onSelect: () => props.onReact(emoji === myReaction ? null : emoji),
+        })),
+        ...(myReaction ? [{ icon: '✖️', label: `내 스티커 떼기 (${myReaction})`, onSelect: () => props.onReact(null) }] : []),
+      ],
+      x,
+      y,
+      '스티커 붙이기',
+    )
+  }
+
+  async function savePhotos() {
+    const stamp = (m.createdAt?.toDate() ?? new Date()).toISOString().slice(0, 10).replaceAll('-', '')
+    for (const [i, a] of m.attachments.entries()) {
+      await saveFile(await photoUrl(a.path), fileName(`지원팀_${stamp}_${i + 1}`, a.path.split('.').pop() ?? 'jpg'))
+    }
+  }
+
   // 메시지 메뉴: 휴대폰 길게 누르기, PC 오른쪽 클릭
-  const menu = useItemMenu(() => [
-    ...(m.body
-      ? [{ icon: '📋', label: '복사', onSelect: () => void copyText(m.body) }]
-      : []),
-    ...(mine && !m.pending ? [{ icon: '🗑️', label: '삭제', danger: true, onSelect: props.onDelete }] : []),
-  ])
+  // 스티커 고르기를 누른 자리 가까이에 띄우려고 마지막으로 누른 자리를 기억한다.
+  const point = useRef({ x: innerWidth / 2, y: innerHeight / 2 })
+  const actions = (): MenuAction[] =>
+    m.deleted || m.pending
+      ? []
+      : [
+          ...(props.canWrite ? [{ icon: '↩️', label: '답장', onSelect: props.onReply }] : []),
+          ...(m.body ? [{ icon: '📋', label: '복사', onSelect: () => void copyText(m.body) }] : []),
+          ...(mine && m.body ? [{ icon: '✏️', label: '수정', onSelect: props.onEdit }] : []),
+          ...(m.attachments.length
+            ? [{ icon: '💾', label: m.attachments.length > 1 ? `사진 ${m.attachments.length}장 저장` : '사진 저장', onSelect: () => void savePhotos() }]
+            : []),
+          ...(links.length
+            ? [{ icon: '🔗', label: links.length > 1 ? `링크 ${links.length}개 복사` : '링크 복사', onSelect: () => void copyText(links.join('\n')) }]
+            : []),
+          { icon: '🏷️', label: myReaction ? `스티커 바꾸기 (${myReaction})` : '스티커 붙이기', onSelect: () => setTimeout(() => pickSticker(point.current.x, point.current.y), 0) },
+          ...(mine ? [{ icon: '🗑️', label: '삭제', danger: true, onSelect: props.onDelete }] : []),
+        ]
+  const menu = useItemMenu(actions)
+
+  // 스티커 모아 보기: { "👍": [uid, ...] }
+  const counts = new Map<string, string[]>()
+  for (const [who, emoji] of Object.entries(m.reactions)) counts.set(emoji, [...(counts.get(emoji) ?? []), who])
+
+  const reply = m.replyTo
   return (
     <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
       {!mine && (props.showAuthor ? <Avatar uid={props.authorUid} name={props.author} /> : <span className="avatar-space" />)}
       {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
-        <div className="bubble has-menu" {...menu}>
-          {m.attachments.length > 0 && (
-            <div className={m.attachments.length === 1 ? 'photos single' : 'photos'}>
-              {m.attachments.map((a, i) => (
-                <StorageImage key={a.thumbPath} path={a.thumbPath} className="photo" onClick={() => props.onOpenPhoto(i)} />
-              ))}
-            </div>
-          )}
-          {m.body && <p>{m.body}</p>}
-        </div>
-        {props.time && (
+        {m.deleted ? (
+          <div className="bubble deleted">
+            <p>삭제된 메시지입니다</p>
+          </div>
+        ) : (
+          <div
+            className="bubble has-menu"
+            {...menu}
+            onPointerDownCapture={(e) => (point.current = { x: e.clientX, y: e.clientY })}
+          >
+            {reply && (
+              <button type="button" className="reply-quote" onClick={() => props.onJump(reply.id)}>
+                <strong>↩ {profiles[reply.authorUid]?.name ?? '나간 팀원'}에게 답장</strong>
+                <span>{props.original?.deleted ? '삭제된 메시지입니다' : reply.text}</span>
+              </button>
+            )}
+            {m.attachments.length > 0 && (
+              <div className={m.attachments.length === 1 ? 'photos single' : 'photos'}>
+                {m.attachments.map((a, i) => (
+                  <StorageImage key={a.thumbPath} path={a.thumbPath} className="photo" onClick={() => props.onOpenPhoto(i)} />
+                ))}
+              </div>
+            )}
+            {m.body && <p>{linkify(m.body)}</p>}
+          </div>
+        )}
+        {(props.time || m.editedAt) && (
           <div className="meta">
-            <span>{props.time}</span>
+            {m.editedAt && !m.deleted && <span>수정됨</span>}
+            {props.time && <span>{props.time}</span>}
           </div>
         )}
       </div>
+      {!m.deleted && counts.size > 0 && (
+        <div className="reactions">
+          {[...counts.entries()].map(([emoji, who]) => (
+            <button
+              key={emoji}
+              type="button"
+              className={who.includes(uid) ? 'reaction mine' : 'reaction'}
+              title={who.map((w) => profiles[w]?.name ?? '나간 팀원').join(', ')}
+              onClick={() => props.onReact(who.includes(uid) ? null : emoji)}
+            >
+              {emoji} {who.length}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
+}
+
+// 주소는 눌러서 열리게 한다.
+function linkify(text: string) {
+  const parts: (string | React.ReactElement)[] = []
+  let last = 0
+  for (const match of text.matchAll(URL_RE)) {
+    const i = match.index ?? 0
+    if (i > last) parts.push(text.slice(last, i))
+    parts.push(
+      <a key={i} href={match[0]} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+        {match[0]}
+      </a>,
+    )
+    last = i + match[0].length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
 }
 
 // 같은 사람, 같은 날 같은 분(시:분)이면 한 묶음
@@ -460,7 +635,16 @@ async function copyText(text: string) {
   }
 }
 
-function Composer({ teamId, channelId, onSent }: { teamId: string; channelId: string; onSent: () => void }) {
+function Composer(props: {
+  teamId: string
+  channelId: string
+  replyTo: ReplyTo | null
+  replyName: string
+  editing: Message | null
+  onCancel: () => void
+  onSent: () => void
+}) {
+  const { teamId, channelId, replyTo, editing, onSent } = props
   const [body, setBody] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const [uploading, setUploading] = useState(0)
@@ -476,17 +660,48 @@ function Composer({ teamId, channelId, onSent }: { teamId: string; channelId: st
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [body])
 
+  // 답장·수정을 고르면 입력칸으로 (수정은 원래 글을 채워 둔다)
+  const draft = useRef('')
+  useEffect(() => {
+    if (editing) {
+      draft.current = body
+      setBody(editing.body)
+    }
+    if (editing || replyTo) textarea.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id, replyTo?.id])
+
+  function cancel() {
+    if (editing) setBody(draft.current)
+    props.onCancel()
+  }
+
   // 보내기: 입력칸을 바로 비우고(키보드는 그대로 열어 둠) 뒤에서 보낸다. 실패하면 글을 되돌린다.
   async function send() {
     const text = body.trim()
     const pics = photos
+    if (editing) {
+      if (!text) return
+      const target = editing
+      setBody(draft.current)
+      draft.current = ''
+      onSent()
+      if (text === target.body) return
+      try {
+        await editMessage(teamId, channelId, target.id, text)
+      } catch (err) {
+        toast(errorMessage(err), { error: true })
+      }
+      return
+    }
     if (!text && pics.length === 0) return
+    const reply = replyTo
     onSent()
     setBody('')
     setPhotos([])
     if (pics.length) setUploading((n) => n + 1)
     try {
-      await sendMessage(teamId, channelId, text, pics)
+      await sendMessage(teamId, channelId, text, pics, reply)
     } catch (err) {
       setBody((now) => (now ? now : text))
       setPhotos((now) => (now.length ? now : pics))
@@ -521,8 +736,20 @@ function Composer({ teamId, channelId, onSent }: { teamId: string; channelId: st
         </div>
       )}
       {uploading > 0 && <p className="muted small uploading">사진 올리는 중…</p>}
+      {(replyTo || editing) && (
+        <div className="composer-context">
+          <div>
+            <strong>{editing ? '✏️ 메시지 수정' : `↩ ${props.replyName}에게 답장`}</strong>
+            <span>{editing ? editing.body : replyTo!.text}</span>
+          </div>
+          <button type="button" className="ghost icon" onClick={cancel} aria-label={editing ? '수정 취소' : '답장 취소'}
+            onPointerDown={(e) => e.preventDefault()}>
+            ✕
+          </button>
+        </div>
+      )}
       <div className="composer-row">
-        <button type="button" className="ghost icon" onClick={() => fileInput.current?.click()} aria-label="사진 추가">
+        <button type="button" className="ghost icon" onClick={() => fileInput.current?.click()} aria-label="사진 추가" disabled={Boolean(editing)}>
           📷
         </button>
         <input
@@ -542,6 +769,7 @@ function Composer({ teamId, channelId, onSent }: { teamId: string; channelId: st
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
+            if (e.key === 'Escape' && (replyTo || editing)) return cancel()
             // PC: Enter = 보내기, Shift/Ctrl+Enter = 줄바꿈. 휴대폰: Enter = 줄바꿈(보내기는 버튼).
             if (e.key !== 'Enter' || e.nativeEvent.isComposing || isTouchUi()) return
             if (e.shiftKey) return
@@ -561,11 +789,11 @@ function Composer({ teamId, channelId, onSent }: { teamId: string; channelId: st
         />
         <button
           className="primary"
-          disabled={!body.trim() && photos.length === 0}
+          disabled={editing ? !body.trim() : !body.trim() && photos.length === 0}
           // 보내기를 눌러도 입력칸에서 포커스가 빠지지 않게 → 휴대폰 키보드가 닫히지 않는다.
           onPointerDown={(e) => e.preventDefault()}
         >
-          보내기
+          {editing ? '수정' : '보내기'}
         </button>
       </div>
     </form>

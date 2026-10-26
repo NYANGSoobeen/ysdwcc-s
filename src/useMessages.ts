@@ -11,7 +11,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Attachment } from './chat.ts'
+import type { Attachment, ReplyTo } from './chat.ts'
 
 // 채팅방 메시지 불러오기.
 // - 최근 100개는 실시간으로 받는다 (새 메시지, 수정, 삭제가 바로 보임).
@@ -26,6 +26,10 @@ export type Message = {
   attachments: Attachment[]
   createdAt: Timestamp | null
   pending: boolean
+  replyTo: ReplyTo | null
+  editedAt: Timestamp | null
+  deleted: boolean
+  reactions: Record<string, string>
 }
 
 function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
@@ -37,6 +41,10 @@ function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
     attachments: data.attachments ?? [],
     createdAt: data.createdAt ?? null,
     pending: d.metadata.hasPendingWrites,
+    replyTo: data.replyTo ?? null,
+    editedAt: data.editedAt ?? null,
+    deleted: data.deleted === true,
+    reactions: data.reactions ?? {},
   }
 }
 
@@ -88,12 +96,14 @@ export function useMessages(ref: CollectionReference) {
   }, [ref])
 
   const messages = useMemo(() => mergeById(older, live), [older, live])
+  const latest = useRef({ messages, hasMore })
+  latest.current = { messages, hasMore }
 
-  // 가장 오래된 메시지보다 더 이전 것을 100개 불러온다.
+  // 가장 오래된 메시지보다 더 이전 것을 100개 불러온다. (답장 원문 찾기처럼 연달아 불러도 되게 최신 값을 쓴다)
   const loadOlder = useCallback(
     async (n = PAGE_SIZE) => {
-      const oldest = messages[0]
-      if (loadingRef.current || !hasMore || !oldest?.createdAt) return 0
+      const oldest = latest.current.messages[0]
+      if (loadingRef.current || !latest.current.hasMore || !oldest?.createdAt) return 0
       loadingRef.current = true
       setLoadingOlder(true)
       try {
@@ -101,16 +111,21 @@ export function useMessages(ref: CollectionReference) {
         const page = snap.docs.map(toMessage).reverse()
         setOlder((prev) => mergeById(page, prev))
         setHasMore(snap.size >= n)
+        // 다음 호출이 렌더링 전에 와도 이어서 불러오게 바로 반영해 둔다.
+        latest.current = { messages: mergeById(page, latest.current.messages), hasMore: snap.size >= n }
         return page.length
       } finally {
         loadingRef.current = false
         setLoadingOlder(false)
       }
     },
-    [ref, hasMore, messages],
+    [ref],
   )
 
-  return { messages, hasMore, loaded, loadingOlder, loadOlder }
+  // 화면이 다시 그려지기 전에도 지금까지 불러온 메시지를 확인할 수 있게 (답장 원문 찾기)
+  const peek = useCallback(() => latest.current.messages, [])
+
+  return { messages, hasMore, loaded, loadingOlder, loadOlder, peek }
 }
 
 function mergeById(older: Message[], newer: Message[]) {

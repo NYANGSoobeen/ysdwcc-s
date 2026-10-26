@@ -91,7 +91,7 @@ function MenuList(props: MenuListProps) {
       <div className="drawer-head">
         <img src="/icons/icon-192.png" alt="" />
         <div>
-          <strong>양산동원 지원팀</strong>
+          <strong>양산동원로얄CC 지원팀</strong>
           <span className="muted small">
             {teamName} · <span className="me-name">{userName}</span>
           </span>

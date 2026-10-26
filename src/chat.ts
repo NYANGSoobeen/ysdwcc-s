@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   serverTimestamp,
@@ -97,7 +98,21 @@ export async function deleteChannel(teamId: string, channelId: string) {
 // ── 메시지 ───────────────────────────────────────────────────
 
 // 사진을 압축해 올린 뒤 메시지를 저장한다. 메시지 저장에 실패하면 올린 사진을 지운다.
-export async function sendMessage(teamId: string, channelId: string, body: string, photos: File[] = []) {
+// 답장: 원문의 일부를 같이 저장해 두어, 원문을 불러오지 않아도 미리보기를 보여 준다.
+export type ReplyTo = { id: string; authorUid: string; text: string }
+
+export function replyPreview(message: { body: string; attachments: Attachment[] }) {
+  if (message.body) return message.body.replace(/\s+/g, ' ').slice(0, 80)
+  return message.attachments.length ? `사진 ${message.attachments.length}장` : ''
+}
+
+export async function sendMessage(
+  teamId: string,
+  channelId: string,
+  body: string,
+  photos: File[] = [],
+  replyTo: ReplyTo | null = null,
+) {
   const uid = auth.currentUser!.uid
   const messageRef = doc(messagesRef(teamId, channelId))
   const folder = `teams/${teamId}/chat/${messageRef.id}`
@@ -130,7 +145,7 @@ export async function sendMessage(teamId: string, channelId: string, body: strin
       body,
       mentions: [],
       customerTags: [],
-      replyTo: null,
+      replyTo,
       attachments,
       // 사진 모아보기에서 사진이 있는 메시지만 조회하기 위한 표시
       hasPhotos: attachments.length > 0,
@@ -144,9 +159,36 @@ export async function sendMessage(teamId: string, channelId: string, body: strin
   return messageRef.id
 }
 
-// 바로 영구 삭제한다. 첨부 사진은 서버(Functions)가 지운다.
-export async function deleteMessage(teamId: string, channelId: string, messageId: string) {
-  await deleteDoc(doc(messagesRef(teamId, channelId), messageId))
+// 내 메시지 수정
+export async function editMessage(teamId: string, channelId: string, messageId: string, body: string) {
+  await updateDoc(doc(messagesRef(teamId, channelId), messageId), { body, editedAt: serverTimestamp() })
+}
+
+// 내 메시지 삭제: 글과 사진은 바로 영구 삭제하고, 대화 흐름이 끊기지 않게 "삭제된 메시지입니다" 자리만 남긴다.
+export async function deleteMessage(teamId: string, channelId: string, message: { id: string; attachments: Attachment[] }) {
+  await updateDoc(doc(messagesRef(teamId, channelId), message.id), {
+    deleted: true,
+    body: '',
+    attachments: [],
+    hasPhotos: false,
+    replyTo: null,
+    mentions: [],
+    customerTags: [],
+    editedAt: null,
+  })
+  // 사진 파일은 올린 사람이 지울 수 있다 (Storage 규칙).
+  await Promise.allSettled(
+    message.attachments.flatMap((a) => [deleteObject(ref(storage, a.path)), deleteObject(ref(storage, a.thumbPath))]),
+  )
+}
+
+// 스티커(공감): 메시지마다 한 사람에 하나. 같은 것을 다시 누르면 뗀다.
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅'] as const
+
+export async function setReaction(teamId: string, channelId: string, messageId: string, uid: string, emoji: string | null) {
+  await updateDoc(doc(messagesRef(teamId, channelId), messageId), {
+    [`reactions.${uid}`]: emoji ?? deleteField(),
+  })
 }
 
 async function resizeToJpeg(file: File, maxSide: number) {
