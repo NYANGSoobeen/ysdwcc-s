@@ -23,6 +23,7 @@ import { StickerLayer, stickerColors } from '../schedule/StickerLayer.tsx'
 import { drawSticker, sameCell, STICKERS, type Mark } from '../schedule/stickers.ts'
 import { ZoomViewer } from '../schedule/ZoomViewer.tsx'
 
+const stickerRows = [...new Set(STICKERS.map((s) => s.row))].sort()
 const ZOOM_STEP = 1.25
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 5
@@ -221,7 +222,8 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
       {schedule && (
         <div className="sched-tools">
           <div className="sticker-rows" role="toolbar" aria-label="수정 표시 스티커">
-            {([1, 2] as const).map((row) => (
+            {/* 스티커가 있는 줄만 그리고, "모두 떼기"는 마지막 줄 끝에 둔다 */}
+            {stickerRows.map((row) => (
               <div key={row} className="sticker-row">
                 {STICKERS.filter((s) => s.row === row).map((s) => (
                   <button
@@ -235,7 +237,7 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
                     {s.t}
                   </button>
                 ))}
-                {row === 2 && schedule.marks.length > 0 && (
+                {row === stickerRows.at(-1) && schedule.marks.length > 0 && (
                   <button type="button" className="sticker-clear" onClick={removeAll}>
                     모두 떼기
                   </button>

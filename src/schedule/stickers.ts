@@ -5,14 +5,10 @@
 //   half: 반차 스티커 (칸을 못 찾았을 때 기본 글자 크기를 72%로)
 export type StickerDef = { t: string; kind: 'work' | 'off'; row: 1 | 2; half?: boolean }
 
+// 지원팀 근무 코드: B0(근무), 휴(휴무). 예) 반차를 넣으려면 { t: 'B/반', kind: 'work', row: 1, half: true }
 export const STICKERS: StickerDef[] = [
-  { t: 'A0', kind: 'work', row: 1 },
-  { t: 'C0', kind: 'work', row: 1 },
-  { t: 'D0', kind: 'work', row: 1 },
+  { t: 'B0', kind: 'work', row: 1 },
   { t: '휴', kind: 'off', row: 1 },
-  { t: 'A/반', kind: 'work', row: 2, half: true },
-  { t: 'C/반', kind: 'work', row: 2, half: true },
-  { t: 'D/반', kind: 'work', row: 2, half: true },
 ]
 
 export const STICKER_STYLE = {
