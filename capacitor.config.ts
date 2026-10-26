@@ -5,7 +5,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // 안드로이드 쪽 코드(android/, 연락처 플러그인)를 바꿨을 때뿐이다.
 const config: CapacitorConfig = {
   appId: 'kr.yangsan.support',
-  appName: '양산동원지원팀',
+  appName: '양산동원로얄CC지원팀',
   webDir: 'dist',
   server: {
     url: 'https://ysdwcc-s.web.app',

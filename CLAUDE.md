@@ -21,7 +21,7 @@
   - 앱에서 건 전화(`tel:`)는 앱으로 돌아오면 메모 창을 띄운다 (화면 6)
   - 받은 전화는 "방금 받은 전화 메모하기" 버튼으로 기록한다 (화면 7)
   - Call Directory Extension으로 전화 올 때 고객 이름을 표시한다
-- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원 지원팀"). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.0(versionCode 3).
+- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원 지원팀"). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
 - **앱 색상:** Merino `#F5EEDD`(바탕) · Rock Blue `#84B3CE`(보조) · Venice Blue `#16587B`(주색, 버튼·내 말풍선·메뉴 바탕). `src/style.css` 맨 위 `:root` 토큰에서 바꾼다 (어두운 모드는 Venice 계열 바탕 + Rock Blue 강조). 메뉴(☰, PC 왼쪽 메뉴)는 Venice Blue 바탕에 Merino 글씨. 채팅방 바탕은 Rock Blue를 Merino 쪽으로 누그러뜨린 `#BED3DC`(`--chat-bg`), 남의 말풍선은 미색, 내 말풍선은 Venice Blue, 날짜 줄은 짙은 남색 반투명.
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전이 나오면 하단 알림을 띄우고 누르면 업데이트한다 (`src/update.ts`).
 - **로그인과 계정:** 이메일/비밀번호 로그인. 계정은 관리자만 만든다 (콘솔에서 가입 기능을 끈다). "@" 없는 아이디는 `아이디@workphone.local`로 저장하며 실제 메일이 아니므로 비밀번호 분실 시 관리자가 초기화한다. 프로젝트에 팀이 없을 때만 로그인 화면에 "처음 시작하기"(첫 관리자 만들기)가 나온다.
