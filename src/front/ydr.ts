@@ -21,12 +21,13 @@ import {
   orderBy,
   query,
   setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions'
 import { connectStorageEmulator, getBlob, getStorage, ref } from 'firebase/storage'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { auth, keepSignedIn } from '../firebase.ts'
+import { auth, db, keepSignedIn } from '../firebase.ts'
 import { toast } from '../ui/dialogs.tsx'
 
 // 🏌️ 프론트 채팅: 양산동원로얄CC 프론트 앱(다른 Firebase 프로젝트 ysdwcc-f)의 채팅방에 "타부서 게스트"로 들어간다.
@@ -139,7 +140,7 @@ function watchGuest(uid: string) {
             ),
           ),
       )
-      if (channels.length === 0) return void disconnectFront()
+      if (channels.length === 0) return void disconnectFront({ forget: true })
       set({
         status: 'on',
         uid,
@@ -166,12 +167,13 @@ export async function connectFront(code?: string) {
     )
     await signInWithCustomToken(ydrAuth, res.data.token)
     setFlag(true)
+    rememberOnAccount(true)
     watchGuest(res.data.uid)
   } catch (err) {
     const codeName = (err as { code?: string }).code ?? ''
     if (!code && codeName.endsWith('permission-denied')) {
       // 초대받은 방이 하나도 없음 (모두 나갔거나 내보내짐)
-      await disconnectFront()
+      await disconnectFront({ forget: true })
       return
     }
     // 다시 로그인이 실패해도(인터넷 끊김 등) 남아 있는 프론트 로그인으로 계속 본다.
@@ -181,16 +183,38 @@ export async function connectFront(code?: string) {
   }
 }
 
-// 앱을 열 때: 프론트 채팅에 들어가 있던 기기면 로그인을 다시 받는다 (내보내졌으면 정리).
-export function resumeFront() {
-  if (hasFlag()) void connectFront()
+// "프론트 채팅에 들어가 있음"을 내 계정(users/{uid}.settings.frontChat)에도 기억한다.
+// → 로그아웃했다 다시 로그인해도, 다른 기기에서 열어도 코드 없이 다시 연결된다 (내보내지거나 나가기 전까지).
+let accountJoined = false
+function rememberOnAccount(on: boolean) {
+  const me = auth.currentUser
+  if (!me || accountJoined === on) return
+  accountJoined = on
+  updateDoc(doc(db, 'users', me.uid), { 'settings.frontChat': on }).catch(() => {})
 }
 
-// 로그아웃할 때, 또는 초대받은 방이 없어졌을 때
-export async function disconnectFront() {
+// 앱을 열 때: 프론트 채팅에 들어가 있던 계정·기기면 코드 없이 다시 로그인한다 (내보내졌으면 정리).
+export function resumeFront(joinedOnAccount: boolean) {
+  accountJoined = joinedOnAccount
+  if (joinedOnAccount || hasFlag()) tryResume()
+}
+
+// 한 번 로그인해 있는 동안 자동 연결은 한 번만 해 본다 (안 되면 초대 코드 입력 화면).
+let triedFor: string | null = null
+export function tryResume() {
+  const me = auth.currentUser
+  if (!me || triedFor === me.uid || state.status !== 'off') return
+  triedFor = me.uid
+  void connectFront()
+}
+
+// 로그아웃할 때(계정 기억은 남김), 또는 초대받은 방이 없어졌을 때(forget: 계정 기억도 지움)
+export async function disconnectFront(opts: { forget?: boolean } = {}) {
   stopGuest()
   stopGuest = () => {}
   setFlag(false)
+  if (opts.forget) rememberOnAccount(false)
+  else triedFor = null
   set({ status: 'off', uid: null, name: '', rooms: [] })
   await signOut(ydrAuth).catch(() => {})
 }

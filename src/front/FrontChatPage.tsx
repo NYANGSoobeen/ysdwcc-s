@@ -11,6 +11,7 @@ import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import {
   assetUrl,
   connectFront,
+  tryResume,
   frontMessagesQuery,
   leaveFrontRoom,
   markFrontRead,
@@ -93,6 +94,8 @@ async function joinWithCode() {
 }
 
 function JoinPage() {
+  // 예전에 들어간 적이 있으면(이 기능 전에 들어간 사람, 기억이 없는 기기) 코드 없이 한 번 다시 연결해 본다.
+  useEffect(() => tryResume(), [])
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

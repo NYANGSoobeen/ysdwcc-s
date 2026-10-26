@@ -91,8 +91,8 @@
   - `useMessages`의 `loadOlder(n)`은 이미 불러오는 중이면 끝난 뒤 이어서 불러온다 (검색·답장 원문·스크롤이 겹쳐도 빠짐없이).
 - **🏌️ 프론트 채팅 (프론트 앱 채팅방에 타부서 게스트로, `src/front/`):** 요구사항은 프론트 저장소(`ysdwcc-f`)의 `GUEST_LINK.md`. 프론트 저장소는 읽기만 하고 고치지 않는다.
   - 프론트 Firebase(`ysdwcc-f`)에 이름 붙인 두 번째 앱 `'ydr'`로 접속(`src/front/ydr.ts`, 웹 설정은 공개 값). 프론트 데이터는 메모리 캐시만(기기에 안 남김), 로그인 유지를 끈 컴퓨터는 프론트 로그인도 세션 저장.
-  - 입장: 우리 ID 토큰 + 초대 코드(6자리) → 프론트 함수 `guestAuth`(us-west1) → 커스텀 토큰으로 프론트에 로그인(아이디 `g_{우리 uid}`). 앱을 열 때마다 `{ idToken }`만으로 다시 로그인(localStorage `front-chat`이 있는 기기만). 초대받은 방이 없으면(permission-denied) 정리.
-  - `guests/{g_uid}`를 지켜보다 방이 빠지면 "내보냈어요" 안내(내가 나간 방은 제외), 방이 하나도 없으면 프론트 로그아웃. 캐시 값(fromCache)으로는 판단하지 않는다.
+  - 입장: 우리 ID 토큰 + 초대 코드(6자리) → 프론트 함수 `guestAuth`(us-west1) → 커스텀 토큰으로 프론트에 로그인(아이디 `g_{우리 uid}`). **한 번 들어가면 내보내지거나 나가기 전까지 코드 없이 계속 쓴다:** 앱을 열 때마다 `{ idToken }`만으로 다시 로그인한다. 들어간 사실은 계정(`users/{uid}.settings.frontChat`, 다시 로그인·다른 기기용)과 기기(localStorage `front-chat`)에 기억하고, 둘 다 없어도 프론트 채팅 화면을 열면 로그인당 한 번 코드 없이 연결해 본다(`tryResume`). 로그아웃은 계정 기억을 남기고, 초대받은 방이 없어지면(permission-denied, 방 0개) 계정 기억도 지운다.
+  - `guests/{g_uid}`를 지켜보다 방이 빠지면 "내보냈어요" 안내(내가 나간 방은 제외), 방이 하나도 없으면 프론트 로그아웃(`disconnectFront({ forget: true })`). 캐시 값(fromCache)으로는 판단하지 않는다.
   - 메시지 읽기는 꼭 `createdAt >= from`(입장 시각, 0이면 전부) 조건 + 100개씩(프론트 규칙). 쓰기는 `{text, authorId, createdAt(ms), replyTo?}`만(4000자), 내 글만 `{text, edited}` 수정·`{deleted, text:''}` 삭제. 사진·이모티콘·파일은 프론트 Storage `assets/{id}`를 `getBlob`으로 보기만(사진 크게 보기도 됨), 이름은 `accounts/{아이디}`(authorId `acc_아이디`), 다른 게스트는 "타부서".
   - 읽음 `channels/{방}/reads/{g_uid} = {at: ms}`(맨 아래까지 봤을 때, 3초에 한 번, 방을 나갈 때 남은 것은 바로). 안 읽은 수는 방 목록·메뉴 "프론트 채팅"·☰ 합계.
   - 화면: 메뉴 "🏌️ 프론트 채팅"(탭 `front`, 보던 방 sessionStorage `front-room`) → 초대 코드 입력 → 방 목록(+ 초대 코드) → 방(⋯ 이 방 나가기 = `guestLeave`). PC에서도 방 머리줄 ‹(`.back-button`)으로 목록에 돌아간다.

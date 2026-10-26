@@ -179,7 +179,11 @@ function SignedIn({ user }: { user: User }) {
       // 기억하지 못해도 동작에는 문제없다.
     }
   }
-  useEffect(() => resumeFront(), [user.uid])
+  const frontJoined = profile?.settings?.frontChat === true
+  const profileReady = profile !== null
+  useEffect(() => {
+    if (profileReady) resumeFront(frontJoined)
+  }, [user.uid, profileReady, frontJoined])
   const frontUnread = useFrontUnread(tab === 'front' ? frontRoom : null)
   const frontUnreadTotal = Object.values(frontUnread).reduce((a, b) => a + b, 0)
 
