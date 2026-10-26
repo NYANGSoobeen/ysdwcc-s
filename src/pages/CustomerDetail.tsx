@@ -2,6 +2,7 @@ import { collection, doc, onSnapshot, orderBy, query, Timestamp } from 'firebase
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ROLE_LABELS } from '../api.ts'
 import { errorMessage } from '../auth.ts'
+import { ask, toast } from '../ui/dialogs.tsx'
 import {
   addNote,
   deleteCustomer,
@@ -87,12 +88,12 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
 
   async function remove() {
     if (!customer) return
-    if (!confirm(`"${customer.name}" 고객을 삭제할까요?\n상담 메모 ${notes.length}개도 함께 영구 삭제되며 되돌릴 수 없습니다.`)) return
+    if (!(await ask({ title: '고객 삭제', message: `"${customer.name}" 고객을 삭제할까요?\n상담 메모 ${notes.length}개도 함께 영구 삭제되며 되돌릴 수 없습니다.`, ok: '삭제', danger: true }))) return
     try {
       await deleteCustomer(customer.id)
       onClose()
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 
@@ -188,11 +189,11 @@ function OwnerField(props: { team: Team; customer: Customer; canWrite: boolean; 
 
   async function change(ownerUid: string) {
     const name = profiles[ownerUid]?.name ?? ''
-    if (!confirm(`담당자를 ${name}님으로 넘길까요?`)) return
+    if (!(await ask({ message: `담당자를 ${name}님으로 넘길까요?`, ok: '넘기기' }))) return
     try {
       await updateCustomer(customer.id, { ownerUid })
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 
@@ -240,7 +241,7 @@ function NextContactField({ customer, canWrite }: { customer: Customer; canWrite
       })
       if (!date) setNote('')
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 
@@ -299,7 +300,7 @@ function EditCustomerForm(props: { customer: Customer; onDone: () => void; onOpe
       const added = cleaned.phones.filter((p) => !customer.phones.includes(p))
       const existing = added.length ? await findCustomerByPhone(customer.teamId, added) : null
       if (existing && existing.id !== customer.id) {
-        if (confirm(`${formatPhone(existing.phone)} 번호는 이미 "${existing.name}" 고객으로 등록되어 있습니다.\n그 고객을 열까요?`)) {
+        if (await ask({ message: `${formatPhone(existing.phone)} 번호는 이미 "${existing.name}" 고객으로 등록되어 있습니다.\n그 고객을 열까요?`, ok: '열기' })) {
           onOpenOther(existing.id)
         }
         return
@@ -345,7 +346,7 @@ function NoteComposer(props: { customerId: string; initialKind: string; autoFocu
       setBody('')
       props.onSaved()
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     } finally {
       setBusy(false)
     }
@@ -404,16 +405,16 @@ function NoteItem(props: {
       setEditing(false)
       setRevisions(null)
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 
   async function remove() {
-    if (!confirm('이 메모를 삭제할까요? 수정 기록도 함께 영구 삭제됩니다.')) return
+    if (!(await ask({ message: '이 메모를 삭제할까요? 수정 기록도 함께 영구 삭제됩니다.', ok: '삭제', danger: true }))) return
     try {
       await deleteNote(customerId, note.id)
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 
@@ -422,7 +423,7 @@ function NoteItem(props: {
     try {
       setRevisions(await loadRevisions(customerId, note.id))
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 

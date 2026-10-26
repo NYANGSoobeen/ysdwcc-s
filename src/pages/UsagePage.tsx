@@ -3,6 +3,7 @@ import { api, formatBytes, type RangeResult, type Usage } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import type { Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
+import { ask, toast } from '../ui/dialogs.tsx'
 
 export function UsagePage({ team }: { team: Team }) {
   const [usage, setUsage] = useState<Usage | null>(null)
@@ -143,12 +144,12 @@ function RangeDelete({ teamId, onDeleted }: { teamId: string; onDeleted: () => v
   async function remove() {
     if (!preview) return
     const label = `${from || '처음'} ~ ${to}`
-    if (!confirm(`${label} 채팅 ${preview.messages}개와 사진 ${preview.photos}장을 영구 삭제할까요?\n되돌릴 수 없습니다.`)) return
+    if (!(await ask({ title: '기간 삭제', message: `${label} 채팅 ${preview.messages}개와 사진 ${preview.photos}장을 영구 삭제할까요?\n되돌릴 수 없습니다.`, ok: '영구 삭제', danger: true }))) return
     setBusy(true)
     setError('')
     try {
       const result = await api.deleteMessagesInRange({ teamId, ...toRange(from, to), dryRun: false })
-      alert(`채팅 ${result.messages}개, 사진 ${result.photos}장을 삭제했습니다.`)
+      toast(`채팅 ${result.messages}개, 사진 ${result.photos}장을 삭제했습니다.`)
       setPreview(null)
       onDeleted()
     } catch (err) {

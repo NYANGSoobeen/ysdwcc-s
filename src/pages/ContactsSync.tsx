@@ -2,6 +2,7 @@ import { doc, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { api } from '../api.ts'
 import { errorMessage } from '../auth.ts'
+import { ask, askText } from '../ui/dialogs.tsx'
 import { db } from '../firebase.ts'
 import {
   APK_URL,
@@ -60,7 +61,7 @@ function NativeContactsSync() {
   }
 
   async function turnOff() {
-    if (!confirm('끄면 이 폰 연락처에서 고객("[업무] 이름")이 모두 지워집니다. 끌까요?')) return
+    if (!(await ask({ message: '끄면 이 폰 연락처에서 고객("[업무] 이름")이 모두 지워집니다. 끌까요?', ok: '끄기', danger: true }))) return
     setBusy(true)
     await clearNativeContacts()
     setBusy(false)
@@ -116,7 +117,7 @@ function CardDavSync({ uid }: { uid: string }) {
   )
 
   async function enable() {
-    if (status?.enabled && !confirm('접속 정보를 새로 만들까요?\n예전 접속 정보로 연결된 폰에서는 고객 연락처가 사라지고, 새 정보로 다시 설정해야 합니다.')) return
+    if (status?.enabled && !(await ask({ message: '접속 정보를 새로 만들까요?\n예전 접속 정보로 연결된 폰에서는 고객 연락처가 사라지고, 새 정보로 다시 설정해야 합니다.', ok: '새로 만들기' }))) return
     setBusy(true)
     setError('')
     try {
@@ -129,7 +130,7 @@ function CardDavSync({ uid }: { uid: string }) {
   }
 
   async function disable() {
-    if (!confirm('연락처 표시를 끌까요?\n폰이 다음에 동기화할 때 고객 연락처가 모두 사라집니다. 폰 설정에서 "지원팀" 연락처 계정도 지워 주세요.')) return
+    if (!(await ask({ message: '연락처 표시를 끌까요?\n폰이 다음에 동기화할 때 고객 연락처가 모두 사라집니다. 폰 설정에서 "지원팀" 연락처 계정도 지워 주세요.', ok: '끄기', danger: true }))) return
     setBusy(true)
     setError('')
     try {
@@ -259,7 +260,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      prompt(`${label} (길게 눌러 복사하세요)`, value)
+      void askText({ title: label, message: '아래 칸을 길게 눌러 복사하세요.', value, ok: '닫기' })
     }
   }
 

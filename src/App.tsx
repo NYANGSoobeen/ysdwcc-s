@@ -15,6 +15,7 @@ import { ProfilePage } from './pages/ProfilePage.tsx'
 import { SchedulePage } from './pages/SchedulePage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 import { IDLE_NOTICE, rememberSignedIn, wasSignedIn, watchIdle } from './session.ts'
+import { SearchContext } from './ui/search.tsx'
 import { useIsDesktop } from './useMedia.ts'
 
 const TEAM_KEY = 'selected-team'
@@ -25,6 +26,20 @@ function savedTeam() {
   } catch {
     return undefined
   }
+}
+
+// F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
+const TAB_KEY = 'current-tab'
+const TABS: Tab[] = ['customers', 'chat', 'schedule', 'members', 'admin', 'usage', 'profile']
+
+function savedTab(): Tab {
+  try {
+    const tab = sessionStorage.getItem(TAB_KEY) as Tab | null
+    if (tab && TABS.includes(tab)) return tab
+  } catch {
+    // 기억하지 못하면 첫 화면
+  }
+  return 'customers'
 }
 
 const REMOVED_NOTICE = '팀에서 제외되어 더 이상 사용할 수 없습니다. 이 기기에 남은 팀 데이터를 지웠습니다.'
@@ -55,9 +70,21 @@ function SignedIn({ user }: { user: User }) {
   const teamId = selectedTeamId && teamIds.includes(selectedTeamId) ? selectedTeamId : teamIds[0]
   const { team, denied } = useTeam(teamId)
   const teamNames = useTeamNames(teamIds)
-  const [tab, setTab] = useState<Tab>('customers')
+  const [tab, setTabState] = useState<Tab>(savedTab)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [queries, setQueries] = useState<Partial<Record<Tab, string>>>({})
+  const [searchFocused, setSearchFocused] = useState(false)
   const desktop = useIsDesktop()
+
+  function setTab(next: Tab) {
+    setTabState(next)
+    setSearchFocused(false)
+    try {
+      sessionStorage.setItem(TAB_KEY, next)
+    } catch {
+      // 기억하지 못해도 동작에는 문제없다.
+    }
+  }
 
   function selectTeam(id: string) {
     setSelectedTeamId(id)
@@ -121,10 +148,18 @@ function SignedIn({ user }: { user: User }) {
       </label>
     ) : null
   const menuProps = { current, isAdmin, superAdmin, teamName: team.name, userName: profile.name, onSelect: setTab }
+  const search = {
+    query: queries[current] ?? '',
+    setQuery: (query: string) => setQueries((prev) => ({ ...prev, [current]: query })),
+    setFocused: setSearchFocused,
+  }
+  // 휴대폰: 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨겨 검색 결과를 넓게 본다.
+  const searching = !desktop && searchFocused
 
   return (
     <MenuContext.Provider value={() => setMenuOpen(true)}>
-      <div className={desktop ? 'shell desktop' : 'shell'}>
+     <SearchContext.Provider value={search}>
+      <div className={`shell${desktop ? ' desktop' : ''}${searching ? ' searching' : ''}`}>
         {desktop && <Sidebar {...menuProps}>{teamSelect}</Sidebar>}
         <div className="shell-main">
           {!desktop && teamSelect && <div className="teambar">{teamSelect}</div>}
@@ -158,6 +193,7 @@ function SignedIn({ user }: { user: User }) {
         </div>
         {!desktop && <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)} />}
       </div>
+     </SearchContext.Provider>
     </MenuContext.Provider>
   )
 }

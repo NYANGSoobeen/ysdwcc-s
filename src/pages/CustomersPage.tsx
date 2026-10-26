@@ -14,12 +14,33 @@ import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { CustomerDetail } from './CustomerDetail.tsx'
 import { MenuButton } from '../menu.tsx'
+import { ask } from '../ui/dialogs.tsx'
+import { SearchBar, useTabSearch } from '../ui/search.tsx'
+
+const OPEN_KEY = 'open-customer'
 
 export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string; desktop: boolean }) {
   const [customers, setCustomers] = useState<Customer[] | null>(null)
-  const [search, setSearch] = useState('')
+  const { query: search } = useTabSearch()
   const [adding, setAdding] = useState(false)
-  const [openId, setOpenId] = useState<string | null>(null)
+  // 열어 둔 고객은 F5(새로 고침) 뒤에도 다시 연다.
+  const [openId, setOpenIdState] = useState<string | null>(() => {
+    try {
+      const [teamId, id] = (sessionStorage.getItem(OPEN_KEY) ?? '').split(':')
+      return teamId === team.id && id ? id : null
+    } catch {
+      return null
+    }
+  })
+  const setOpenId = (id: string | null) => {
+    setOpenIdState(id)
+    try {
+      if (id) sessionStorage.setItem(OPEN_KEY, `${team.id}:${id}`)
+      else sessionStorage.removeItem(OPEN_KEY)
+    } catch {
+      // 기억하지 못해도 동작에는 문제없다.
+    }
+  }
   const profiles = useMemberProfiles(Object.keys(team.members))
   const canWrite = team.members[uid] !== 'viewer'
 
@@ -77,6 +98,7 @@ export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string;
           <span />
         )}
       </header>
+      <SearchBar placeholder="이름, 회사, 전화번호 검색" />
       <div className="page-body">
         {adding && (
           <AddCustomerForm
@@ -87,13 +109,6 @@ export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string;
             }}
           />
         )}
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="이름, 회사, 전화번호 검색"
-          aria-label="고객 검색"
-        />
         {customers === null && <p className="center muted">불러오는 중…</p>}
         {due.length > 0 && (
           <section>
@@ -228,7 +243,7 @@ function AddCustomerForm({ teamId, onDone }: { teamId: string; onDone: (id: stri
     try {
       const existing = await findCustomerByPhone(teamId, cleaned.phones)
       if (existing) {
-        if (confirm(`${formatPhone(existing.phone)} 번호는 이미 "${existing.name}" 고객으로 등록되어 있습니다.\n그 고객을 열까요?`)) {
+        if (await ask({ message: `${formatPhone(existing.phone)} 번호는 이미 "${existing.name}" 고객으로 등록되어 있습니다.\n그 고객을 열까요?`, ok: '열기' })) {
           onDone(existing.id)
         }
         return

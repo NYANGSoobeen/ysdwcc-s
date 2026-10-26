@@ -1,5 +1,5 @@
 import { collection, limit, onSnapshot, orderBy, query, type Timestamp } from 'firebase/firestore'
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
 import { deleteMessage, sendMessage, type Attachment } from '../chat.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
@@ -8,6 +8,9 @@ import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { MenuButton } from '../menu.tsx'
+import { useItemMenu } from '../ui/ContextMenu.tsx'
+import { ask, toast } from '../ui/dialogs.tsx'
+import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 const PAGE_SIZE = 50
 const MAX_PHOTOS = 10
@@ -60,6 +63,38 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
   }, [messages])
 
+  // 🔍 채팅 검색: 대화는 그대로 두고 찾은 말 위치로 이동한다 (▲ 이전, ▼ 다음, Enter = 이전).
+  // 지금은 불러온 메시지 안에서 찾는다.
+  const { query: searchQuery } = useTabSearch()
+  const [searchOpen, setSearchOpen] = useState(() => Boolean(searchQuery))
+  const q = searchQuery.trim().toLowerCase()
+  const matches = useMemo(
+    () => (q ? messages.filter((m) => m.body.toLowerCase().includes(q)).map((m) => m.id) : []),
+    [messages, q],
+  )
+  // 고른 말(없거나 결과에서 빠지면 가장 최근에 찾은 말)
+  const [picked, setPicked] = useState<string | null>(null)
+  const currentMatch = picked && matches.includes(picked) ? picked : (matches.at(-1) ?? null)
+  const matchIndex = currentMatch ? matches.indexOf(currentMatch) : -1
+  useEffect(() => setPicked(null), [q])
+
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    if (!q) {
+      // 검색을 지우면 맨 아래(최신)로
+      stickToBottom.current = true
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    if (!currentMatch) return
+    stickToBottom.current = false
+    el.querySelector(`[data-msg="${currentMatch}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [q, currentMatch])
+
+  const older = () => matches.length && setPicked(matches[matchIndex <= 0 ? matches.length - 1 : matchIndex - 1])
+  const newer = () => matches.length && setPicked(matches[matchIndex >= matches.length - 1 ? 0 : matchIndex + 1])
+
   function onScroll() {
     const el = listRef.current!
     stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -67,11 +102,11 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
 
   async function remove(message: Message) {
     const photoNote = message.attachments.length ? ` 사진 ${message.attachments.length}장도 함께 지워집니다.` : ''
-    if (!confirm(`이 메시지를 삭제할까요? 되돌릴 수 없습니다.${photoNote}`)) return
+    if (!(await ask({ message: `이 메시지를 삭제할까요? 되돌릴 수 없습니다.${photoNote}`, ok: '삭제', danger: true }))) return
     try {
       await deleteMessage(team.id, message.id)
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 
@@ -87,10 +122,40 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
       <header className="page-header">
         <MenuButton />
         <h2>{team.name}</h2>
-        <button type="button" className="ghost" onClick={() => setShowGallery(true)}>
-          사진
-        </button>
+        <div className="header-actions">
+          <button
+            type="button"
+            className={searchOpen ? 'ghost icon active' : 'ghost icon'}
+            onClick={() => setSearchOpen(!searchOpen)}
+            aria-label="채팅 검색"
+            aria-pressed={searchOpen}
+          >
+            🔍
+          </button>
+          <button type="button" className="ghost" onClick={() => setShowGallery(true)}>
+            사진
+          </button>
+        </div>
       </header>
+      {searchOpen && (
+        <SearchBar placeholder="대화 내용 검색" autoFocus onEnter={older} onCancel={() => setSearchOpen(false)}>
+          {q && (
+            <span className="search-nav">
+              <span className="small muted" aria-live="polite">
+                {matches.length ? `${matchIndex + 1} / ${matches.length}건` : '0건'}
+              </span>
+              <button type="button" className="ghost icon" onClick={older} disabled={!matches.length} aria-label="이전 찾기"
+                onPointerDown={(e) => e.preventDefault()}>
+                ▲
+              </button>
+              <button type="button" className="ghost icon" onClick={newer} disabled={!matches.length} aria-label="다음 찾기"
+                onPointerDown={(e) => e.preventDefault()}>
+                ▼
+              </button>
+            </span>
+          )}
+        </SearchBar>
+      )}
       <div className="messages" ref={listRef} onScroll={onScroll}>
         {hasMore && (
           <button
@@ -112,36 +177,17 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
           if (day) lastDay = day
           const mine = m.authorUid === uid
           return (
-            <div key={m.id}>
+            <div key={m.id} data-msg={m.id}>
               {showDay && <div className="day">{day}</div>}
-              <div className={mine ? 'message mine' : 'message'}>
-                {!mine && <div className="author">{profiles[m.authorUid]?.name ?? '나간 팀원'}</div>}
-                <div className="bubble-row">
-                  <div className="bubble">
-                    {m.attachments.length > 0 && (
-                      <div className={m.attachments.length === 1 ? 'photos single' : 'photos'}>
-                        {m.attachments.map((a, i) => (
-                          <StorageImage
-                            key={a.thumbPath}
-                            path={a.thumbPath}
-                            className="photo"
-                            onClick={() => openPhoto(m, i)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {m.body && <p>{m.body}</p>}
-                  </div>
-                  <div className="meta">
-                    {mine && !m.pending && (
-                      <button type="button" className="link danger" onClick={() => remove(m)}>
-                        삭제
-                      </button>
-                    )}
-                    <span>{m.pending ? '보내는 중' : date?.toLocaleTimeString('ko-KR', { timeStyle: 'short' })}</span>
-                  </div>
-                </div>
-              </div>
+              <MessageItem
+                message={m}
+                mine={mine}
+                author={profiles[m.authorUid]?.name ?? '나간 팀원'}
+                time={m.pending ? '보내는 중' : (date?.toLocaleTimeString('ko-KR', { timeStyle: 'short' }) ?? '')}
+                highlight={currentMatch === m.id}
+                onOpenPhoto={(i) => openPhoto(m, i)}
+                onDelete={() => void remove(m)}
+              />
             </div>
           )
         })}
@@ -162,6 +208,54 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
   )
 }
 
+function MessageItem(props: {
+  message: Message
+  mine: boolean
+  author: string
+  time: string
+  highlight: boolean
+  onOpenPhoto: (index: number) => void
+  onDelete: () => void
+}) {
+  const { message: m, mine } = props
+  // 메시지 메뉴: 휴대폰 길게 누르기, PC 오른쪽 클릭
+  const menu = useItemMenu(() => [
+    ...(m.body
+      ? [{ icon: '📋', label: '복사', onSelect: () => void copyText(m.body) }]
+      : []),
+    ...(mine && !m.pending ? [{ icon: '🗑️', label: '삭제', danger: true, onSelect: props.onDelete }] : []),
+  ])
+  return (
+    <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
+      {!mine && <div className="author">{props.author}</div>}
+      <div className="bubble-row">
+        <div className="bubble has-menu" {...menu}>
+          {m.attachments.length > 0 && (
+            <div className={m.attachments.length === 1 ? 'photos single' : 'photos'}>
+              {m.attachments.map((a, i) => (
+                <StorageImage key={a.thumbPath} path={a.thumbPath} className="photo" onClick={() => props.onOpenPhoto(i)} />
+              ))}
+            </div>
+          )}
+          {m.body && <p>{m.body}</p>}
+        </div>
+        <div className="meta">
+          <span>{props.time}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast('복사했습니다.')
+  } catch {
+    toast('복사하지 못했습니다.', { error: true })
+  }
+}
+
 function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
   const [body, setBody] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
@@ -179,7 +273,7 @@ function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
       setBody('')
       setPhotos([])
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     } finally {
       setBusy(false)
     }

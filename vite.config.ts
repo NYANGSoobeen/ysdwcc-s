@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
 import pkg from './package.json' with { type: 'json' }
 
 const REQUIRED_ENV = [
@@ -28,8 +29,9 @@ export default defineConfig(({ command, mode }) => {
 
 const config = {
   define: {
-    // 화면에 표시할 버전. 배포마다 package.json의 version을 올린다.
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    // 화면(메뉴 왼쪽 아래, 내 정보)에 표시할 버전: package.json 버전 · 빌드 날짜 · 커밋.
+    // 어떤 배포가 폰에 떠 있는지 바로 알 수 있게 한다.
+    __APP_VERSION__: JSON.stringify(buildVersion()),
   },
   plugins: [
     VitePWA({
@@ -60,4 +62,15 @@ const config = {
       },
     }),
   ],
+}
+
+function buildVersion() {
+  const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(2).replaceAll('-', '.')
+  let commit = ''
+  try {
+    commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    // git이 없으면 커밋은 생략
+  }
+  return [pkg.version, date, commit].filter(Boolean).join(' · ')
 }

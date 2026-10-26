@@ -1,8 +1,9 @@
 import { onSnapshot } from 'firebase/firestore'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { errorMessage } from '../auth.ts'
 import type { Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
+import { ask, askText, toast } from '../ui/dialogs.tsx'
 import { findCell } from '../schedule/cells.ts'
 import {
   changeMarks,
@@ -36,12 +37,10 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
   const [zoom, setZoom] = useState(1)
   const [viewport, setViewport] = useState(0)
   const [progress, setProgress] = useState('')
-  const [toast, setToast] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [full, setFull] = useState<{ src: string; marks: Mark[]; page: Page; revoke: boolean } | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // 모든 직원이 실시간으로 같은 스케줄과 스티커를 본다.
   useEffect(
@@ -65,14 +64,10 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
     return () => observer.disconnect()
   }, [schedule === undefined])
 
-  const say = useCallback((text: string) => {
-    clearTimeout(toastTimer.current)
-    setToast(text)
-    toastTimer.current = setTimeout(() => setToast(''), 2600)
-  }, [])
+  const say = toast
 
   async function pickFile(file: File) {
-    if (schedule && !confirm(`새 스케줄을 올리면 지금 스케줄(${schedule.fileName})은 영구 삭제돼요. 계속할까요?`)) return
+    if (schedule && !(await ask({ message: `새 스케줄을 올리면 지금 스케줄(${schedule.fileName})은 영구 삭제돼요. 계속할까요?`, ok: '올리기' }))) return
     try {
       setProgress('준비하는 중…')
       await uploadSchedule(team.id, file, setProgress)
@@ -80,7 +75,7 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
       setSticker(null)
       say('스케줄을 올렸어요.')
     } catch (err) {
-      alert(err instanceof ScheduleFileError ? err.message : `올리지 못했어요. ${errorMessage(err)}`)
+      toast(err instanceof ScheduleFileError ? err.message : `올리지 못했어요. ${errorMessage(err)}`, { error: true })
     } finally {
       setProgress('')
     }
@@ -128,7 +123,7 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
   }
 
   async function removeAll() {
-    if (!confirm('붙인 스티커를 모두 뗄까요?')) return
+    if (!(await ask({ message: '붙인 스티커를 모두 뗄까요?', ok: '모두 떼기', danger: true }))) return
     try {
       await changeMarks(team.id, () => [])
     } catch (err) {
@@ -187,21 +182,21 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
           onClose={() => setMenuOpen(false)}
           onUpload={() => fileInput.current?.click()}
           onRename={async () => {
-            const name = prompt('파일 이름', schedule.fileName)?.trim()
+            const name = (await askText({ title: '파일 이름 바꾸기', value: schedule.fileName, required: '이름을 입력하세요.', ok: '바꾸기' }))?.trim()
             if (!name || name === schedule.fileName) return
             try {
               await renameSchedule(team.id, name)
             } catch (err) {
-              alert(errorMessage(err))
+              toast(errorMessage(err), { error: true })
             }
           }}
           onDelete={async () => {
-            if (!confirm(`스케줄(${schedule.fileName})을 삭제할까요?\n원본, 쪽 그림, 스티커가 모두 영구 삭제되며 되돌릴 수 없어요.`)) return
+            if (!(await ask({ title: '스케줄 삭제', message: `스케줄(${schedule.fileName})을 삭제할까요?\n원본, 쪽 그림, 스티커가 모두 영구 삭제되며 되돌릴 수 없어요.`, ok: '삭제', danger: true }))) return
             try {
               await deleteSchedule(team.id)
               say('스케줄을 삭제했어요.')
             } catch (err) {
-              alert(errorMessage(err))
+              toast(errorMessage(err), { error: true })
             }
           }}
         />
@@ -306,11 +301,6 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
       {progress && (
         <div className="sched-progress" role="status">
           <div className="card">{progress}</div>
-        </div>
-      )}
-      {toast && (
-        <div className="toast" role="status">
-          {toast}
         </div>
       )}
       {full && <ZoomViewer src={full.src} page={full.page} marks={full.marks} title={full.page.name} onClose={closeFull} />}

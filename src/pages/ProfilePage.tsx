@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { ROLE_LABELS } from '../api.ts'
 import { errorMessage, logOutAndWipe, toLoginId } from '../auth.ts'
 import { PasswordForm } from './PasswordForm.tsx'
+import { ask, toast } from '../ui/dialogs.tsx'
 import { db } from '../firebase.ts'
 import { ContactsSync } from './ContactsSync.tsx'
 import type { Profile, Team } from '../hooks.ts'
@@ -40,8 +41,8 @@ export function ProfilePage({ user, profile, team }: Props) {
         <button
           type="button"
           className="danger-button"
-          onClick={() => {
-            if (confirm('로그아웃할까요? 이 기기에 저장된 팀 데이터가 지워집니다.')) void logOutAndWipe()
+          onClick={async () => {
+            if (await ask({ message: '로그아웃할까요? 이 기기에 저장된 팀 데이터가 지워집니다.', ok: '로그아웃' })) void logOutAndWipe()
           }}
         >
           로그아웃
@@ -63,7 +64,7 @@ function NameForm({ uid, name }: { uid: string; name: string }) {
       await updateDoc(doc(db, 'users', uid), { name: value.trim() })
       setSaved(true)
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     }
   }
 

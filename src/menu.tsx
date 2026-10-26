@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 // 왼쪽 위 ☰ 버튼으로 여는 메뉴. 기능이 늘어나면 MENU_ITEMS에 추가한다.
 export type Tab = 'customers' | 'chat' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
@@ -21,6 +21,36 @@ export const MENU_ITEMS: MenuItem[] = [
   { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },
   { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
 ]
+
+// 메뉴 묶음. 제목이 있는 묶음은 제목을 눌러 접고 펼 수 있고, 접은 상태는 기기마다 기억한다.
+// (예: 관리자 전용, 앞으로 생길 단체 채팅방 목록)
+const SECTIONS: { id: MenuItem['section']; title?: string }[] = [
+  { id: 'main' },
+  { id: 'extra' },
+  { id: 'admin', title: '관리자 전용' },
+]
+
+const COLLAPSED_KEY = 'menu-collapsed'
+
+function useCollapsed() {
+  const [collapsed, setCollapsed] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]') as string[]
+    } catch {
+      return []
+    }
+  })
+  function toggle(id: string) {
+    const next = collapsed.includes(id) ? collapsed.filter((c) => c !== id) : [...collapsed, id]
+    setCollapsed(next)
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next))
+    } catch {
+      // 기억하지 못해도 이번에는 접힌다.
+    }
+  }
+  return { collapsed, toggle }
+}
 
 export const MenuContext = createContext<() => void>(() => {})
 
@@ -47,7 +77,7 @@ type MenuListProps = {
 // 메뉴 내용: 휴대폰의 ☰ 서랍과 PC의 왼쪽 고정 메뉴가 같이 쓴다.
 function MenuList({ current, isAdmin, superAdmin, teamName, userName, onSelect, focusable = true, children }: MenuListProps) {
   const items = MENU_ITEMS.filter((i) => (!i.superAdminOnly || superAdmin) && (!i.adminOnly || isAdmin))
-  const section = (name: MenuItem['section']) => items.filter((i) => i.section === name)
+  const { collapsed, toggle } = useCollapsed()
   return (
     <>
       <div className="drawer-head">
@@ -60,11 +90,29 @@ function MenuList({ current, isAdmin, superAdmin, teamName, userName, onSelect, 
         </div>
       </div>
       {children}
-      {(['main', 'extra', 'admin'] as const).map((name) =>
-        section(name).length === 0 ? null : (
-          <ul key={name} className="drawer-list">
-            {name === 'admin' && <li className="drawer-label">관리자 전용</li>}
-            {section(name).map((item) => (
+      {SECTIONS.map(({ id, title }) => {
+        const list = items.filter((i) => i.section === id)
+        if (list.length === 0) return null
+        // 지금 보고 있는 화면이 든 묶음은 접혀 있어도 그 항목만은 보인다.
+        const closed = Boolean(title) && collapsed.includes(id)
+        const shown = closed ? list.filter((i) => i.tab === current) : list
+        return (
+          <ul key={id} className="drawer-list">
+            {title && (
+              <li>
+                <button
+                  type="button"
+                  className="drawer-label"
+                  aria-expanded={!closed}
+                  onClick={() => toggle(id)}
+                  tabIndex={focusable ? 0 : -1}
+                >
+                  {title}
+                  <span aria-hidden="true">{closed ? '▸' : '▾'}</span>
+                </button>
+              </li>
+            )}
+            {shown.map((item) => (
               <li key={item.tab}>
                 <button
                   type="button"
@@ -79,8 +127,9 @@ function MenuList({ current, isAdmin, superAdmin, teamName, userName, onSelect, 
               </li>
             ))}
           </ul>
-        ),
-      )}
+        )
+      })}
+      <p className="app-version">v{__APP_VERSION__}</p>
     </>
   )
 }

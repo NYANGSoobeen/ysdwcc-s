@@ -5,6 +5,9 @@ import { errorMessage, toEmail, toLoginId } from '../auth.ts'
 import { db } from '../firebase.ts'
 import { useMemberProfiles, useTeamsSummary, type Profile, type Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
+import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
+import { ask, askText, tell, toast } from '../ui/dialogs.tsx'
+import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 export const ROLE_HELP: Record<Role, string> = {
   admin: '팀원 관리(추가, 권한, 비밀번호, 삭제), 팀 이름, 모든 기능',
@@ -26,7 +29,8 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
   const uids = Object.keys(team.members)
   const profiles = useMemberProfiles(uids)
   const [adding, setAdding] = useState(false)
-  const sorted = sortMembers(team, profiles)
+  const { query } = useTabSearch()
+  const sorted = filterMembers(sortMembers(team, profiles), profiles, query)
 
   return (
     <div className="page">
@@ -35,6 +39,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
         <h2>관리자</h2>
         <span />
       </header>
+      <SearchBar placeholder="팀원 이름, 아이디 검색" />
       <div className="page-body two-col">
         <p className="notice small">
           🛡️ <strong>{team.name}</strong> 팀의 관리자만 보는 화면입니다.
@@ -52,6 +57,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
             </button>
           </div>
           {adding && <AddMemberForm teamId={team.id} onDone={() => setAdding(false)} />}
+          {sorted.length === 0 && <p className="center muted">검색 결과가 없습니다.</p>}
           <ul className="list">
             {sorted.map((memberUid) => (
               <MemberRow
@@ -90,6 +96,16 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
       </div>
     </div>
   )
+}
+
+// 위쪽 검색칸: 이름이나 아이디로 팀원을 찾는다.
+export function filterMembers(uids: string[], profiles: Record<string, { name: string; email?: string }>, query: string) {
+  const q = query.trim().toLowerCase()
+  if (!q) return uids
+  return uids.filter((id) => {
+    const p = profiles[id]
+    return Boolean(p && (p.name.toLowerCase().includes(q) || toLoginId(p.email).toLowerCase().includes(q)))
+  })
 }
 
 export function sortMembers(team: Team, profiles: Record<string, { name: string }>) {
@@ -157,9 +173,9 @@ function MemberRow(props: {
     setBusy(true)
     try {
       await action()
-      if (done) alert(done)
+      if (done) toast(done)
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     } finally {
       setBusy(false)
     }
@@ -167,43 +183,86 @@ function MemberRow(props: {
 
   function changeRole(next: Role) {
     if (next === role) return
-    void run(() => api.updateMemberRole({ teamId: team.id, uid: memberUid, role: next }))
+    void run(() => api.updateMemberRole({ teamId: team.id, uid: memberUid, role: next }), `${name}님 권한: ${ROLE_LABELS[next]}`)
   }
 
-  function resetPassword() {
-    const password = prompt(`${name}님의 임시 비밀번호 (6자 이상)\n다음에 로그인하면 새 비밀번호를 정하게 됩니다.`)
+  async function resetPassword() {
+    const password = await askText({
+      title: '비밀번호 초기화',
+      message: `${name}님의 임시 비밀번호를 정하세요 (6자 이상).\n다음에 로그인하면 새 비밀번호를 정하게 됩니다.`,
+      label: '임시 비밀번호',
+      ok: '초기화',
+      required: '임시 비밀번호를 입력하세요.',
+    })
     if (!password) return
-    void run(
-      () => api.resetMemberPassword({ teamId: team.id, uid: memberUid, password }),
-      `임시 비밀번호로 바꿨습니다. ${name}님에게 알려 주세요.\n로그인하면 새 비밀번호를 정하게 됩니다.`,
-    )
+    if (password.length < 6) return toast('임시 비밀번호는 6자 이상이어야 합니다.', { error: true })
+    setBusy(true)
+    try {
+      await api.resetMemberPassword({ teamId: team.id, uid: memberUid, password })
+      await tell({
+        title: '임시 비밀번호로 바꿨습니다',
+        message: `${name}님에게 알려 주세요.\n아이디: ${loginId}\n임시 비밀번호: ${password}\n로그인하면 새 비밀번호를 정하게 됩니다.`,
+      })
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    } finally {
+      setBusy(false)
+    }
   }
 
-  function toggleActive() {
+  async function toggleActive() {
     if (inactive) {
-      if (!confirm(`${name}님의 계정을 다시 사용하게 할까요?`)) return
+      if (!(await ask({ message: `${name}님의 계정을 다시 사용하게 할까요?`, ok: '다시 사용' }))) return
       void run(() => api.setMemberActive({ teamId: team.id, uid: memberUid, active: true }), `${name}님이 다시 로그인할 수 있습니다.`)
       return
     }
-    const reason = prompt(`${name}님의 계정을 사용 중지합니다.\n열려 있는 앱은 바로 로그아웃되고, 로그인 화면에 이유가 표시됩니다.\n\n중지 이유:`, '')
-    if (reason === null) return
-    if (!reason.trim()) return alert('중지 이유를 입력하세요.')
+    const reason = await askText({
+      title: '계정 사용 중지',
+      message: `${name}님의 계정을 사용 중지합니다.\n열려 있는 앱은 바로 로그아웃되고, 로그인 화면에 이유가 표시됩니다.`,
+      label: '중지 이유',
+      placeholder: '예: 휴직, 퇴사 예정',
+      ok: '사용 중지',
+      required: '중지 이유를 입력하세요.',
+    })
+    if (!reason?.trim()) return
     void run(
       () => api.setMemberActive({ teamId: team.id, uid: memberUid, active: false, reason: reason.trim() }),
       `${name}님의 계정을 사용 중지했습니다.`,
     )
   }
 
-  function remove() {
-    if (!confirm(`${name}님을 팀에서 삭제할까요?\n\n바로 팀 데이터에 접근할 수 없게 되고, 그 사람 폰에 남은 데이터도 다음에 앱을 열 때 지워집니다. 다른 팀에 속하지 않았다면 계정도 삭제됩니다.`)) return
+  async function remove() {
+    const ok = await ask({
+      title: '팀원 삭제',
+      message: `${name}님을 팀에서 삭제할까요?\n\n바로 팀 데이터에 접근할 수 없게 되고, 그 사람 폰에 남은 데이터도 다음에 앱을 열 때 지워집니다. 다른 팀에 속하지 않았다면 계정도 삭제됩니다.`,
+      ok: '삭제',
+      danger: true,
+    })
+    if (!ok) return
     void run(async () => {
       const { accountDeleted } = await api.removeMember({ teamId: team.id, uid: memberUid })
-      alert(accountDeleted ? `${name}님을 삭제하고 계정도 지웠습니다.` : `${name}님을 이 팀에서 뺐습니다.`)
+      toast(accountDeleted ? `${name}님을 삭제하고 계정도 지웠습니다.` : `${name}님을 이 팀에서 뺐습니다.`)
     })
   }
 
+  // 관리 메뉴: ⋯ 버튼, PC 오른쪽 클릭, 휴대폰 길게 누르기
+  const actions = (): MenuAction[] =>
+    canManage && !isMe
+      ? [
+          ...(Object.keys(ROLE_LABELS) as Role[])
+            .filter((r) => r !== role)
+            .map((r) => ({ icon: '🔑', label: `권한: ${ROLE_LABELS[r]}(으)로`, onSelect: () => changeRole(r) })),
+          { icon: '🔒', label: '비밀번호 초기화', onSelect: () => void resetPassword() },
+          inactive
+            ? { icon: '✅', label: '다시 사용', onSelect: () => void toggleActive() }
+            : { icon: '⛔', label: '사용 중지', onSelect: () => void toggleActive() },
+          { icon: '🗑️', label: '팀에서 삭제', danger: true, onSelect: () => void remove() },
+        ]
+      : []
+  const menu = useItemMenu(actions, name)
+
   return (
-    <li className="row">
+    <li className={canManage && !isMe ? 'row has-menu' : 'row'} {...(canManage && !isMe ? menu : {})}>
       <div className="row-main">
         <strong>
           {name}
@@ -216,26 +275,14 @@ function MemberRow(props: {
       </div>
       {canManage ? (
         <div className="row-actions">
-          <select value={role} onChange={(e) => changeRole(e.target.value as Role)} disabled={busy} aria-label={`${name} 권한`}>
+          <select value={role} onChange={(e) => changeRole(e.target.value as Role)} disabled={busy || isMe} aria-label={`${name} 권한`}>
             {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABELS[r]}
               </option>
             ))}
           </select>
-          {!isMe && (
-            <>
-              <button type="button" className="link" onClick={resetPassword} disabled={busy}>
-                비밀번호
-              </button>
-              <button type="button" className="link" onClick={toggleActive} disabled={busy}>
-                {inactive ? '다시 사용' : '사용 중지'}
-              </button>
-              <button type="button" className="link danger" onClick={remove} disabled={busy}>
-                삭제
-              </button>
-            </>
-          )}
+          {!isMe && <MoreButton actions={actions} title={name} label={`${name} 관리 메뉴`} />}
         </div>
       ) : (
         <span className="badge">{ROLE_LABELS[role]}</span>
@@ -263,11 +310,12 @@ function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void 
         password: form.password,
         role: form.role,
       })
-      alert(
-        existed
-          ? `${form.name}님을 추가했습니다. 이미 있던 계정이라 비밀번호는 그대로입니다.`
-          : `${form.name}님을 추가했습니다.\n아이디: ${form.loginId.trim()}\n임시 비밀번호: ${form.password}\n처음 로그인하면 새 비밀번호를 정하게 됩니다.`,
-      )
+      if (existed) toast(`${form.name}님을 추가했습니다. 이미 있던 계정이라 비밀번호는 그대로입니다.`)
+      else
+        await tell({
+          title: `${form.name}님을 추가했습니다`,
+          message: `아래 내용을 ${form.name}님에게 알려 주세요.\n아이디: ${form.loginId.trim()}\n임시 비밀번호: ${form.password}\n처음 로그인하면 새 비밀번호를 정하게 됩니다.`,
+        })
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -319,8 +367,9 @@ function TeamNameForm({ team }: { team: Team }) {
     setBusy(true)
     try {
       await updateDoc(doc(db, 'teams', team.id), { name: name.trim() })
+      toast('팀 이름을 바꿨습니다.')
     } catch (err) {
-      alert(errorMessage(err))
+      toast(errorMessage(err), { error: true })
     } finally {
       setBusy(false)
     }
