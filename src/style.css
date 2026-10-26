@@ -1,16 +1,23 @@
 :root {
-  --bg: #f5f6f8;
-  --surface: #ffffff;
-  --text: #1f2328;
-  --muted: #656d76;
-  --border: #d8dee4;
-  --accent: #1f6feb;
-  --accent-text: #ffffff;
-  --mine: #fee500;
-  --mine-text: #191919;
-  --danger: #cf222e;
-  --notice-bg: #ddf4ff;
-  --chat-bg: #b2c7d9;
+  /* 팔레트: Merino(바탕) · Rock Blue(보조) · Venice Blue(주색) */
+  --merino: #f5eedd;
+  --rock: #84b3ce;
+  --venice: #16587b;
+  --venice-deep: #0f3f59;
+
+  --bg: var(--merino);
+  --surface: #fffcf5;
+  --text: #12354a;
+  --muted: #5e7380;
+  --border: #e3d9c3;
+  --accent: var(--venice);
+  --accent-text: var(--merino);
+  --mine: var(--venice);
+  --mine-text: var(--merino);
+  --danger: #b3261e;
+  --notice-bg: #dce9f1;
+  --chat-bg: #c9dce8;
+  --shadow: 22 88 123;
   font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -19,16 +26,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --text: #e6edf3;
-    --muted: #8d96a0;
-    --border: #30363d;
-    --accent: #2f81f7;
-    --mine: #e5cf00;
-    --danger: #f85149;
-    --notice-bg: #0c2d6b;
-    --chat-bg: #1c2733;
+    --bg: #0b1e2a;
+    --surface: #12293a;
+    --text: var(--merino);
+    --muted: #9db3c2;
+    --border: #24435a;
+    --accent: var(--rock);
+    --accent-text: #0b1e2a;
+    --mine: var(--rock);
+    --mine-text: #0b1e2a;
+    --danger: #f2827a;
+    --notice-bg: #173b52;
+    --chat-bg: #0f2433;
+    --shadow: 0 0 0;
   }
 }
 
@@ -198,6 +208,23 @@ h3 {
   color: var(--muted);
 }
 
+.form label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.form label.check input {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .form label input,
 .form label select,
 .inline-form label input {
@@ -252,7 +279,7 @@ h3 {
   width: 96px;
   height: 96px;
   border-radius: 22px;
-  box-shadow: 0 8px 24px rgb(31 111 235 / 0.3);
+  box-shadow: 0 8px 24px rgb(var(--shadow) / 0.3);
 }
 
 .login h1 {
@@ -305,6 +332,7 @@ h3 {
 .tab.active {
   color: var(--accent);
   font-weight: 600;
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 
 .page,
@@ -457,6 +485,42 @@ h3 {
   background: var(--notice-bg);
   color: var(--accent);
   font-weight: 600;
+}
+
+/* 메뉴(휴대폰 ☰, PC 왼쪽 메뉴): Venice Blue 바탕에 Merino 글씨 */
+.drawer,
+.sidebar {
+  --surface: var(--venice);
+  --text: var(--merino);
+  --muted: var(--rock);
+  --border: rgb(245 238 221 / 0.16);
+  --notice-bg: rgb(132 179 206 / 0.24);
+  --accent: var(--merino);
+  --bg: rgb(245 238 221 / 0.08);
+  color: var(--text);
+}
+
+.drawer .drawer-item,
+.sidebar .drawer-item {
+  color: var(--text);
+}
+
+.drawer .drawer-item.active,
+.sidebar .drawer-item.active {
+  box-shadow: inset 3px 0 0 var(--rock);
+}
+
+.sidebar select,
+.drawer select {
+  background: var(--venice-deep);
+  color: var(--merino);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .drawer,
+  :root:not([data-theme='light']) .sidebar {
+    --surface: #0f2433;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1359,8 +1423,8 @@ details.small summary {
   max-width: calc(100vw - 32px);
   padding: 10px 16px;
   border-radius: 999px;
-  background: #1f2328;
-  color: #ffffff;
+  background: var(--venice-deep);
+  color: var(--merino);
   font-size: 14px;
   text-align: center;
 }
@@ -1440,8 +1504,8 @@ details.small summary {
   gap: 12px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #1f2328;
-  color: #ffffff;
+  background: var(--venice-deep);
+  color: var(--merino);
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
 }
 
@@ -1450,8 +1514,8 @@ details.small summary {
   padding: 8px 14px;
   border: 0;
   border-radius: 8px;
-  background: #1f6feb;
-  color: #ffffff;
+  background: var(--rock);
+  color: var(--venice-deep);
   font-weight: 600;
 }
 

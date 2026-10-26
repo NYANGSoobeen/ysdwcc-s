@@ -27,8 +27,29 @@ export function LoginPage() {
   )
 }
 
+// 아이디 저장: 이 기기(브라우저)에만 아이디를 기억한다. 비밀번호는 저장하지 않는다.
+const SAVED_ID_KEY = 'saved-login-id'
+
+function savedLoginId() {
+  try {
+    return localStorage.getItem(SAVED_ID_KEY)
+  } catch {
+    return null
+  }
+}
+
+function saveLoginId(loginId: string | null) {
+  try {
+    if (loginId) localStorage.setItem(SAVED_ID_KEY, loginId)
+    else localStorage.removeItem(SAVED_ID_KEY)
+  } catch {
+    // 저장소를 못 쓰면 매번 입력한다.
+  }
+}
+
 function LoginForm() {
-  const [loginId, setLoginId] = useState('')
+  const [loginId, setLoginId] = useState(() => savedLoginId() ?? '')
+  const [remember, setRemember] = useState(() => savedLoginId() !== null)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,6 +60,7 @@ function LoginForm() {
     setError('')
     try {
       await logIn(loginId, password)
+      saveLoginId(remember ? loginId.trim() : null)
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)
@@ -54,6 +76,7 @@ function LoginForm() {
           onChange={(e) => setLoginId(e.target.value)}
           autoComplete="username"
           autoCapitalize="none"
+          autoFocus={!loginId}
           required
         />
       </label>
@@ -64,8 +87,13 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
+          autoFocus={Boolean(loginId)}
           required
         />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+        아이디 저장
       </label>
       {error && <p className="error">{error}</p>}
       <button className="primary" disabled={busy}>

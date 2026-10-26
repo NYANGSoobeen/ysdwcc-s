@@ -43,8 +43,8 @@ const config = {
         lang: 'ko',
         start_url: '/',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#1f6feb',
+        background_color: '#f5eedd',
+        theme_color: '#16587b',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
