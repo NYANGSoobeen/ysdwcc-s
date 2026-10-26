@@ -36,7 +36,7 @@ export function UsagePage({ team }: { team: Team }) {
           새로고침
         </button>
       </header>
-      <div className="page-body">
+      <div className="page-body masonry">
         {error && <p className="error">{error}</p>}
         {!usage && !error && <p className="center muted">계산하는 중…</p>}
         {usage && (

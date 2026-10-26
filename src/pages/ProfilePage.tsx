@@ -22,7 +22,8 @@ export function ProfilePage({ user, profile, team }: Props) {
         <h2>내 정보</h2>
         <span />
       </header>
-      <div className="page-body">
+      <div className="page-body two-col">
+        <div className="col">
         <section className="card">
           <NameForm uid={user.uid} name={profile.name} />
           <dl className="stats">
@@ -31,8 +32,10 @@ export function ProfilePage({ user, profile, team }: Props) {
             <div><dt>권한</dt><dd>{profile.superAdmin ? '최고 관리자 (모든 팀)' : ROLE_LABELS[team.members[user.uid]]}</dd></div>
           </dl>
         </section>
-        <ContactsSync uid={user.uid} />
         <PasswordForm />
+        </div>
+        <div className="col">
+        <ContactsSync uid={user.uid} />
         <button
           type="button"
           className="danger-button"
@@ -43,6 +46,7 @@ export function ProfilePage({ user, profile, team }: Props) {
           로그아웃
         </button>
         <p className="muted small center">버전 {__APP_VERSION__}</p>
+        </div>
       </div>
     </div>
   )

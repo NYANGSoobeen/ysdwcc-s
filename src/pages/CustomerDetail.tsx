@@ -27,11 +27,13 @@ type Props = {
   team: Team
   uid: string
   profiles: Record<string, Profile>
+  embedded?: boolean // PC 2단 화면의 오른쪽 칸에 넣을 때
   onClose: () => void
   onOpenOther: (customerId: string) => void
 }
 
-export function CustomerDetail({ customerId, team, uid, profiles, onClose, onOpenOther }: Props) {
+export function CustomerDetail({ customerId, team, uid, profiles, embedded = false, onClose, onOpenOther }: Props) {
+  const frame = embedded ? 'detail-pane' : 'overlay'
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [notes, setNotes] = useState<Note[]>([])
   const [editing, setEditing] = useState(false)
@@ -75,7 +77,7 @@ export function CustomerDetail({ customerId, team, uid, profiles, onClose, onOpe
 
   if (!customer) {
     return (
-      <div className="overlay">
+      <div className={frame}>
         <p className="center muted">불러오는 중…</p>
       </div>
     )
@@ -95,10 +97,10 @@ export function CustomerDetail({ customerId, team, uid, profiles, onClose, onOpe
   }
 
   return (
-    <div className="overlay">
+    <div className={frame}>
       <header className="page-header">
-        <button type="button" className="ghost" onClick={onClose} aria-label="고객 목록으로">
-          ‹
+        <button type="button" className="ghost" onClick={onClose} aria-label={embedded ? '닫기' : '고객 목록으로'}>
+          {embedded ? '✕' : '‹'}
         </button>
         <h2>{customer.name}</h2>
         {canWrite ? (

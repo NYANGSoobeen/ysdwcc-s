@@ -15,7 +15,7 @@ import { useMemberProfiles, type Team } from '../hooks.ts'
 import { CustomerDetail } from './CustomerDetail.tsx'
 import { MenuButton } from '../menu.tsx'
 
-export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
+export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string; desktop: boolean }) {
   const [customers, setCustomers] = useState<Customer[] | null>(null)
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
@@ -49,8 +49,23 @@ export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
     return { due, rest: list }
   }, [customers, search])
 
+  const detail = openId ? (
+    <CustomerDetail
+      key={openId}
+      customerId={openId}
+      team={team}
+      uid={uid}
+      profiles={profiles}
+      embedded={desktop}
+      onClose={() => setOpenId(null)}
+      onOpenOther={setOpenId}
+    />
+  ) : null
+
+  // PC: 왼쪽 목록 | 오른쪽 상세 (2단). 휴대폰: 목록 위에 상세를 전체 화면으로 띄운다.
   return (
-    <div className="page">
+    <div className={desktop ? 'split' : 'page'}>
+    <div className={desktop ? 'page split-list' : 'contents'}>
       <header className="page-header">
         <MenuButton />
         <h2>고객 {customers ? customers.length : ''}</h2>
@@ -85,7 +100,7 @@ export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
             <h3>오늘까지 연락할 고객</h3>
             <ul className="list">
               {due.map((c) => (
-                <CustomerRow key={c.id} customer={c} showDue onOpen={() => setOpenId(c.id)} />
+                <CustomerRow key={c.id} customer={c} showDue selected={desktop && openId === c.id} onOpen={() => setOpenId(c.id)} />
               ))}
             </ul>
           </section>
@@ -104,6 +119,7 @@ export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
                     key={c.id}
                     customer={c}
                     owner={profiles[c.ownerUid]?.name}
+                    selected={desktop && openId === c.id}
                     onOpen={() => setOpenId(c.id)}
                   />
                 ))}
@@ -112,26 +128,29 @@ export function CustomersPage({ team, uid }: { team: Team; uid: string }) {
           </section>
         )}
       </div>
-      {openId && (
-        <CustomerDetail
-          customerId={openId}
-          team={team}
-          uid={uid}
-          profiles={profiles}
-          onClose={() => setOpenId(null)}
-          onOpenOther={setOpenId}
-        />
+    </div>
+      {desktop ? (
+        <div className="split-detail">
+          {detail ?? (
+            <div className="split-empty">
+              <span aria-hidden="true">📇</span>
+              <p>왼쪽 목록에서 고객을 고르면 여기에 상세 정보와 상담 이력이 보여요.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        detail
       )}
     </div>
   )
 }
 
-function CustomerRow(props: { customer: Customer; owner?: string; showDue?: boolean; onOpen: () => void }) {
-  const { customer: c, owner, showDue, onOpen } = props
+function CustomerRow(props: { customer: Customer; owner?: string; showDue?: boolean; selected?: boolean; onOpen: () => void }) {
+  const { customer: c, owner, showDue, selected, onOpen } = props
   const overdue = showDue && c.nextContactAt && c.nextContactAt.toDate() < startOfToday()
   return (
     <li>
-      <button type="button" className="row row-button" onClick={onOpen}>
+      <button type="button" className={selected ? 'row row-button selected' : 'row row-button'} onClick={onOpen} aria-current={selected || undefined}>
         <div className="row-main">
           <strong>{c.name}</strong>
           <span className="muted small">

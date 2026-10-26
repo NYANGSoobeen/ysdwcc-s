@@ -1438,3 +1438,329 @@ details.small summary {
   color: #ffffff;
   font-weight: 600;
 }
+
+/* 2열 화면(내 정보, 관리자)의 열: 휴대폰에서는 상자 없이 한 줄로 쌓인다 */
+.page-body > .col {
+  display: contents;
+}
+
+.page-body > .col > * {
+  flex-shrink: 0;
+}
+
+/* 휴대폰 목록 래퍼: PC가 아닐 때는 상자 없이 내용만 보인다 */
+.contents {
+  display: contents;
+}
+
+/* ══════════════════════════════════════════════════════════
+   PC 화면 (가로 1024px 이상)
+   왼쪽 고정 메뉴, 넓은 본문, 고객 2단, 카드 여러 열. 휴대폰 화면은 위의 기본 규칙 그대로.
+   ══════════════════════════════════════════════════════════ */
+.shell-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-select select {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+.sidebar {
+  display: none;
+}
+
+.shell.desktop {
+  --sidebar-w: 248px;
+  flex-direction: row;
+  max-width: none;
+  height: 100dvh;
+}
+
+.shell.desktop .sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  padding: 20px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+}
+
+.shell.desktop .sidebar .team-select {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shell.desktop .sidebar .drawer-item {
+  min-height: 42px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+/* 머리줄: ☰ 버튼 없이 제목을 왼쪽에 */
+.shell.desktop .page-header:has(> .menu-button) {
+  grid-template-columns: 1fr auto;
+  min-height: 64px;
+  padding: 0 32px;
+}
+
+.shell.desktop .page-header:has(> .menu-button) .menu-button {
+  display: none;
+}
+
+.shell.desktop .page-header:has(> .menu-button) h2 {
+  text-align: left;
+  font-size: 20px;
+}
+
+.shell.desktop .page-header > :last-child:not(h2) {
+  justify-self: end;
+}
+
+.shell.desktop .page-body {
+  padding: 24px 32px 40px;
+}
+
+/* 내 정보, 용량, 관리자: 카드를 여러 열로 */
+.shell.desktop .page-body.masonry {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  align-items: start;
+  align-content: start;
+  gap: 24px;
+}
+
+/* 내 정보, 관리자: 왼쪽 주요 내용 | 오른쪽 보조 내용 */
+.shell.desktop .page-body.two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr);
+  align-items: start;
+  align-content: start;
+  gap: 24px;
+  max-width: 1280px;
+}
+
+.shell.desktop .page-body.two-col > .notice {
+  grid-column: 1 / -1;
+}
+
+.shell.desktop .page-body.two-col > .col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* 안내 문구와 맨 아래 작은 글씨는 한 줄 전체를 쓴다 */
+.shell.desktop .page-body.masonry > .notice,
+.shell.desktop .page-body.masonry > p.small {
+  grid-column: 1 / -1;
+}
+
+/* 팀원 목록처럼 한 줄 목록은 너무 넓게 퍼지지 않게 */
+.shell.desktop .page-body:not(.masonry) > .list,
+.shell.desktop .page-body:not(.masonry) > .help,
+.shell.desktop .page-body:not(.masonry) > button.primary {
+  max-width: 880px;
+}
+
+.shell.desktop .page-body > button.primary {
+  align-self: flex-start;
+  padding: 10px 20px;
+}
+
+/* 고객: 왼쪽 목록 | 오른쪽 상세 */
+.split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(340px, 420px) 1fr;
+}
+
+.split-list {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.shell.desktop .split-list .page-header:has(> .menu-button) {
+  padding: 0 20px;
+}
+
+.shell.desktop .split-list .page-body {
+  padding: 16px 20px 32px;
+}
+
+.split-detail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.detail-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-pane .overlay-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.shell.desktop .detail-pane .page-body {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.split-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.split-empty span {
+  font-size: 48px;
+}
+
+.row-button.selected {
+  background: var(--notice-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* 전체 화면 위에 뜨는 화면(사진 모아보기 등)은 PC에서 왼쪽 메뉴를 가리지 않는다 */
+.shell.desktop .overlay {
+  left: var(--sidebar-w);
+  max-width: none;
+  margin: 0;
+}
+
+.shell.desktop .grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+/* 채팅: 넓은 화면에서는 말풍선을 너무 길게 늘이지 않는다 */
+.shell.desktop .messages {
+  padding: 20px 32px;
+}
+
+.shell.desktop .bubble-row {
+  max-width: min(640px, 65%);
+}
+
+.shell.desktop .photos {
+  grid-template-columns: repeat(3, 120px);
+}
+
+.shell.desktop .photos.single {
+  grid-template-columns: 280px;
+}
+
+.shell.desktop .composer {
+  padding: 12px 32px;
+}
+
+/* 스케줄: 스티커 버튼, 안내, 확대 버튼을 한 줄에 */
+.shell.desktop .sched-tools {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 32px;
+}
+
+.shell.desktop .sticker-rows {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shell.desktop .sticker-row + .sticker-row {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+.shell.desktop .sticker-button {
+  min-width: 56px;
+  min-height: 40px;
+  font-size: 16px;
+}
+
+.shell.desktop .sched-hint {
+  order: 3;
+  flex-basis: 100%;
+}
+
+.shell.desktop .zoom-row {
+  margin-left: auto;
+}
+
+.shell.desktop .sched-scroll {
+  padding: 20px 32px;
+}
+
+.shell.desktop .file-menu {
+  top: 64px;
+  right: 32px;
+}
+
+/* 알림은 하단 탭이 없으니 오른쪽 아래로 */
+.shell.desktop ~ #update-banner,
+body:has(.shell.desktop) #update-banner {
+  left: auto;
+  right: 24px;
+  bottom: 24px;
+  width: 380px;
+}
+
+body:has(.shell.desktop) .toast {
+  bottom: 32px;
+  left: calc(50% + 124px);
+}
+
+/* 마우스를 쓰는 화면: 가리키면 살짝 표시 */
+@media (hover: hover) {
+  .row-button:hover,
+  .drawer-item:hover:not(.active),
+  .grid-cell:hover {
+    background: var(--bg);
+  }
+
+  button:not(:disabled):hover {
+    filter: brightness(0.97);
+  }
+
+  button.primary:not(:disabled):hover {
+    filter: brightness(1.08);
+  }
+
+  .sticker-button:hover {
+    filter: brightness(1.04);
+  }
+}

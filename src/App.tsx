@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api.ts'
 import { logOutAndWipe } from './auth.ts'
 import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
-import { MenuContext, MenuDrawer, type Tab } from './menu.tsx'
+import { MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage } from './pages/ChatPage.tsx'
@@ -13,6 +13,7 @@ import { MembersPage } from './pages/MembersPage.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
 import { SchedulePage } from './pages/SchedulePage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
+import { useIsDesktop } from './useMedia.ts'
 
 const TEAM_KEY = 'selected-team'
 
@@ -42,6 +43,7 @@ function SignedIn({ user }: { user: User }) {
   const teamNames = useTeamNames(teamIds)
   const [tab, setTab] = useState<Tab>('customers')
   const [menuOpen, setMenuOpen] = useState(false)
+  const desktop = useIsDesktop()
 
   function selectTeam(id: string) {
     setSelectedTeamId(id)
@@ -79,61 +81,57 @@ function SignedIn({ user }: { user: User }) {
   const isAdmin = team.members[user.uid] === 'admin'
   const current = (tab === 'usage' && !superAdmin) || (tab === 'admin' && !isAdmin) ? 'customers' : tab
 
+  const teamSelect =
+    teamIds.length > 1 ? (
+      <label className="team-select">
+        <span className="muted small">팀</span>
+        <select value={team.id} onChange={(e) => selectTeam(e.target.value)} aria-label="팀 바꾸기">
+          {teamIds.map((id) => (
+            <option key={id} value={id}>
+              {teamNames[id] || '…'}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null
+  const menuProps = { current, isAdmin, superAdmin, teamName: team.name, userName: profile.name, onSelect: setTab }
+
   return (
     <MenuContext.Provider value={() => setMenuOpen(true)}>
-    <div className="shell">
-      {teamIds.length > 1 && (
-        <div className="teambar">
-          <label>
-            <span className="muted small">팀</span>
-            <select value={team.id} onChange={(e) => selectTeam(e.target.value)} aria-label="팀 바꾸기">
-              {teamIds.map((id) => (
-                <option key={id} value={id}>
-                  {teamNames[id] || '…'}
-                </option>
-              ))}
-            </select>
-          </label>
+      <div className={desktop ? 'shell desktop' : 'shell'}>
+        {desktop && <Sidebar {...menuProps}>{teamSelect}</Sidebar>}
+        <div className="shell-main">
+          {!desktop && teamSelect && <div className="teambar">{teamSelect}</div>}
+          <div className="shell-body">
+            {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} />}
+            {current === 'chat' && <ChatPage team={team} uid={user.uid} />}
+            {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
+            {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('admin')} />}
+            {current === 'admin' && (
+              <AdminPage
+                team={team}
+                uid={user.uid}
+                superAdmin={superAdmin}
+                teamIds={teamIds}
+                onSelectTeam={selectTeam}
+                onOpenUsage={() => setTab('usage')}
+              />
+            )}
+            {current === 'usage' && <UsagePage team={team} />}
+            {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
+          </div>
+          {!desktop && (
+            <nav className="tabbar">
+              <TabButton active={current === 'customers'} onClick={() => setTab('customers')} icon="📇" label="고객" />
+              <TabButton active={current === 'chat'} onClick={() => setTab('chat')} icon="💬" label="채팅" />
+              <TabButton active={current === 'schedule'} onClick={() => setTab('schedule')} icon="📅" label="스케줄" />
+              <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
+              <TabButton active={current === 'profile'} onClick={() => setTab('profile')} icon="⚙️" label="내 정보" />
+            </nav>
+          )}
         </div>
-      )}
-      <div className="shell-body">
-        {current === 'customers' && <CustomersPage team={team} uid={user.uid} />}
-        {current === 'chat' && <ChatPage team={team} uid={user.uid} />}
-        {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
-        {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('admin')} />}
-        {current === 'admin' && (
-          <AdminPage
-            team={team}
-            uid={user.uid}
-            superAdmin={superAdmin}
-            teamIds={teamIds}
-            onSelectTeam={selectTeam}
-            onOpenUsage={() => setTab('usage')}
-          />
-        )}
-        {current === 'usage' && <UsagePage team={team} />}
-        {current === 'profile' && (
-          <ProfilePage user={user} profile={profile} team={team} />
-        )}
+        {!desktop && <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)} />}
       </div>
-      <nav className="tabbar">
-        <TabButton active={current === 'customers'} onClick={() => setTab('customers')} icon="📇" label="고객" />
-        <TabButton active={current === 'chat'} onClick={() => setTab('chat')} icon="💬" label="채팅" />
-        <TabButton active={current === 'schedule'} onClick={() => setTab('schedule')} icon="📅" label="스케줄" />
-        <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
-        <TabButton active={current === 'profile'} onClick={() => setTab('profile')} icon="⚙️" label="내 정보" />
-      </nav>
-      <MenuDrawer
-        open={menuOpen}
-        current={current}
-        isAdmin={isAdmin}
-        superAdmin={superAdmin}
-        teamName={team.name}
-        userName={profile.name}
-        onSelect={setTab}
-        onClose={() => setMenuOpen(false)}
-      />
-    </div>
     </MenuContext.Provider>
   )
 }

@@ -35,12 +35,13 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
         <h2>관리자</h2>
         <span />
       </header>
-      <div className="page-body">
+      <div className="page-body two-col">
         <p className="notice small">
           🛡️ <strong>{team.name}</strong> 팀의 관리자만 보는 화면입니다.
           {superAdmin && ' 최고 관리자는 아래에서 모든 팀을 관리할 수 있습니다.'}
         </p>
 
+        <div className="col">
         <TeamNameForm team={team} />
 
         <section className="admin-section">
@@ -68,7 +69,9 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
             팀에서 삭제하면 그 사람은 바로 팀 데이터에 접근할 수 없고, 폰에 남은 데이터도 다음에 앱을 열 때 지워집니다.
           </p>
         </section>
+        </div>
 
+        <div className="col">
         {superAdmin && (
           <section className="admin-section">
             <h3>최고 관리자</h3>
@@ -81,6 +84,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
         )}
 
         <RoleHelp />
+        </div>
       </div>
     </div>
   )
