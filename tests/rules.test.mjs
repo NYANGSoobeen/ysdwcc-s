@@ -97,13 +97,19 @@ test('팀에서 빠지면 바로 팀 데이터에 접근할 수 없다', async (
   await assertFails(getDoc(doc(fs('ed2'), 'teams/t1')))
 })
 
-test('채팅 사진: editor만 올리고, 팀원만 보고, 크기와 형식 제한', async () => {
+test('채팅 사진·파일: editor만 올리고, 팀원만 보고, 크기와 형식 제한', async () => {
   const meta = (uid, contentType = 'image/jpeg') => ({ contentType, customMetadata: { uploaderUid: uid } })
   await assertSucceeds(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/0.jpg'), jpeg, meta('ed')))
   await assertFails(uploadBytes(ref(st('viewer'), 'teams/t1/chat/m1/1.jpg'), jpeg, meta('viewer')))
   await assertFails(uploadBytes(ref(st('outsider'), 'teams/t1/chat/m1/1.jpg'), jpeg, meta('outsider')))
   await assertFails(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/1.pdf'), jpeg, meta('ed', 'application/pdf')))
   await assertFails(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/big.jpg'), new Uint8Array(2 * 1024 * 1024 + 1), meta('ed')))
+  // 첨부 파일(f_번호.확장자): 엑셀·PDF·한글 등 10MB 이하만
+  await assertSucceeds(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/f_0.pdf'), jpeg, meta('ed', 'application/pdf')))
+  await assertSucceeds(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/f_1.hwp'), jpeg, meta('ed', 'application/octet-stream')))
+  await assertFails(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/f_2.exe'), jpeg, meta('ed', 'application/octet-stream')))
+  await assertFails(uploadBytes(ref(st('ed'), 'teams/t1/chat/m1/f_3.xlsx'), new Uint8Array(10 * 1024 * 1024 + 1), meta('ed', 'application/octet-stream')))
+  await assertFails(uploadBytes(ref(st('viewer'), 'teams/t1/chat/m1/f_4.pdf'), jpeg, meta('viewer', 'application/pdf')))
   await assertFails(deleteObject(ref(st('ed2'), 'teams/t1/chat/m1/0.jpg')))
   await assertSucceeds(deleteObject(ref(st('ed'), 'teams/t1/chat/m1/0.jpg')))
 })

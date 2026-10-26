@@ -67,6 +67,12 @@
   - 삭제: 글·사진은 바로 영구 삭제(사진 파일은 올린 사람이 지움)하고 `deleted: true`인 빈 메시지가 "삭제된 메시지입니다"로 남는다 (대화 흐름 유지). 용량 관리의 기간 삭제는 문서째 지운다.
   - 스티커(공감): `reactions {uid: 이모지}`, 한 사람에 하나(👍 ❤️ 😂 😮 😢 🙏 ✅, `REACTIONS`). 팀원 누구나(보기 권한 포함) 자기 것만 바꿀 수 있다(규칙 `canUpdateMessage`). 말풍선 아래 개수 표시, 누르면 내 것 붙이기/떼기.
   - 글 속 주소는 눌러서 새 탭으로 열린다.
+- **사진 여러 장과 파일 (공통 기능 4-3):**
+  - 입력칸 ＋ 메뉴: 🖼️ 사진 보관함 / 📷 사진 찍기(휴대폰만) / 📁 파일 선택. PC는 Ctrl+V로 캡처 붙여넣기, 채팅 화면 아무 데나 끌어다 놓기.
+  - 사진은 한 번에 최대 30장(`MAX_PHOTOS`)을 한 메시지로, 줄여서(긴 쪽 1600px + 썸네일 400px) 3장씩 동시에 올리며 "올리는 중… 3/12" 표시. 말풍선 격자: 1장은 크게, 2·4장은 2칸, 나머지는 3칸(`photoCols`).
+  - 파일: 엑셀·CSV·PDF·한글·워드·파워포인트·압축·텍스트(`FILE_EXTS`), 10MB 이하. Storage `teams/{teamId}/chat/{msgId}/f_{번호}.{확장자}`(규칙도 같은 목록·크기), 메시지 `files[{path, name, size, type}]`. 파일 카드: PC에서 PDF는 새 탭, 나머지와 휴대폰은 저장(`saveFile`). 메시지 메뉴 💾 파일 저장.
+  - 크게 보기(`PhotoViewer`): 이 방에 불러온 사진 전체를 ← → / 밀어서 넘김, 두 손가락 확대, 두 번 눌러 확대/원래대로, 확대 중엔 한 손가락으로 이동(밀어도 안 넘어감), PC는 휠 확대.
+  - 용량 관리: 사진 장수는 원본(`숫자.jpg`)만 세고, 파일은 용량에만 넣는다. 기간 삭제는 파일도 함께 지운다.
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문).
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **용량 탭(최고 관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
@@ -133,7 +139,7 @@ teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null)
 teams/{teamId}/channels/{channelId}  name, createdBy, createdAt   (단체 채팅방, main은 기본 방 이름만)
 teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모양
 teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], customerTags[customerId],
-                                 replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}],
+                                 replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}], files[{path, name, size, type}],
                                  reactions{uid: 이모지}, deleted, editedAt,
                                  hasPhotos (사진 모아보기 조회용), createdAt, editedAt
 ```

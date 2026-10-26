@@ -23,6 +23,23 @@ export type Attachment = {
   thumbSize: number
 }
 
+// 채팅에 붙이는 파일 (사진이 아닌 것). 서버 규칙(storage.rules)과 같은 목록, 10MB 이하.
+export type ChatFile = { path: string; name: string; size: number; type: string }
+export const FILE_EXTS = ['xls', 'xlsx', 'csv', 'pdf', 'hwp', 'hwpx', 'doc', 'docx', 'ppt', 'pptx', 'zip', 'txt']
+export const FILE_MAX_BYTES = 10 * 1024 * 1024
+export const MAX_PHOTOS = 30
+
+export const extOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''
+export const isPhotoFile = (f: File) => f.type.startsWith('image/') && !/svg/.test(f.type)
+
+// 보낼 수 없는 파일이면 이유를 돌려준다.
+export function fileProblem(f: File) {
+  if (isPhotoFile(f)) return null
+  if (!FILE_EXTS.includes(extOf(f.name))) return `"${f.name}"은(는) 보낼 수 없는 파일이에요. (엑셀·PDF·한글·워드·파워포인트·압축·텍스트만)`
+  if (f.size > FILE_MAX_BYTES) return `"${f.name}"은(는) 10MB를 넘어 보낼 수 없어요.`
+  return null
+}
+
 const PHOTO_MAX_SIDE = 1600
 const THUMB_MAX_SIDE = 400
 const JPEG_QUALITY = 0.8
@@ -101,9 +118,10 @@ export async function deleteChannel(teamId: string, channelId: string) {
 // 답장: 원문의 일부를 같이 저장해 두어, 원문을 불러오지 않아도 미리보기를 보여 준다.
 export type ReplyTo = { id: string; authorUid: string; text: string }
 
-export function replyPreview(message: { body: string; attachments: Attachment[] }) {
+export function replyPreview(message: { body: string; attachments: Attachment[]; files?: ChatFile[] }) {
   if (message.body) return message.body.replace(/\s+/g, ' ').slice(0, 80)
-  return message.attachments.length ? `사진 ${message.attachments.length}장` : ''
+  if (message.attachments.length) return `사진 ${message.attachments.length}장`
+  return message.files?.length ? `파일 ${message.files[0].name}` : ''
 }
 
 export async function sendMessage(
@@ -112,32 +130,48 @@ export async function sendMessage(
   body: string,
   photos: File[] = [],
   replyTo: ReplyTo | null = null,
+  files: File[] = [],
+  onProgress?: (done: number, total: number) => void,
 ) {
   const uid = auth.currentUser!.uid
   const messageRef = doc(messagesRef(teamId, channelId))
   const folder = `teams/${teamId}/chat/${messageRef.id}`
-  const metadata = { contentType: 'image/jpeg', customMetadata: { uploaderUid: uid } }
+  const meta = (contentType: string) => ({ contentType, customMetadata: { uploaderUid: uid } })
 
   const uploaded: string[] = []
-  const attachments: Attachment[] = []
+  const attachments: Attachment[] = new Array(photos.length)
+  const chatFiles: ChatFile[] = []
+  const total = photos.length + files.length
+  let done = 0
+  const tick = () => onProgress?.(++done, total)
   try {
-    for (const [i, file] of photos.entries()) {
-      const photo = await resizeToJpeg(file, PHOTO_MAX_SIDE)
-      const thumb = await resizeToJpeg(file, THUMB_MAX_SIDE)
-      const path = `${folder}/${i}.jpg`
-      const thumbPath = `${folder}/${i}_thumb.jpg`
-      await uploadBytes(ref(storage, path), photo.blob, metadata)
+    // 사진은 줄여서(긴 쪽 1600px, 썸네일 400px) 3장씩 동시에 올린다.
+    let next = 0
+    const worker = async () => {
+      while (next < photos.length) {
+        const i = next++
+        const file = photos[i]
+        const photo = await resizeToJpeg(file, PHOTO_MAX_SIDE)
+        const thumb = await resizeToJpeg(file, THUMB_MAX_SIDE)
+        const path = `${folder}/${i}.jpg`
+        const thumbPath = `${folder}/${i}_thumb.jpg`
+        await uploadBytes(ref(storage, path), photo.blob, meta('image/jpeg'))
+        uploaded.push(path)
+        await uploadBytes(ref(storage, thumbPath), thumb.blob, meta('image/jpeg'))
+        uploaded.push(thumbPath)
+        attachments[i] = { path, thumbPath, width: photo.width, height: photo.height, size: photo.blob.size, thumbSize: thumb.blob.size }
+        tick()
+      }
+    }
+    await Promise.all([worker(), worker(), worker()])
+
+    for (const [i, file] of files.entries()) {
+      const path = `${folder}/f_${i}.${extOf(file.name)}`
+      const type = file.type || 'application/octet-stream'
+      await uploadBytes(ref(storage, path), file, meta(type))
       uploaded.push(path)
-      await uploadBytes(ref(storage, thumbPath), thumb.blob, metadata)
-      uploaded.push(thumbPath)
-      attachments.push({
-        path,
-        thumbPath,
-        width: photo.width,
-        height: photo.height,
-        size: photo.blob.size,
-        thumbSize: thumb.blob.size,
-      })
+      chatFiles.push({ path, name: file.name, size: file.size, type })
+      tick()
     }
 
     await setDoc(messageRef, {
@@ -147,6 +181,7 @@ export async function sendMessage(
       customerTags: [],
       replyTo,
       attachments,
+      files: chatFiles,
       // 사진 모아보기에서 사진이 있는 메시지만 조회하기 위한 표시
       hasPhotos: attachments.length > 0,
       createdAt: serverTimestamp(),
@@ -165,11 +200,16 @@ export async function editMessage(teamId: string, channelId: string, messageId: 
 }
 
 // 내 메시지 삭제: 글과 사진은 바로 영구 삭제하고, 대화 흐름이 끊기지 않게 "삭제된 메시지입니다" 자리만 남긴다.
-export async function deleteMessage(teamId: string, channelId: string, message: { id: string; attachments: Attachment[] }) {
+export async function deleteMessage(
+  teamId: string,
+  channelId: string,
+  message: { id: string; attachments: Attachment[]; files: ChatFile[] },
+) {
   await updateDoc(doc(messagesRef(teamId, channelId), message.id), {
     deleted: true,
     body: '',
     attachments: [],
+    files: [],
     hasPhotos: false,
     replyTo: null,
     mentions: [],
@@ -177,9 +217,10 @@ export async function deleteMessage(teamId: string, channelId: string, message: 
     editedAt: null,
   })
   // 사진 파일은 올린 사람이 지울 수 있다 (Storage 규칙).
-  await Promise.allSettled(
-    message.attachments.flatMap((a) => [deleteObject(ref(storage, a.path)), deleteObject(ref(storage, a.thumbPath))]),
-  )
+  await Promise.allSettled([
+    ...message.attachments.flatMap((a) => [deleteObject(ref(storage, a.path)), deleteObject(ref(storage, a.thumbPath))]),
+    ...message.files.map((f) => deleteObject(ref(storage, f.path))),
+  ])
 }
 
 // 스티커(공감): 메시지마다 한 사람에 하나. 같은 것을 다시 누르면 뗀다.

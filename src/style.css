@@ -870,16 +870,6 @@ input[type='date']::-webkit-date-and-time-value {
   font-size: 12px;
 }
 
-.photos {
-  display: grid;
-  grid-template-columns: repeat(3, 80px);
-  gap: 2px;
-}
-
-.photos.single {
-  grid-template-columns: 200px;
-}
-
 .photo {
   display: block;
   width: 100%;
@@ -2035,11 +2025,15 @@ button.primary.danger-fill {
 }
 
 .shell.desktop .photos {
-  grid-template-columns: repeat(3, 120px);
+  width: 360px;
 }
 
-.shell.desktop .photos.single {
-  grid-template-columns: 280px;
+.shell.desktop .photos.cols-1 {
+  width: 280px;
+}
+
+.shell.desktop .file-card {
+  width: 320px;
 }
 
 .shell.desktop .composer {
@@ -2418,4 +2412,134 @@ textarea:focus-visible {
 
 .meta span + span {
   margin-left: 4px;
+}
+
+/* ── 사진 여러 장과 파일 (4-3) ── */
+/* 카톡식 격자: 1장은 크게, 2·4장은 2칸, 나머지는 3칸 */
+.photos {
+  display: grid;
+  gap: 2px;
+  width: min(270px, 62vw);
+}
+
+.photos.cols-1 {
+  grid-template-columns: 1fr;
+  width: min(220px, 55vw);
+}
+
+.photos.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.photos.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.photos.cols-1 .photo {
+  aspect-ratio: auto;
+  max-height: 320px;
+}
+
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(260px, 62vw);
+  min-height: 56px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  white-space: normal;
+}
+
+.file-card + .file-card,
+.photos + .file-card {
+  border-top: 1px solid rgb(0 0 0 / 0.08);
+}
+
+.file-icon {
+  font-size: 28px;
+}
+
+.file-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.file-text strong {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.file-text span {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.file-chip {
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-chip span {
+  margin-left: 4px;
+  color: var(--muted);
+}
+
+.attach-button {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* 끌어다 놓기 안내 */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px;
+  border: 3px dashed var(--accent);
+  border-radius: 16px;
+  background: rgb(245 238 221 / 0.85);
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* 사진 크게 보기 확대 */
+.viewer-stage.zoomable {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.viewer-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
 }

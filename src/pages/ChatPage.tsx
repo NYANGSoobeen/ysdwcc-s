@@ -1,11 +1,15 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
 import {
   createChannel,
   deleteChannel,
   deleteMessage,
   editMessage,
+  FILE_EXTS,
+  fileProblem,
+  isPhotoFile,
   MAIN_CHANNEL,
+  MAX_PHOTOS,
   messagesRef,
   photoUrl,
   REACTIONS,
@@ -14,6 +18,7 @@ import {
   sendMessage,
   setReaction,
   type Channel,
+  type ChatFile,
   type ReplyTo,
 } from '../chat.ts'
 import { fileName, saveFile } from '../download.ts'
@@ -27,7 +32,6 @@ import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/Contex
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
-const MAX_PHOTOS = 10
 
 type ChatProps = {
   team: Team
@@ -311,14 +315,55 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
     return () => clearTimeout(t)
   }, [flashId])
 
+  // 사진 크게 보기: 이 방에 불러온 사진 전체를 ← → / 밀어서 넘겨 본다.
   function openPhoto(message: Message, index: number) {
-    const author = profiles[message.authorUid]?.name ?? '나간 팀원'
-    const createdAt = message.createdAt?.toDate() ?? null
-    setViewer({ photos: message.attachments.map((attachment) => ({ attachment, author, createdAt })), index })
+    const photos: ViewerPhoto[] = []
+    let start = 0
+    for (const m of messages) {
+      if (m.deleted) continue
+      const author = profiles[m.authorUid]?.name ?? '나간 팀원'
+      const createdAt = m.createdAt?.toDate() ?? null
+      m.attachments.forEach((attachment, i) => {
+        if (m.id === message.id && i === index) start = photos.length
+        photos.push({ attachment, author, createdAt })
+      })
+    }
+    setViewer({ photos, index: start })
   }
 
+  // 끌어다 놓기: 채팅 화면 아무 데나 사진·파일을 놓으면 보낼 준비 (PC)
+  const addToComposer = useRef<(files: File[]) => void>(() => {})
+  const registerAdd = useCallback((add: (files: File[]) => void) => {
+    addToComposer.current = add
+  }, [])
+  const [dragging, setDragging] = useState(false)
+  const dragDepth = useRef(0)
+  const hasFiles = (e: React.DragEvent) => [...e.dataTransfer.types].includes('Files')
+
   return (
-    <div className="chat">
+    <div
+      className="chat"
+      onDragEnter={(e) => {
+        if (!hasFiles(e) || !canWrite) return
+        dragDepth.current += 1
+        setDragging(true)
+      }}
+      onDragOver={(e) => {
+        if (hasFiles(e) && canWrite) e.preventDefault()
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1)
+        if (!dragDepth.current) setDragging(false)
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e) || !canWrite) return
+        e.preventDefault()
+        dragDepth.current = 0
+        setDragging(false)
+        addToComposer.current([...e.dataTransfer.files])
+      }}
+    >
+      {dragging && <div className="drop-overlay">여기에 놓으면 보낼 사진·파일로 추가돼요</div>}
       <header className="page-header">
         {onBack ? (
           <button type="button" className="ghost menu-button" onClick={onBack} aria-label="채팅방 목록">
@@ -448,6 +493,7 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
             setReplyTo(null)
             setEditing(null)
           }}
+          registerAdd={registerAdd}
         />
       ) : (
         <p className="composer muted small">보기 권한은 메시지를 보낼 수 없습니다.</p>
@@ -520,6 +566,9 @@ function MessageItem(props: {
           ...(m.attachments.length
             ? [{ icon: '💾', label: m.attachments.length > 1 ? `사진 ${m.attachments.length}장 저장` : '사진 저장', onSelect: () => void savePhotos() }]
             : []),
+          ...(m.files.length
+            ? [{ icon: '💾', label: m.files.length > 1 ? `파일 ${m.files.length}개 저장` : '파일 저장', onSelect: () => void saveChatFiles(m.files) }]
+            : []),
           ...(links.length
             ? [{ icon: '🔗', label: links.length > 1 ? `링크 ${links.length}개 복사` : '링크 복사', onSelect: () => void copyText(links.join('\n')) }]
             : []),
@@ -555,12 +604,24 @@ function MessageItem(props: {
               </button>
             )}
             {m.attachments.length > 0 && (
-              <div className={m.attachments.length === 1 ? 'photos single' : 'photos'}>
+              // 카톡처럼: 1장은 크게, 2·4장은 2칸, 나머지는 3칸씩
+              <div className={`photos cols-${photoCols(m.attachments.length)}`}>
                 {m.attachments.map((a, i) => (
                   <StorageImage key={a.thumbPath} path={a.thumbPath} className="photo" onClick={() => props.onOpenPhoto(i)} />
                 ))}
               </div>
             )}
+            {m.files.map((f) => (
+              <button key={f.path} type="button" className="file-card" onClick={() => void openChatFile(f)}>
+                <span className="file-icon" aria-hidden="true">
+                  {fileIcon(f.name)}
+                </span>
+                <span className="file-text">
+                  <strong>{f.name}</strong>
+                  <span>{formatSize(f.size)} · {isTouchUi() || !f.name.toLowerCase().endsWith('.pdf') ? '눌러서 저장' : '눌러서 열기'}</span>
+                </span>
+              </button>
+            ))}
             {m.body && <p>{linkify(m.body)}</p>}
           </div>
         )}
@@ -608,6 +669,33 @@ function linkify(text: string) {
   return parts
 }
 
+function photoCols(n: number) {
+  if (n === 1) return 1
+  if (n === 2 || n === 4) return 2
+  return 3
+}
+
+// 파일 카드: PC에서 PDF는 새 탭으로 열고, 나머지(그리고 휴대폰)는 저장한다.
+async function openChatFile(f: ChatFile) {
+  try {
+    const url = await photoUrl(f.path)
+    if (!isTouchUi() && f.name.toLowerCase().endsWith('.pdf')) window.open(url, '_blank', 'noopener')
+    else await saveFile(url, f.name)
+  } catch {
+    toast('파일을 열지 못했어요. 삭제되었을 수 있어요.', { error: true })
+  }
+}
+
+async function saveChatFiles(files: ChatFile[]) {
+  for (const f of files) {
+    try {
+      await saveFile(await photoUrl(f.path), f.name)
+    } catch {
+      toast(`"${f.name}"을(를) 저장하지 못했어요.`, { error: true })
+    }
+  }
+}
+
 // 같은 사람, 같은 날 같은 분(시:분)이면 한 묶음
 function sameGroup(a: Message | undefined, b: Message | undefined) {
   if (!a || !b || a.authorUid !== b.authorUid || !a.createdAt || !b.createdAt) return false
@@ -643,14 +731,68 @@ function Composer(props: {
   editing: Message | null
   onCancel: () => void
   onSent: () => void
+  // 채팅 화면에 끌어다 놓은 파일을 받을 수 있게 붙이는 함수를 알려 준다.
+  registerAdd: (add: (files: File[]) => void) => void
 }) {
   const { teamId, channelId, replyTo, editing, onSent } = props
   const [body, setBody] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
-  const [uploading, setUploading] = useState(0)
+  const [files, setFiles] = useState<File[]>([])
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const galleryInput = useRef<HTMLInputElement>(null)
+  const cameraInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const previews = usePreviews(photos)
+
+  // 사진은 최대 30장, 파일은 엑셀·PDF·한글·워드·압축 등 10MB 이하
+  function addFiles(list: File[]) {
+    if (editing || list.length === 0) return
+    const pics = list.filter(isPhotoFile)
+    const others = list.filter((f) => !isPhotoFile(f))
+    const problems = others.map(fileProblem).filter(Boolean)
+    if (problems.length) toast(problems[0]!, { error: true })
+    const okFiles = others.filter((f) => !fileProblem(f))
+    if (photos.length + pics.length > MAX_PHOTOS) toast(`사진은 한 번에 ${MAX_PHOTOS}장까지 보낼 수 있어요.`, { error: true })
+    setPhotos((prev) => [...prev, ...pics].slice(0, MAX_PHOTOS))
+    setFiles((prev) => [...prev, ...okFiles].slice(0, 10))
+  }
+  const addRef = useRef(addFiles)
+  addRef.current = addFiles
+  useEffect(() => props.registerAdd((list) => addRef.current(list)), [props.registerAdd])
+
+  // PC: Ctrl+V로 캡처한 그림·복사한 파일을 붙여 넣는다 (입력칸 밖에서 눌러도).
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const pasted = [...(e.clipboardData?.files ?? [])]
+      if (!pasted.length) return
+      // 창(입력 창)이나 검색칸에 붙여 넣는 건 그쪽에 맡긴다.
+      if (e.target instanceof Element && e.target.closest('.modal, .search-bar')) return
+      e.preventDefault()
+      addRef.current(pasted)
+      textarea.current?.focus()
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
+
+  function openAttachMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect()
+    openMenu(
+      [
+        { icon: '🖼️', label: '사진 보관함', onSelect: () => galleryInput.current?.click() },
+        ...(isTouchUi() ? [{ icon: '📷', label: '사진 찍기', onSelect: () => cameraInput.current?.click() }] : []),
+        { icon: '📁', label: '파일 선택', onSelect: () => fileInput.current?.click() },
+      ],
+      r.left,
+      r.top - 8,
+    )
+  }
+
+  const pickInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles([...(e.target.files ?? [])])
+    e.target.value = ''
+  }
 
   // 입력칸은 글이 길어지면 5줄까지 늘어난다.
   useLayoutEffect(() => {
@@ -680,6 +822,7 @@ function Composer(props: {
   async function send() {
     const text = body.trim()
     const pics = photos
+    const attach = files
     if (editing) {
       if (!text) return
       const target = editing
@@ -694,20 +837,23 @@ function Composer(props: {
       }
       return
     }
-    if (!text && pics.length === 0) return
+    if (!text && pics.length === 0 && attach.length === 0) return
     const reply = replyTo
     onSent()
     setBody('')
     setPhotos([])
-    if (pics.length) setUploading((n) => n + 1)
+    setFiles([])
+    const uploads = pics.length + attach.length
+    if (uploads) setProgress({ done: 0, total: uploads })
     try {
-      await sendMessage(teamId, channelId, text, pics, reply)
+      await sendMessage(teamId, channelId, text, pics, reply, attach, (done, total) => setProgress({ done, total }))
     } catch (err) {
       setBody((now) => (now ? now : text))
       setPhotos((now) => (now.length ? now : pics))
+      setFiles((now) => (now.length ? now : attach))
       toast(errorMessage(err), { error: true })
     } finally {
-      if (pics.length) setUploading((n) => n - 1)
+      if (uploads) setProgress(null)
     }
   }
 
@@ -735,7 +881,20 @@ function Composer(props: {
           ))}
         </div>
       )}
-      {uploading > 0 && <p className="muted small uploading">사진 올리는 중…</p>}
+      {files.length > 0 && (
+        <div className="file-chips">
+          {files.map((f, i) => (
+            <button type="button" key={`${f.name}${i}`} className="file-chip" onClick={() => setFiles(files.filter((_, j) => j !== i))} aria-label={`${f.name} 빼기`}>
+              {fileIcon(f.name)} {f.name} <span>✕</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {progress && (
+        <p className="muted small uploading" role="status">
+          올리는 중… {progress.done}/{progress.total}
+        </p>
+      )}
       {(replyTo || editing) && (
         <div className="composer-context">
           <div>
@@ -749,20 +908,18 @@ function Composer(props: {
         </div>
       )}
       <div className="composer-row">
-        <button type="button" className="ghost icon" onClick={() => fileInput.current?.click()} aria-label="사진 추가" disabled={Boolean(editing)}>
-          📷
+        <button type="button" className="ghost icon attach-button" onClick={openAttachMenu} aria-label="사진·파일 보내기" disabled={Boolean(editing)}>
+          ＋
         </button>
+        <input ref={galleryInput} type="file" accept="image/*" multiple hidden onChange={pickInput} />
+        <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={pickInput} />
         <input
           ref={fileInput}
           type="file"
-          accept="image/*"
           multiple
           hidden
-          onChange={(e) => {
-            const picked = [...(e.target.files ?? [])]
-            setPhotos((prev) => [...prev, ...picked].slice(0, MAX_PHOTOS))
-            e.target.value = ''
-          }}
+          accept={['image/*', ...FILE_EXTS.map((e) => `.${e}`)].join(',')}
+          onChange={pickInput}
         />
         <textarea
           ref={textarea}
@@ -789,7 +946,7 @@ function Composer(props: {
         />
         <button
           className="primary"
-          disabled={editing ? !body.trim() : !body.trim() && photos.length === 0}
+          disabled={editing ? !body.trim() : !body.trim() && photos.length === 0 && files.length === 0}
           // 보내기를 눌러도 입력칸에서 포커스가 빠지지 않게 → 휴대폰 키보드가 닫히지 않는다.
           onPointerDown={(e) => e.preventDefault()}
         >
@@ -798,6 +955,22 @@ function Composer(props: {
       </div>
     </form>
   )
+}
+
+// 파일 종류별 그림
+export function fileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊'
+  if (ext === 'pdf') return '📕'
+  if (['hwp', 'hwpx', 'doc', 'docx', 'txt'].includes(ext)) return '📝'
+  if (['ppt', 'pptx'].includes(ext)) return '📽️'
+  if (ext === 'zip') return '🗜️'
+  return '📄'
+}
+
+export function formatSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`
 }
 
 function usePreviews(files: File[]) {

@@ -428,7 +428,8 @@ export const getUsage = onCall(async (req) => {
       scheduleBytes += size
       continue
     }
-    const isPhoto = !file.name.endsWith('_thumb.jpg')
+    // 사진 원본만 센다 (썸네일 ·_thumb.jpg, 첨부 파일 f_… 은 용량에만 넣는다)
+    const isPhoto = /\/\d+\.jpg$/.test(file.name)
     const month = String(file.metadata.timeCreated ?? '').slice(0, 7) || '알 수 없음'
     const entry = months.get(month) ?? { bytes: 0, photos: 0 }
     entry.bytes += size
@@ -471,7 +472,7 @@ export const deleteMessagesInRange = onCall(async (req) => {
       c
         .where('createdAt', '>=', Timestamp.fromMillis(from))
         .where('createdAt', '<', Timestamp.fromMillis(to))
-        .select('attachments')
+        .select('attachments', 'files')
         .get(),
     ),
   )
@@ -482,9 +483,11 @@ export const deleteMessagesInRange = onCall(async (req) => {
   const withPhotos: string[] = []
   for (const doc of docs) {
     const attachments = (doc.get('attachments') ?? []) as { size?: number; thumbSize?: number }[]
-    if (attachments.length > 0) withPhotos.push(doc.id)
+    const files = (doc.get('files') ?? []) as { size?: number }[]
+    if (attachments.length > 0 || files.length > 0) withPhotos.push(doc.id)
     photos += attachments.length
     for (const a of attachments) bytes += (a.size ?? 0) + (a.thumbSize ?? 0)
+    for (const f of files) bytes += f.size ?? 0
   }
   const result = { messages: docs.length, photos, bytes }
   if (dryRun) return result
