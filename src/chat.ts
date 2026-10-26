@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { api, type LinkPreview } from './api.ts'
 import { auth, db, storage } from './firebase.ts'
 
 export type Attachment = {
@@ -116,6 +117,8 @@ export async function deleteChannel(teamId: string, channelId: string) {
 
 // 사진을 압축해 올린 뒤 메시지를 저장한다. 메시지 저장에 실패하면 올린 사진을 지운다.
 // 답장: 원문의 일부를 같이 저장해 두어, 원문을 불러오지 않아도 미리보기를 보여 준다.
+export type { LinkPreview }
+
 export type ReplyTo = { id: string; authorUid: string; text: string }
 
 export function replyPreview(message: { body: string; attachments: Attachment[]; files?: ChatFile[] }) {
@@ -132,6 +135,7 @@ export async function sendMessage(
   replyTo: ReplyTo | null = null,
   files: File[] = [],
   onProgress?: (done: number, total: number) => void,
+  mentions: string[] = [],
 ) {
   const uid = auth.currentUser!.uid
   const messageRef = doc(messagesRef(teamId, channelId))
@@ -177,7 +181,7 @@ export async function sendMessage(
     await setDoc(messageRef, {
       authorUid: uid,
       body,
-      mentions: [],
+      mentions,
       customerTags: [],
       replyTo,
       attachments,
@@ -192,6 +196,24 @@ export async function sendMessage(
     throw error
   }
   return messageRef.id
+}
+
+// 링크 미리보기: 보낸 뒤 서버가 읽어 온 제목·설명·사진을 메시지에 붙인다.
+export async function attachLinkPreview(teamId: string, channelId: string, messageId: string, url: string) {
+  const preview = await api.linkPreview({ url }).catch(() => null)
+  if (preview) await updateDoc(doc(messagesRef(teamId, channelId), messageId), { link: preview }).catch(() => {})
+}
+
+export const firstUrl = (text: string) => text.match(/https?:\/\/[^\s<>"']+/)?.[0] ?? null
+
+// @멘션: 글 속 "@이름"과 "@모두"를 찾아 부른 사람 목록(uid)을 만든다. @모두는 나를 뺀 팀원 전부.
+export const MENTION_ALL = '모두'
+export function findMentions(text: string, members: { uid: string; name: string }[], me: string) {
+  const found = new Set<string>()
+  if (text.includes(`@${MENTION_ALL}`)) members.forEach((m) => m.uid !== me && found.add(m.uid))
+  for (const m of members) if (m.name && text.includes(`@${m.name}`)) found.add(m.uid)
+  found.delete(me)
+  return [...found]
 }
 
 // 내 메시지 수정
@@ -214,6 +236,7 @@ export async function deleteMessage(
     replyTo: null,
     mentions: [],
     customerTags: [],
+    link: null,
     editedAt: null,
   })
   // 사진 파일은 올린 사람이 지울 수 있다 (Storage 규칙).

@@ -2543,3 +2543,125 @@ textarea:focus-visible {
   height: 100%;
   transform-origin: center;
 }
+
+/* ── 링크 미리보기와 @멘션 (4-4) ── */
+.link-card {
+  display: flex;
+  flex-direction: column;
+  width: min(280px, 62vw);
+  margin: 0 8px 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+}
+
+.shell.desktop .link-card {
+  width: 320px;
+}
+
+.link-card img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  background: var(--bg);
+}
+
+.link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+}
+
+.link-text strong {
+  font-size: 14px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.link-desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.link-site {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* 말풍선의 @이름 */
+.mention {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.message.mine .mention {
+  color: var(--rock);
+}
+
+.mention.me {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: #ffe066;
+  color: #12354a;
+}
+
+/* 나를 부른 말: 노란 테두리 */
+.message.mentioned-me .bubble {
+  box-shadow: 0 0 0 2px #f5c518;
+}
+
+/* 입력칸 위 @ 직원 목록 */
+.mention-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.12);
+}
+
+.mention-option {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 15px;
+}
+
+.mention-option.active {
+  background: var(--notice-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 누르면 그 자리로 가는 알림 */
+.toasts .toast.action {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  min-height: 0;
+  white-space: pre-line;
+}
+
+.bubble a.link-card,
+.bubble a.link-card * {
+  text-decoration: none;
+}

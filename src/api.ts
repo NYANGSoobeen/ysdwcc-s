@@ -20,6 +20,8 @@ export type Usage = {
   counts: { members: number; messages: number; photoMessages: number; customers: number }
 }
 
+export type LinkPreview = { url: string; title: string; desc: string; image: string; site: string }
+
 export type RangeResult = { messages: number; photos: number; bytes: number }
 
 function call<Req, Res>(name: string) {
@@ -46,6 +48,7 @@ export const api = {
   setMemberActive: call<{ teamId: string; uid: string; active: boolean; reason?: string }, { ok: true }>(
     'setMemberActive',
   ),
+  linkPreview: call<{ url: string }, LinkPreview | null>('linkPreview'),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
   getMyAccess: call<void, { superAdmin: boolean }>('getMyAccess'),
   createTeam: call<{ name: string }, { teamId: string }>('createTeam'),

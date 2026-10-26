@@ -26,7 +26,7 @@ type Dialog =
   | { id: number; kind: 'confirm'; options: ConfirmOptions; resolve: (ok: boolean) => void }
   | { id: number; kind: 'prompt'; options: PromptOptions; resolve: (value: string | null) => void }
 
-type Toast = { id: number; text: string; error: boolean }
+type Toast = { id: number; text: string; error: boolean; onClick?: () => void }
 
 let dialogs: Dialog[] = []
 let toasts: Toast[] = []
@@ -67,8 +67,9 @@ export function askText(options: PromptOptions) {
 }
 
 // 화면 아래에 잠깐 떴다 사라지는 알림.
-export function toast(text: string, opts: { error?: boolean } = {}) {
-  const item = { id: nextId++, text, error: Boolean(opts.error) }
+// onClick을 주면 알림을 눌러 그 자리로 갈 수 있다 (예: "○○님이 나를 불렀어요" → 그 방).
+export function toast(text: string, opts: { error?: boolean; onClick?: () => void; long?: boolean } = {}) {
+  const item = { id: nextId++, text, error: Boolean(opts.error), onClick: opts.onClick }
   toasts = [...toasts.slice(-2), item]
   emit()
   setTimeout(
@@ -76,7 +77,7 @@ export function toast(text: string, opts: { error?: boolean } = {}) {
       toasts = toasts.filter((t) => t.id !== item.id)
       emit()
     },
-    item.error ? 4500 : 2600,
+    item.error || opts.long ? 5000 : 2600,
   )
 }
 
@@ -210,11 +211,26 @@ export function DialogHost() {
       )}
       {toastList.length > 0 && (
         <div className="toasts" role="status" aria-live="polite">
-          {toastList.map((t) => (
-            <div key={t.id} className={t.error ? 'toast error' : 'toast'}>
-              {t.text}
-            </div>
-          ))}
+          {toastList.map((t) =>
+            t.onClick ? (
+              <button
+                key={t.id}
+                type="button"
+                className="toast action"
+                onClick={() => {
+                  toasts = toasts.filter((x) => x.id !== t.id)
+                  emit()
+                  t.onClick!()
+                }}
+              >
+                {t.text}
+              </button>
+            ) : (
+              <div key={t.id} className={t.error ? 'toast error' : 'toast'}>
+                {t.text}
+              </div>
+            ),
+          )}
         </div>
       )}
     </>

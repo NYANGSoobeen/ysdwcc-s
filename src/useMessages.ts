@@ -11,7 +11,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Attachment, ChatFile, ReplyTo } from './chat.ts'
+import type { Attachment, ChatFile, LinkPreview, ReplyTo } from './chat.ts'
 
 // 채팅방 메시지 불러오기.
 // - 최근 100개는 실시간으로 받는다 (새 메시지, 수정, 삭제가 바로 보임).
@@ -31,6 +31,8 @@ export type Message = {
   editedAt: Timestamp | null
   deleted: boolean
   reactions: Record<string, string>
+  mentions: string[]
+  link: LinkPreview | null
 }
 
 function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
@@ -47,6 +49,8 @@ function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
     editedAt: data.editedAt ?? null,
     deleted: data.deleted === true,
     reactions: data.reactions ?? {},
+    mentions: data.mentions ?? [],
+    link: data.link ?? null,
   }
 }
 

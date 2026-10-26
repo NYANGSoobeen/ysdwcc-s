@@ -4,8 +4,12 @@ import {
   createChannel,
   deleteChannel,
   deleteMessage,
+  attachLinkPreview,
   editMessage,
   FILE_EXTS,
+  findMentions,
+  firstUrl,
+  MENTION_ALL,
   fileProblem,
   isPhotoFile,
   MAIN_CHANNEL,
@@ -127,6 +131,11 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   const canWrite = myRole !== 'viewer'
   const isAdmin = myRole === 'admin'
   const canManage = room.id === MAIN_CHANNEL ? isAdmin : isAdmin || (canWrite && room.createdBy === uid)
+  const members = useMemo(
+    () => Object.keys(team.members).map((m) => ({ uid: m, name: profiles[m]?.name ?? '' })).filter((m) => m.name),
+    [team.members, profiles],
+  )
+  const memberNames = useMemo(() => members.map((m) => m.name), [members])
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
   // 이전 메시지를 앞에 붙일 때 보던 자리를 유지하기 위한 값
@@ -455,6 +464,8 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
                 canWrite={canWrite}
                 profiles={profiles}
                 original={m.replyTo ? messages.find((x) => x.id === m.replyTo!.id) : undefined}
+                memberNames={memberNames}
+                myName={profiles[uid]?.name ?? ''}
                 onOpenPhoto={(i) => openPhoto(m, i)}
                 onDelete={() => void remove(m)}
                 onReply={() => {
@@ -494,6 +505,8 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
             setEditing(null)
           }}
           registerAdd={registerAdd}
+          members={members}
+          me={uid}
         />
       ) : (
         <p className="composer muted small">보기 권한은 메시지를 보낼 수 없습니다.</p>
@@ -518,6 +531,8 @@ function MessageItem(props: {
   canWrite: boolean
   profiles: Record<string, { name: string }>
   original?: Message
+  memberNames: string[]
+  myName: string
   onOpenPhoto: (index: number) => void
   onDelete: () => void
   onReply: () => void
@@ -583,7 +598,11 @@ function MessageItem(props: {
 
   const reply = m.replyTo
   return (
-    <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
+    <div
+      className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}${
+        !mine && !m.deleted && m.mentions.includes(uid) ? ' mentioned-me' : ''
+      }`}
+    >
       {!mine && (props.showAuthor ? <Avatar uid={props.authorUid} name={props.author} /> : <span className="avatar-space" />)}
       {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
@@ -622,7 +641,17 @@ function MessageItem(props: {
                 </span>
               </button>
             ))}
-            {m.body && <p>{linkify(m.body)}</p>}
+            {m.body && <p>{linkify(m.body, props.memberNames, props.myName)}</p>}
+            {m.link && (
+              <a className="link-card" href={m.link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                {m.link.image && <img src={m.link.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                <span className="link-text">
+                  {m.link.title && <strong>{m.link.title}</strong>}
+                  {m.link.desc && <span className="link-desc">{m.link.desc}</span>}
+                  <span className="link-site">{m.link.site}</span>
+                </span>
+              </a>
+            )}
           </div>
         )}
         {(props.time || m.editedAt) && (
@@ -652,18 +681,33 @@ function MessageItem(props: {
 }
 
 // 주소는 눌러서 열리게 한다.
-function linkify(text: string) {
+// 글 속 주소는 눌러서 열리게, "@이름"·"@모두"는 색칠한다 (나를 부른 건 더 진하게).
+function linkify(text: string, names: string[] = [], myName = '') {
+  const mentionWords = [MENTION_ALL, ...names].filter(Boolean).sort((a, b) => b.length - a.length)
+  const escaped = mentionWords.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = new RegExp(`${URL_RE.source}${escaped.length ? `|@(?:${escaped.join('|')})` : ''}`, 'g')
   const parts: (string | React.ReactElement)[] = []
   let last = 0
-  for (const match of text.matchAll(URL_RE)) {
+  for (const match of text.matchAll(pattern)) {
     const i = match.index ?? 0
     if (i > last) parts.push(text.slice(last, i))
-    parts.push(
-      <a key={i} href={match[0]} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-        {match[0]}
-      </a>,
-    )
-    last = i + match[0].length
+    const token = match[0]
+    if (token.startsWith('@')) {
+      const who = token.slice(1)
+      const me = who === MENTION_ALL || (myName && who === myName)
+      parts.push(
+        <span key={i} className={me ? 'mention me' : 'mention'}>
+          {token}
+        </span>,
+      )
+    } else {
+      parts.push(
+        <a key={i} href={token} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+          {token}
+        </a>,
+      )
+    }
+    last = i + token.length
   }
   if (last < text.length) parts.push(text.slice(last))
   return parts
@@ -733,6 +777,8 @@ function Composer(props: {
   onSent: () => void
   // 채팅 화면에 끌어다 놓은 파일을 받을 수 있게 붙이는 함수를 알려 준다.
   registerAdd: (add: (files: File[]) => void) => void
+  members: { uid: string; name: string }[]
+  me: string
 }) {
   const { teamId, channelId, replyTo, editing, onSent } = props
   const [body, setBody] = useState('')
@@ -744,6 +790,42 @@ function Composer(props: {
   const fileInput = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const previews = usePreviews(photos)
+
+  // @멘션: "@"를 치면 직원 목록(맨 위 @모두)을 띄우고, 고르면 "@이름 "을 넣는다.
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const candidates = mention
+    ? [{ uid: 'all', name: MENTION_ALL }, ...props.members.filter((m) => m.uid !== props.me)]
+        .filter((c) => c.name.toLowerCase().includes(mention.query.toLowerCase()))
+        .slice(0, 8)
+    : []
+
+  function updateMention(el: HTMLTextAreaElement) {
+    const before = el.value.slice(0, el.selectionStart)
+    const found = before.match(/(^|\s)@([^\s@]*)$/)
+    setMention(found ? { start: el.selectionStart - found[2].length - 1, query: found[2] } : null)
+    setMentionIndex(0)
+  }
+
+  function pickMention(name: string) {
+    const el = textarea.current
+    if (!el || !mention) return
+    const end = el.selectionStart
+    const next = `${body.slice(0, mention.start)}@${name} ${body.slice(end)}`
+    pendingCaret.current = mention.start + name.length + 2
+    setBody(next)
+    setMention(null)
+  }
+  // 넣은 "@이름 " 바로 뒤로 커서를 옮긴다 (화면을 그리자마자, 다음 글자가 엉뚱한 데 들어가지 않게).
+  const pendingCaret = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const el = textarea.current
+    if (el && pendingCaret.current !== null) {
+      el.focus()
+      el.setSelectionRange(pendingCaret.current, pendingCaret.current)
+      pendingCaret.current = null
+    }
+  }, [body])
 
   // 사진은 최대 30장, 파일은 엑셀·PDF·한글·워드·압축 등 10MB 이하
   function addFiles(list: File[]) {
@@ -846,7 +928,10 @@ function Composer(props: {
     const uploads = pics.length + attach.length
     if (uploads) setProgress({ done: 0, total: uploads })
     try {
-      await sendMessage(teamId, channelId, text, pics, reply, attach, (done, total) => setProgress({ done, total }))
+      const mentions = findMentions(text, props.members, props.me)
+      const id = await sendMessage(teamId, channelId, text, pics, reply, attach, (done, total) => setProgress({ done, total }), mentions)
+      const url = firstUrl(text)
+      if (url) void attachLinkPreview(teamId, channelId, id, url)
     } catch (err) {
       setBody((now) => (now ? now : text))
       setPhotos((now) => (now.length ? now : pics))
@@ -907,6 +992,24 @@ function Composer(props: {
           </button>
         </div>
       )}
+      {mention && candidates.length > 0 && (
+        <ul className="mention-list" role="listbox" aria-label="부를 사람">
+          {candidates.map((c, i) => (
+            <li key={c.uid}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={i === mentionIndex}
+                className={i === mentionIndex ? 'mention-option active' : 'mention-option'}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => pickMention(c.name)}
+              >
+                {c.uid === 'all' ? '👥 @모두 (팀원 전체)' : `@${c.name}`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="composer-row">
         <button type="button" className="ghost icon attach-button" onClick={openAttachMenu} aria-label="사진·파일 보내기" disabled={Boolean(editing)}>
           ＋
@@ -924,8 +1027,33 @@ function Composer(props: {
         <textarea
           ref={textarea}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => {
+            setBody(e.target.value)
+            updateMention(e.target)
+          }}
+          onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && updateMention(e.currentTarget)}
+          onClick={(e) => updateMention(e.currentTarget)}
+          onBlur={() => setTimeout(() => setMention(null), 150)}
           onKeyDown={(e) => {
+            // @멘션 목록이 떠 있으면: ↑↓ 고르기, Enter·Tab 넣기, Esc 닫기
+            if (mention && candidates.length) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                const step = e.key === 'ArrowDown' ? 1 : -1
+                setMentionIndex((i) => (i + step + candidates.length) % candidates.length)
+                return
+              }
+              if ((e.key === 'Enter' || e.key === 'Tab') && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                pickMention(candidates[mentionIndex]?.name ?? candidates[0].name)
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setMention(null)
+                return
+              }
+            }
             if (e.key === 'Escape' && (replyTo || editing)) return cancel()
             // PC: Enter = 보내기, Shift/Ctrl+Enter = 줄바꿈. 휴대폰: Enter = 줄바꿈(보내기는 버튼).
             if (e.key !== 'Enter' || e.nativeEvent.isComposing || isTouchUi()) return

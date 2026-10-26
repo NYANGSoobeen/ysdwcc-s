@@ -6,6 +6,7 @@ import { setGlobalOptions } from 'firebase-functions/v2'
 import { onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https'
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
+import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
 
 // Firestore와 같은 리전. 무료 사용량을 넘지 않도록 동시 실행 수를 제한한다.
@@ -574,3 +575,34 @@ async function disableTokens(uid: string) {
   for (const t of tokens.docs) batch.update(t.ref, { disabled: true, disabledAt: FieldValue.serverTimestamp() })
   if (!tokens.empty) await batch.commit()
 }
+
+// ── 채팅 링크 미리보기 ───────────────────────────────────────
+// 팀원만 부를 수 있다. 같은 주소는 7일 동안 저장해 둔 결과를 다시 쓴다 (linkPreviews, 앱에서 접근 불가).
+const PREVIEW_TTL_MS = 7 * 24 * 3600 * 1000
+
+export const linkPreview = onCall({ timeoutSeconds: 15 }, async (req) => {
+  const uid = requireUid(req)
+  const db = getFirestore()
+  const user = await db.doc(`users/${uid}`).get()
+  if (!user.exists || user.get('active') === false || !((user.get('teamIds') ?? []) as string[]).length) {
+    throw new HttpsError('permission-denied', '팀원만 쓸 수 있습니다.')
+  }
+  const url = text(req.data?.url, '주소', 2000)
+  if (!/^https?:\/\//i.test(url)) throw new HttpsError('invalid-argument', '주소가 올바르지 않습니다.')
+
+  const cacheRef = db.doc(`linkPreviews/${previewKey(url)}`)
+  const cached = await cacheRef.get()
+  if (cached.exists && Date.now() - Number(cached.get('at') ?? 0) < PREVIEW_TTL_MS) {
+    return cached.get('preview') ?? null
+  }
+  try {
+    const preview = await fetchPreview(url)
+    const result = preview.title || preview.desc || preview.image ? preview : null
+    await cacheRef.set({ preview: result, at: Date.now() })
+    return result
+  } catch {
+    // 읽지 못한 주소는 미리보기 없이 링크만 보인다.
+    await cacheRef.set({ preview: null, at: Date.now() })
+    return null
+  }
+})

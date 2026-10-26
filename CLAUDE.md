@@ -73,6 +73,11 @@
   - 파일: 엑셀·CSV·PDF·한글·워드·파워포인트·압축·텍스트(`FILE_EXTS`), 10MB 이하. Storage `teams/{teamId}/chat/{msgId}/f_{번호}.{확장자}`(규칙도 같은 목록·크기), 메시지 `files[{path, name, size, type}]`. 파일 카드: PC에서 PDF는 새 탭, 나머지와 휴대폰은 저장(`saveFile`). 메시지 메뉴 💾 파일 저장.
   - 크게 보기(`PhotoViewer`): 이 방에 불러온 사진 전체를 ← → / 밀어서 넘김, 두 손가락 확대, 두 번 눌러 확대/원래대로, 확대 중엔 한 손가락으로 이동(밀어도 안 넘어감), PC는 휠 확대.
   - 용량 관리: 사진 장수는 원본(`숫자.jpg`)만 세고, 파일은 용량에만 넣는다. 기간 삭제는 파일도 함께 지운다.
+- **링크 미리보기와 @멘션 (공통 기능 4-4):**
+  - 링크: 보낸 뒤 앱이 서버 함수 `linkPreview`(`functions/src/linkPreview.ts`)를 불러 그 페이지의 og:title·description·image(없으면 <title>)를 읽어 메시지 `link {url, title, desc, image, site}`에 붙인다. 팀원만 부를 수 있고, 같은 주소는 7일 동안 `linkPreviews/{sha1}`(앱 접근 불가)에 저장해 다시 쓴다. 내부망·서버 주소(localhost, 10.x, 192.168.x, 169.254.x 등)와 80/443 외 포트는 읽지 않고(넘겨 주는 주소도 매번 검사), 6초·512KB까지만 읽는다. euc-kr 페이지도 읽는다.
+  - @멘션: 입력칸에서 "@"를 치면 직원 목록(맨 위 @모두)이 뜨고 글자로 걸러진다. ↑↓·Enter·Tab·Esc, 휴대폰은 눌러서 고른다. 보낼 때 글 속 "@이름"/"@모두"로 `mentions[uid]`를 만든다(@모두 = 나를 뺀 팀원 전부). 말풍선의 @이름은 색칠, 나를 부른 말은 노란 테두리와 내 이름 노란 칠.
+  - 알림 "○○님이 나를 불렀어요"(`src/useMentionAlerts.ts`): 앱이 열려 있으면 방마다 나를 부른 최신 메시지 1개만 지켜보다가(읽기 절약) 새로 오면 화면 아래 알림, 누르면 그 방으로. 지금 그 방을 보고 있으면 알리지 않는다. PC는 다른 창을 보고 있고 브라우저 알림을 허용해 두었으면 바탕화면 알림도. **앱이 꺼져 있을 때의 푸시 알림은 아직 없다** (알림 기능을 만들 때 FCM으로 붙인다. 갤럭시 앱은 알림 플러그인과 APK 재빌드 필요).
+  - 색인: `firestore.indexes.json`에 messages `mentions`(배열 포함) + `createdAt` 내림차순.
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문).
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **용량 탭(최고 관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
@@ -126,6 +131,7 @@ users/{uid}                      name, email, teamIds[], superAdmin, platform, s
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
 meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)
+linkPreviews/{sha1(url)}         preview, at   (링크 미리보기 7일 저장, 앱에서 접근 불가)
 teams/{teamId}                   name, members{uid: "admin"|"editor"|"viewer"}, autoShare, shareNotes,
                                  contactsVersion (고객이 바뀔 때마다 Functions가 올림, CardDAV ctag용)
 customers/{customerId}           teamId, name, company, phones[] (E.164), ownerUid,
@@ -140,7 +146,7 @@ teams/{teamId}/channels/{channelId}  name, createdBy, createdAt   (단체 채팅
 teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모양
 teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], customerTags[customerId],
                                  replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}], files[{path, name, size, type}],
-                                 reactions{uid: 이모지}, deleted, editedAt,
+                                 reactions{uid: 이모지}, deleted, editedAt, link{url, title, desc, image, site},
                                  hasPhotos (사진 모아보기 조회용), createdAt, editedAt
 ```
 

@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { api } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
-import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
+import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } from './hooks.ts'
+import { useMentionAlerts } from './useMentionAlerts.ts'
 import { MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
@@ -82,6 +83,8 @@ function SignedIn({ user }: { user: User }) {
   const teamId = selectedTeamId && teamIds.includes(selectedTeamId) ? selectedTeamId : teamIds[0]
   const { team, denied } = useTeam(teamId)
   const channels = useChannels(team?.id)
+  const memberProfiles = useMemberProfiles(Object.keys(team?.members ?? {}))
+  const memberNames = Object.fromEntries(Object.entries(memberProfiles).map(([id, p]) => [id, p.name]))
   const teamNames = useTeamNames(teamIds)
   const [tab, setTabState] = useState<Tab>(savedTab)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -126,6 +129,31 @@ function SignedIn({ user }: { user: User }) {
   // 공용 컴퓨터(PC): 15분 넘게 앱을 닫아 두었으면 다시 로그인하게 한다.
   useEffect(() => watchIdle(() => void logOutAndWipe(IDLE_NOTICE)), [])
 
+  // 보고 있는 채팅방 (휴대폰에서 null이면 방 목록)
+  const channelId = team && channelState?.teamId === team.id ? channelState.id : null
+  const roomId = channels?.some((c) => c.id === channelId) ? channelId : desktop ? MAIN_CHANNEL : null
+  function openChannel(id: string | null) {
+    if (!team) return
+    setChannelState({ teamId: team.id, id })
+    setQueries((prev) => ({ ...prev, chat: '' }))
+    setTab('chat')
+    try {
+      sessionStorage.setItem(CHANNEL_KEY, `${team.id}:${id ?? ''}`)
+    } catch {
+      // 기억하지 못해도 동작에는 문제없다.
+    }
+  }
+
+  // "○○님이 나를 불렀어요" (지금 그 방을 보고 있으면 알리지 않음)
+  useMentionAlerts({
+    teamId: team?.id,
+    channels,
+    uid: user.uid,
+    names: memberNames,
+    viewing: tab === 'chat' ? roomId : null,
+    onOpen: openChannel,
+  })
+
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)
   // 관리자가 사용 중지하면 바로 로그아웃하고 로그인 화면에 이유를 보여 준다.
@@ -162,18 +190,6 @@ function SignedIn({ user }: { user: User }) {
         </select>
       </label>
     ) : null
-  const channelId = channelState?.teamId === team.id ? channelState.id : null
-  const roomId = channels?.some((c) => c.id === channelId) ? channelId : desktop ? MAIN_CHANNEL : null
-  function openChannel(id: string | null) {
-    setChannelState({ teamId: team!.id, id })
-    setQueries((prev) => ({ ...prev, chat: '' }))
-    setTab('chat')
-    try {
-      sessionStorage.setItem(CHANNEL_KEY, `${team!.id}:${id ?? ''}`)
-    } catch {
-      // 기억하지 못해도 동작에는 문제없다.
-    }
-  }
   const canWrite = team.members[user.uid] !== 'viewer'
   const menuProps = {
     current,
