@@ -163,10 +163,39 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   const [newBelow, setNewBelow] = useState(false)
   const lastId = messages.at(-1)?.id
 
+  // 찾은 말·답장 원문으로 이동하면 그 말을 몇 초 동안 화면 가운데에 고정한다.
+  // (키보드가 닫히거나, 사진이 늦게 뜨거나, 이전 메시지가 앞에 붙어도 그 말이 밀려나지 않게)
+  // 사용자가 직접 화면을 굴리거나 누르면 바로 푼다.
+  const pin = useRef<{ id: string; until: number } | null>(null)
+  const centerPinned = useCallback(() => {
+    const p = pin.current
+    if (!p) return false
+    if (Date.now() > p.until) {
+      pin.current = null
+      return false
+    }
+    const node = listRef.current?.querySelector(`[data-msg="${p.id}"]`)
+    if (!node) return false
+    node.scrollIntoView({ block: 'center' })
+    return true
+  }, [])
+  function pinTo(id: string) {
+    stickToBottom.current = false
+    pin.current = { id, until: Date.now() + PIN_MS }
+    listRef.current?.querySelector(`[data-msg="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+  const releasePin = () => {
+    pin.current = null
+  }
+
   // 새 메시지가 오면, 맨 아래를 보고 있을 때만 따라 내려간다. 위에서 읽는 중이면 "새 메시지" 버튼을 띄운다.
   useLayoutEffect(() => {
     const el = listRef.current
     if (!el) return
+    if (centerPinned()) {
+      restore.current = null
+      return
+    }
     if (restore.current) {
       el.scrollTop = el.scrollHeight - restore.current.height + restore.current.top
       restore.current = null
@@ -236,12 +265,14 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   ]
 
   // 🔍 채팅 검색: 대화는 그대로 두고 찾은 말 위치로 이동한다 (▲ 이전, ▼ 다음, Enter = 이전).
-  // 지금은 불러온 메시지 안에서 찾는다.
+  // 불러온 메시지에 없거나 가장 오래된 결과에서 ▲를 누르면 이전 메시지를 300개씩 더 불러와 찾는다 (최대 3000개).
   const { query: searchQuery } = useTabSearch()
   const [searchOpen, setSearchOpen] = useState(() => Boolean(searchQuery))
   const q = searchQuery.trim().toLowerCase()
+  const qRef = useRef(q)
+  qRef.current = q
   const matches = useMemo(
-    () => (q ? messages.filter((m) => m.body.toLowerCase().includes(q)).map((m) => m.id) : []),
+    () => (q ? messages.filter((m) => !m.deleted && m.body.toLowerCase().includes(q)).map((m) => m.id) : []),
     [messages, q],
   )
   // 고른 말(없거나 결과에서 빠지면 가장 최근에 찾은 말)
@@ -250,21 +281,83 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   const matchIndex = currentMatch ? matches.indexOf(currentMatch) : -1
   useEffect(() => setPicked(null), [q])
 
+  const [searching, setSearching] = useState(false)
+  const searchRun = useRef(0)
+  const capped = messages.length >= SEARCH_MAX
+  // 이전 메시지를 300개씩 불러오며 찾는다. 새로 찾은 말(오래된 것부터)을 돌려준다.
+  async function searchOlder() {
+    const run = ++searchRun.current
+    setSearching(true)
+    try {
+      while (searchRun.current === run && peek().length < SEARCH_MAX) {
+        const el = listRef.current
+        if (el && !restore.current) restore.current = { height: el.scrollHeight, top: el.scrollTop }
+        const count = await loadOlder(Math.min(SEARCH_PAGE, SEARCH_MAX - peek().length))
+        if (!count) {
+          restore.current = null
+          break
+        }
+        const query = qRef.current
+        const found = peek()
+          .slice(0, count)
+          .filter((m) => !m.deleted && m.body.toLowerCase().includes(query))
+          .map((m) => m.id)
+        if (found.length && searchRun.current === run) {
+          // 찾은 말이 불러온 것 중 맨 앞쪽이면 가운데에 올 수 있게 위로 조금 더 불러 둔다.
+          if (peek().findIndex((m) => m.id === found.at(-1)) < 20 && peek().length < SEARCH_MAX) {
+            if (el && !restore.current) restore.current = { height: el.scrollHeight, top: el.scrollTop }
+            if (!(await loadOlder(50))) restore.current = null
+          }
+          return found
+        }
+      }
+      return []
+    } finally {
+      if (searchRun.current === run) setSearching(false)
+    }
+  }
+
+  // 검색어를 넣었는데 불러온 메시지에 없으면 이전 메시지에서 찾는다 (글자를 다 칠 때까지 잠깐 기다림).
+  const noneLoaded = q !== '' && loaded && matches.length === 0
+  useEffect(() => {
+    if (!noneLoaded) return
+    const t = setTimeout(() => {
+      void searchOlder().then((found) => found.length && setPicked(found.at(-1)!))
+    }, 400)
+    return () => {
+      clearTimeout(t)
+      searchRun.current++
+      setSearching(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noneLoaded, q])
+
   useEffect(() => {
     const el = listRef.current
     if (!el) return
     if (!q) {
       // 검색을 지우면 맨 아래(최신)로
+      releasePin()
       stickToBottom.current = true
       el.scrollTop = el.scrollHeight
       return
     }
-    if (!currentMatch) return
-    stickToBottom.current = false
-    el.querySelector(`[data-msg="${currentMatch}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (currentMatch) pinTo(currentMatch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, currentMatch])
 
-  const older = () => matches.length && setPicked(matches[matchIndex <= 0 ? matches.length - 1 : matchIndex - 1])
+  async function older() {
+    if (searching || !q) return
+    if (matchIndex > 0) return setPicked(matches[matchIndex - 1])
+    // 가장 오래된 결과: 이전 메시지를 더 불러와 찾는다.
+    if (hasMore && !capped) {
+      const found = await searchOlder()
+      if (found.length) return setPicked(found.at(-1)!)
+    }
+    if (!matches.length) return
+    toast(peek().length >= SEARCH_MAX ? '최근 3000개 메시지까지 찾았어요. 가장 최근 결과로 돌아갑니다.' : '대화 처음까지 찾았어요. 가장 최근 결과로 돌아갑니다.')
+    setPicked(matches.at(-1)!)
+  }
   const newer = () => matches.length && setPicked(matches[matchIndex >= matches.length - 1 ? 0 : matchIndex + 1])
 
   // 키보드가 열려 화면이 줄거나 사진이 늦게 떠서 길어져도, 맨 아래를 보고 있었으면 맨 아래를 유지한다.
@@ -272,6 +365,7 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
     const el = listRef.current
     if (!el) return
     const keep = () => {
+      if (centerPinned()) return
       if (stickToBottom.current) el.scrollTop = el.scrollHeight
     }
     const observer = new ResizeObserver(keep)
@@ -285,7 +379,7 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
       observer.disconnect()
       mo.disconnect()
     }
-  }, [])
+  }, [centerPinned])
 
   // 읽음 표시: 이 방을 보고 있고(앱이 앞에 있고) 맨 아래까지 봤으면, 남이 보낸 새 말이 있을 때 내 읽은 시각을 올린다.
   // 쓰기를 아끼려고 3초에 한 번까지만.
@@ -368,7 +462,7 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
 
   useEffect(() => {
     if (!flashId) return
-    listRef.current?.querySelector(`[data-msg="${flashId}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    pinTo(flashId)
     const t = setTimeout(() => setFlashId(null), 2500)
     return () => clearTimeout(t)
   }, [flashId])
@@ -445,13 +539,19 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
         </div>
       </header>
       {searchOpen && (
-        <SearchBar placeholder="대화 내용 검색" autoFocus onEnter={older} onCancel={() => setSearchOpen(false)}>
+        <SearchBar placeholder="대화 내용 검색" autoFocus onEnter={() => void older()} onCancel={() => setSearchOpen(false)}>
           {q && (
             <span className="search-nav">
               <span className="small muted" aria-live="polite">
-                {matches.length ? `${matchIndex + 1} / ${matches.length}건` : '0건'}
+                {searching
+                  ? '이전 메시지에서 찾는 중…'
+                  : matches.length
+                    ? `${matchIndex + 1} / ${matches.length}건`
+                    : capped
+                      ? '0건 (최근 3000개)'
+                      : '0건'}
               </span>
-              <button type="button" className="ghost icon" onClick={older} disabled={!matches.length} aria-label="이전 찾기"
+              <button type="button" className="ghost icon" onClick={() => void older()} disabled={!matches.length || searching} aria-label="이전 찾기"
                 onPointerDown={(e) => e.preventDefault()}>
                 ▲
               </button>
@@ -467,8 +567,14 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
         className="messages"
         ref={listRef}
         onScroll={onScroll}
-        // 휴대폰: 대화 영역을 누르면 키보드를 닫는다.
+        // 직접 굴리면(휠, 손가락으로 밀기, 마우스로 스크롤바 끌기, 키보드) 찾은 말 고정을 푼다.
+        // 휴대폰에서 대화 영역을 눌러 키보드를 닫는 것은 풀지 않는다 (그 때문에 화면이 줄어도 찾은 말 유지).
+        onWheel={releasePin}
+        onTouchMove={releasePin}
+        onKeyDown={releasePin}
         onPointerDown={(e) => {
+          if (e.pointerType === 'mouse') releasePin()
+          // 휴대폰: 대화 영역을 누르면 키보드를 닫는다.
           const active = document.activeElement
           if (e.pointerType !== 'mouse' && active instanceof HTMLTextAreaElement && active.closest('.composer')) active.blur()
         }}
@@ -572,6 +678,10 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
 }
 
 const URL_RE = /https?:\/\/[^\s<>"']+/g
+// 채팅 검색: 이전 메시지를 300개씩, 최대 3000개까지 불러와 찾는다. 찾은 말은 4초 동안 가운데 고정.
+const SEARCH_PAGE = 300
+const SEARCH_MAX = 3000
+const PIN_MS = 4000
 
 function MessageItem(props: {
   message: Message

@@ -62,7 +62,6 @@ export function useMessages(ref: CollectionReference) {
   const [hasMore, setHasMore] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
-  const loadingRef = useRef(false)
 
   useEffect(() => {
     setLive([])
@@ -105,14 +104,16 @@ export function useMessages(ref: CollectionReference) {
   const latest = useRef({ messages, hasMore })
   latest.current = { messages, hasMore }
 
-  // 가장 오래된 메시지보다 더 이전 것을 100개 불러온다. (답장 원문 찾기처럼 연달아 불러도 되게 최신 값을 쓴다)
+  // 가장 오래된 메시지보다 더 이전 것을 n개(기본 100개) 불러온다.
+  // 이미 불러오는 중이면 그것이 끝난 뒤 이어서 불러온다 (검색, 답장 원문 찾기, 스크롤이 겹쳐도 빠짐없이).
+  const inflight = useRef<Promise<number> | null>(null)
   const loadOlder = useCallback(
-    async (n = PAGE_SIZE) => {
+    async (n = PAGE_SIZE): Promise<number> => {
+      while (inflight.current) await inflight.current.catch(() => 0)
       const oldest = latest.current.messages[0]
-      if (loadingRef.current || !latest.current.hasMore || !oldest?.createdAt) return 0
-      loadingRef.current = true
-      setLoadingOlder(true)
-      try {
+      if (!latest.current.hasMore || !oldest?.createdAt) return 0
+      const run = (async () => {
+        setLoadingOlder(true)
         const snap = await getDocs(query(ref, orderBy('createdAt', 'desc'), startAfter(oldest.createdAt), limit(n)))
         const page = snap.docs.map(toMessage).reverse()
         setOlder((prev) => mergeById(page, prev))
@@ -120,8 +121,12 @@ export function useMessages(ref: CollectionReference) {
         // 다음 호출이 렌더링 전에 와도 이어서 불러오게 바로 반영해 둔다.
         latest.current = { messages: mergeById(page, latest.current.messages), hasMore: snap.size >= n }
         return page.length
+      })()
+      inflight.current = run
+      try {
+        return await run
       } finally {
-        loadingRef.current = false
+        inflight.current = null
         setLoadingOlder(false)
       }
     },
