@@ -155,7 +155,7 @@ teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], cu
 
 - `npm run emulators` 후 다른 터미널에서 `npm run dev:emulators`: 로컬 에뮬레이터(Auth, Firestore, Storage, Functions)로 앱 실행
 - `npm test`: 보안 규칙과 Functions 테스트 (에뮬레이터에서 실행)
-- `npm run release`: 최신 코드 받기(git pull) → 설치 → 빌드 → 전체 배포. 사용자는 Windows cmd에서 이것만 실행한다.
+- `npm run release`: 최신 코드 받기(git pull) → 설치 → 빌드 → 전체 배포(`scripts/deploy.mjs`). 사용자는 Windows cmd에서 이것만 실행한다. 함수가 많아 한꺼번에 올리면 분당 요청 수 제한으로 몇 개만 실패하는 일이 있어(실제로 겪음), 실패하면 1분 쉬고 최대 3번 다시 배포한다(바뀌지 않은 함수는 Firebase가 건너뜀). 항상 `--project ysdwcc-s`로, `GOOGLE_CLOUD_QUOTA_PROJECT`는 빼고 배포한다.
 - 자동 배포: `.github/workflows/deploy.yml`이 main에 올라갈 때마다 배포한다 (Actions 탭에서 수동 실행도 가능). 저장소 Secret `FIREBASE_SERVICE_ACCOUNT`(배포용 서비스 계정 키 JSON)가 있어야 동작하고, 없으면 건너뛴다.
 - 설치 없이 배포: Google Cloud Shell(브라우저 터미널)에서 `git clone` → `npx firebase login --no-localhost` → `npm run release`. **Cloud Shell 줄 끝이 `(ysdwcc-s)`인지 먼저 확인**한다. 다른 프로젝트면 `gcloud config set project ysdwcc-s` 후 `unset GOOGLE_CLOUD_QUOTA_PROJECT`.
 - Cloud Shell은 파일을 한 번에 많이 올리면 12개쯤에서 끊긴다 (실제로 겪음). 그래서 배포 파일 수를 적게 유지한다: pdf.js 한글 글꼴 정보(cMap, 약 170개)는 사이트에 넣지 않고 jsDelivr CDN에서 받는다 (`src/schedule/data.ts`의 `PDFJS_CDN`). 끊기면 같은 명령을 다시 실행하면 이어서 올라간다.
