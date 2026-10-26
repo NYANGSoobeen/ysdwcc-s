@@ -23,6 +23,7 @@ export type Schedule = {
 
 export const scheduleRef = (teamId: string) => doc(db, 'teams', teamId, 'schedule', 'current')
 
+const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174'
 const MAX_PAGES = 10
 const LONG_SIDE = 2400
 const MAX_PIXELS = 14_000_000 // 휴대폰 캔버스 한도 (가로×세로)
@@ -59,10 +60,11 @@ async function renderPdf(file: File, onProgress: (text: string) => void): Promis
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default
   const pdf = await pdfjs.getDocument({
     data: new Uint8Array(await file.arrayBuffer()),
-    // 한글 PDF가 깨지지 않게 글꼴 정보를 같이 쓴다 (빌드 때 public/pdfjs/ 로 복사됨)
-    cMapUrl: '/pdfjs/cmaps/',
+    // 한글 PDF가 깨지지 않게 글꼴 정보를 같이 쓴다. 파일이 170개나 되어 우리 사이트에 올리면
+    // 배포가 자주 끊기므로, pdf.js와 같은 버전의 공개 CDN(jsDelivr)에서 받는다.
+    cMapUrl: `${PDFJS_CDN}/cmaps/`,
     cMapPacked: true,
-    standardFontDataUrl: '/pdfjs/standard_fonts/',
+    standardFontDataUrl: `${PDFJS_CDN}/standard_fonts/`,
   }).promise
   const count = Math.min(pdf.numPages, MAX_PAGES)
   const pages: RenderedPage[] = []

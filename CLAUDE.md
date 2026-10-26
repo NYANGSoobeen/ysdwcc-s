@@ -120,7 +120,8 @@ teams/{teamId}/messages/{msgId}  authorUid, body, mentions[uid], customerTags[cu
 - `npm test`: 보안 규칙과 Functions 테스트 (에뮬레이터에서 실행)
 - `npm run release`: 최신 코드 받기(git pull) → 설치 → 빌드 → 전체 배포. 사용자는 Windows cmd에서 이것만 실행한다.
 - 자동 배포: `.github/workflows/deploy.yml`이 main에 올라갈 때마다 배포한다 (Actions 탭에서 수동 실행도 가능). 저장소 Secret `FIREBASE_SERVICE_ACCOUNT`(배포용 서비스 계정 키 JSON)가 있어야 동작하고, 없으면 건너뛴다.
-- 설치 없이 배포: Google Cloud Shell(브라우저 터미널)에서 `git clone` → `npx firebase login --no-localhost` → `npm run release`.
+- 설치 없이 배포: Google Cloud Shell(브라우저 터미널)에서 `git clone` → `npx firebase login --no-localhost` → `npm run release`. **Cloud Shell 줄 끝이 `(ysdwcc-s)`인지 먼저 확인**한다. 다른 프로젝트면 `gcloud config set project ysdwcc-s` 후 `unset GOOGLE_CLOUD_QUOTA_PROJECT`.
+- Cloud Shell은 파일을 한 번에 많이 올리면 12개쯤에서 끊긴다 (실제로 겪음). 그래서 배포 파일 수를 적게 유지한다: pdf.js 한글 글꼴 정보(cMap, 약 170개)는 사이트에 넣지 않고 jsDelivr CDN에서 받는다 (`src/schedule/data.ts`의 `PDFJS_CDN`). 끊기면 같은 명령을 다시 실행하면 이어서 올라간다.
 - Firebase 웹 설정은 `.env.production`, 프로젝트 연결은 `.firebaserc`에 커밋되어 있다 (공개 값). 따로 복사할 필요 없음.
 - 연락처 구독은 배포 후 실제 폰으로 한 번 확인한다 (테스트는 tsdav 클라이언트로만 함). 함수 주소가 다르면 `VITE_CARDDAV_URL`에 적는다.
 - 앱에서 부르는 함수(onCall)는 처음 만들어질 때만 "누구나 호출 가능"으로 설정되고 이후 배포로는 고쳐지지 않는다. 첫 배포에서 이 설정이 실패해 403이 나면 그 함수를 `firebase functions:delete`로 지우고 다시 배포한다.
