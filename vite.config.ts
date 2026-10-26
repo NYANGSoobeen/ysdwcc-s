@@ -69,9 +69,7 @@ const config = {
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // pdf.js(약 1.3MB)는 스케줄을 올릴 때만 받는다 (업데이트마다 내려받지 않게).
-        globIgnores: ['**/pdf-*.js', '**/pdf.worker*.js', 'pdfjs/**', 'download/**'],
-        // 갤럭시 앱 설치 파일은 서비스 워커가 가로채지 않고 서버에서 바로 받게 한다.
-        navigateFallbackDenylist: [/^\/download\//],
+        globIgnores: ['**/pdf-*.js', '**/pdf.worker*.js', 'pdfjs/**'],
         cleanupOutdatedCaches: true,
       },
     }),

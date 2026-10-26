@@ -17,8 +17,8 @@ export const isAndroidApp = Capacitor.isNativePlatform() && Capacitor.getPlatfor
 export const isAndroidBrowser = !isAndroidApp && /Android/i.test(navigator.userAgent)
 export const NativeContacts = registerPlugin<ContactsSyncPlugin>('ContactsSync')
 
-// 갤럭시 앱 설치 파일 주소 (Firebase Hosting)
-export const APK_URL = '/download/yangsan-support.apk'
+// 갤럭시 앱 설치 파일 주소. Firebase Hosting은 APK 파일을 올리지 못해(배포 실패) GitHub 저장소에서 받는다.
+export const APK_URL = 'https://github.com/NYANGSoobeen/ysdwcc-s/raw/main/release/yangsan-support.apk'
 
 const ENABLED_KEY = 'native-contacts-enabled'
 const CHANGED = 'native-contacts-changed'
