@@ -228,3 +228,22 @@ test('읽음 표시: 팀원은 방의 읽음을 모두 보고, 자기 것만 지
   await assertFails(setDoc(doc(fs('outsider'), `${main}/outsider`), { at: serverTimestamp() }))
   await assertFails(deleteDoc(doc(fs('ed'), `${main}/ed`)))
 })
+
+test('푸시 토큰: 본인 것만 등록·삭제, 남의 토큰은 못 읽고, 같은 기기는 다른 사람이 이어 쓸 수 있다', async () => {
+  const t = (uid, extra = {}) => ({ uid, token: 'tok-1', platform: 'web', mode: 'all', updatedAt: serverTimestamp(), ...extra })
+  await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed2')))
+  await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { mode: 'loud' })))
+  await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { extra: 1 })))
+  await assertFails(setDoc(doc(fs(null), 'pushTokens/h1'), t('ed')))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed')))
+  await assertSucceeds(getDoc(doc(fs('ed'), 'pushTokens/h1')))
+  await assertFails(getDoc(doc(fs('viewer'), 'pushTokens/h1')))
+  await assertFails(getDocs(collection(fs('viewer'), 'pushTokens')))
+  // 같은 기기(같은 토큰)를 다른 사람이 로그인해 쓰면 그 사람 것으로
+  await assertFails(setDoc(doc(fs('viewer'), 'pushTokens/h1'), t('viewer', { token: 'tok-other' })))
+  await assertSucceeds(setDoc(doc(fs('viewer'), 'pushTokens/h1'), t('viewer')))
+  await assertFails(deleteDoc(doc(fs('ed'), 'pushTokens/h1')))
+  await assertSucceeds(deleteDoc(doc(fs('viewer'), 'pushTokens/h1')))
+  // 서버 전용: 프론트 알림 비밀값
+  await assertFails(getDoc(doc(fs('admin'), 'meta/frontLink')))
+})

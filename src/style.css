@@ -2741,3 +2741,39 @@ textarea:focus-visible {
 .bubble a.link-card * {
   text-decoration: none;
 }
+
+/* 내 정보 → 알림: 받을 알림 고르기 */
+.segmented {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.segmented button {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+}
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+.segmented button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+/* 관리자 → 프론트 알림 비밀값 */
+.secret-box {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--notice-bg);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 14px;
+  word-break: break-all;
+  user-select: all;
+}
+dd.break {
+  word-break: break-all;
+}

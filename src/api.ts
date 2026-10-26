@@ -49,6 +49,8 @@ export const api = {
     'setMemberActive',
   ),
   linkPreview: call<{ url: string }, LinkPreview | null>('linkPreview'),
+  frontLinkInfo: call<void, { configured: boolean; updatedAt: number | null }>('frontLinkInfo'),
+  setFrontLinkSecret: call<{ secret?: string }, { secret: string }>('setFrontLinkSecret'),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
   getMyAccess: call<void, { superAdmin: boolean }>('getMyAccess'),
   createTeam: call<{ name: string }, { teamId: string }>('createTeam'),

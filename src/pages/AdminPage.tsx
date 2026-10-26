@@ -7,6 +7,7 @@ import { useMemberProfiles, useTeamsSummary, type Profile, type Team } from '../
 import { MenuButton } from '../menu.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, tell, toast } from '../ui/dialogs.tsx'
+import { FrontLinkCard } from './FrontLinkCard.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 export const ROLE_HELP: Record<Role, string> = {
@@ -85,6 +86,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
             <h3>최고 관리자</h3>
             <AllTeams teamIds={teamIds} current={team.id} onSelectTeam={onSelectTeam} />
             <CreateTeamForm onCreated={onSelectTeam} />
+            <FrontLinkCard />
             <button type="button" onClick={onOpenUsage}>
               📦 용량 관리 (사진·스케줄 저장 공간, 기간별 채팅 삭제)
             </button>

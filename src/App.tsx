@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
@@ -8,6 +8,7 @@ import { useMentionAlerts } from './useMentionAlerts.ts'
 import { badgeText, useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
 import { resumeFront, useFrontUnread } from './front/ydr.ts'
+import { listenOpenRequests, refreshPush, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
@@ -185,6 +186,19 @@ function SignedIn({ user }: { user: User }) {
     if (profileReady) resumeFront(frontJoined)
   }, [user.uid, profileReady, frontJoined])
   const frontUnread = useFrontUnread(tab === 'front' ? frontRoom : null)
+
+  // 🔔 푸시 알림: 켜 둔 기기면 등록을 새로 적고, 알림을 눌러 들어오면 그 방을 연다.
+  useEffect(() => void refreshPush(), [user.uid])
+  const openRequest = useRef<(req: OpenRequest) => void>(() => {})
+  openRequest.current = (req) => {
+    if (req.kind === 'front') return openFrontRoom(req.ch)
+    if (!teamIds.includes(req.teamId)) return
+    if (req.teamId !== team?.id) selectTeam(req.teamId)
+    setChannelState({ teamId: req.teamId, id: req.channelId })
+    setQueries((prev) => ({ ...prev, chat: '' }))
+    setTab('chat')
+  }
+  useEffect(() => listenOpenRequests((req) => openRequest.current(req)), [])
   const frontUnreadTotal = Object.values(frontUnread).reduce((a, b) => a + b, 0)
 
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.

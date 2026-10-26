@@ -3,11 +3,13 @@ import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { setGlobalOptions } from 'firebase-functions/v2'
-import { onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https'
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
+import { notifyChatMessage, notifyFront } from './push.js'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 
 // Firestore와 같은 리전. 무료 사용량을 넘지 않도록 동시 실행 수를 제한한다.
 setGlobalOptions({ region: 'us-west1', maxInstances: 3 })
@@ -606,4 +608,68 @@ export const linkPreview = onCall({ timeoutSeconds: 15 }, async (req) => {
     await cacheRef.set({ preview: null, at: Date.now() })
     return null
   }
+})
+
+// ── 푸시 알림 ────────────────────────────────────────────────
+// 팀 채팅 새 메시지 → 보낸 사람을 뺀 팀원의 기기에 알림 (src/push.ts, functions/src/push.ts)
+export const onMessageCreatedPush = onDocumentCreated('teams/{teamId}/messages/{msgId}', async (event) => {
+  const data = event.data?.data()
+  if (data) await notifyChatMessage(event.params.teamId, 'main', data)
+})
+export const onChannelMessageCreatedPush = onDocumentCreated(
+  'teams/{teamId}/channels/{channelId}/messages/{msgId}',
+  async (event) => {
+    const data = event.data?.data()
+    if (data) await notifyChatMessage(event.params.teamId, event.params.channelId, data)
+  },
+)
+
+// 🏌️ 프론트 채팅 알림: 프론트 서버가 "게스트(우리 직원)가 있는 방에 새 말이 왔다"고 알려 준다 (GUEST_LINK.md 7번).
+// POST { uids: [우리 uid…], title, body, ch, msg }, 머리글 x-ydr-secret = 비밀값.
+// 비밀값은 코드에 넣지 않고 최고 관리자가 관리자 화면에서 넣는다 → meta/frontLink.secret (앱에서 접근 불가).
+export const ydrGuestPush = onRequest({ invoker: 'public', timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('POST only')
+    return
+  }
+  const saved = String((await getFirestore().doc('meta/frontLink').get()).get('secret') ?? '')
+  const given = String(req.get('x-ydr-secret') ?? '')
+  if (saved.length < 20 || !sameSecret(given, saved)) {
+    res.status(403).send('forbidden')
+    return
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>
+  const uids = Array.isArray(body.uids) ? body.uids.filter((u): u is string => typeof u === 'string' && /^[\w-]{1,128}$/.test(u)).slice(0, 200) : []
+  const ch = typeof body.ch === 'string' ? body.ch.slice(0, 200) : ''
+  if (!uids.length || !ch) {
+    res.status(400).send('bad request')
+    return
+  }
+  const sent = await notifyFront(uids, String(body.title ?? '').slice(0, 200), String(body.body ?? '').slice(0, 500), ch)
+  res.json({ ok: true, sent })
+})
+
+function sameSecret(a: string, b: string) {
+  const x = Buffer.from(a)
+  const y = Buffer.from(b)
+  return x.length === y.length && timingSafeEqual(x, y)
+}
+
+// 최고 관리자: 프론트 알림 연동 정보 보기 / 비밀값 새로 만들기·넣기.
+// 비밀값은 만들 때 한 번만 보여 준다 (프론트 앱 ⚙️ 타부서 연동 설정에 같은 값을 넣는다).
+export const frontLinkInfo = onCall(async (req) => {
+  await requireSuperAdmin(req)
+  const snap = await getFirestore().doc('meta/frontLink').get()
+  return { configured: String(snap.get('secret') ?? '').length >= 20, updatedAt: snap.get('updatedAt')?.toMillis?.() ?? null }
+})
+
+export const setFrontLinkSecret = onCall(async (req) => {
+  const uid = await requireSuperAdmin(req)
+  const given = typeof req.data?.secret === 'string' ? req.data.secret.trim() : ''
+  if (given && (given.length < 20 || given.length > 200 || /\s/.test(given))) {
+    throw new HttpsError('invalid-argument', '비밀값은 공백 없이 20자 이상이어야 합니다.')
+  }
+  const secret = given || randomBytes(24).toString('base64url')
+  await getFirestore().doc('meta/frontLink').set({ secret, updatedAt: FieldValue.serverTimestamp(), updatedBy: uid })
+  return { secret }
 })
