@@ -16,7 +16,8 @@
   --mine-text: var(--merino);
   --danger: #b3261e;
   --notice-bg: #dce9f1;
-  --chat-bg: #c9dce8;
+  /* 채팅방 바탕: Rock Blue를 Merino 쪽으로 누그러뜨린 색 (카톡 하늘색 자리) */
+  --chat-bg: #bed3dc;
   --shadow: 22 88 123;
   font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   color: var(--text);
@@ -761,8 +762,8 @@ input[type='date']::-webkit-date-and-time-value {
   width: fit-content;
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgb(0 0 0 / 0.15);
-  color: #ffffff;
+  background: rgb(15 63 89 / 0.5);
+  color: var(--merino);
   font-size: 12px;
 }
 
@@ -798,6 +799,7 @@ input[type='date']::-webkit-date-and-time-value {
   min-width: 0;
   border-radius: 14px;
   background: var(--surface);
+  box-shadow: 0 1px 2px rgb(var(--shadow) / 0.12);
   overflow: hidden;
 }
 
