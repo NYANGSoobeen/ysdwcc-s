@@ -2160,3 +2160,89 @@ textarea:focus-visible {
   outline-offset: 0;
   border-color: var(--accent);
 }
+
+/* ── 단체 채팅방 (4-1) ── */
+.room-icon {
+  font-size: 22px;
+}
+
+.room-icon + .row-main {
+  flex: 1;
+}
+
+.drawer-item.add {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.history-edge {
+  display: flex;
+  justify-content: center;
+  min-height: 36px;
+  align-items: center;
+}
+
+/* 같은 사람이 같은 1분 안에 보낸 말: 간격을 좁힌다 */
+.msg-wrap.grouped {
+  margin-top: -3px;
+}
+
+/* 남의 말: 왼쪽에 이름 첫 글자 동그라미, 오른쪽에 이름과 말풍선 */
+.message:not(.mine) {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+}
+
+.message:not(.mine) > .avatar,
+.message:not(.mine) > .avatar-space {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.message:not(.mine) > .author,
+.message:not(.mine) > .bubble-row {
+  grid-column: 2;
+}
+
+.message:not(.mine) > .author {
+  margin-left: 2px;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.avatar-space {
+  width: 36px;
+}
+
+/* 위에서 읽는 중에 새 메시지가 오면 */
+.chat {
+  position: relative;
+}
+
+.new-below {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  z-index: 5;
+  transform: translateX(-50%);
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--venice-deep);
+  color: var(--merino);
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.2);
+}

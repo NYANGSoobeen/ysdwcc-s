@@ -29,6 +29,33 @@ export const onMessageDeleted = onDocumentDeleted(
   },
 )
 
+// 새로 만든 채팅방(teams/{teamId}/channels/{channelId})의 메시지도 같은 폴더 규칙으로 사진을 지운다.
+export const onChannelMessageDeleted = onDocumentDeleted(
+  'teams/{teamId}/channels/{channelId}/messages/{msgId}',
+  async (event) => {
+    const { teamId, msgId } = event.params
+    await getStorage().bucket().deleteFiles({ prefix: `teams/${teamId}/chat/${msgId}/` })
+  },
+)
+
+// 채팅방을 지우면 방의 메시지를 모두 지운다 (메시지마다 위 트리거가 사진을 지운다).
+export const onChannelDeleted = onDocumentDeleted('teams/{teamId}/channels/{channelId}', async (event) => {
+  const { teamId, channelId } = event.params
+  if (channelId === 'main') return
+  const db = getFirestore()
+  await db.recursiveDelete(db.collection(`teams/${teamId}/channels/${channelId}/messages`))
+})
+
+// 팀의 모든 채팅방 메시지 컬렉션 (기본 방 + 만든 방들)
+async function messageCollections(teamId: string) {
+  const db = getFirestore()
+  const channels = await db.collection(`teams/${teamId}/channels`).select().get()
+  return [
+    db.collection(`teams/${teamId}/messages`),
+    ...channels.docs.filter((c) => c.id !== 'main').map((c) => c.ref.collection('messages')),
+  ]
+}
+
 // 스케줄은 팀마다 하나(teams/{teamId}/schedule/current). 새로 올리거나 지우면
 // 이전 스케줄의 원본, 쪽 그림을 지운다 (스티커는 문서 안에 있어 함께 사라진다).
 export const onScheduleWritten = onDocumentWritten('teams/{teamId}/schedule/{docId}', async (event) => {
@@ -378,12 +405,14 @@ async function requireSuperAdminOf(req: CallableRequest, teamId: unknown) {
 export const getUsage = onCall(async (req) => {
   const { teamId, members } = await requireSuperAdminOf(req, req.data?.teamId)
   const db = getFirestore()
-  const messages = db.collection(`teams/${teamId}/messages`)
+  const collections = await messageCollections(teamId)
+  const sum = async (counts: Promise<{ data: () => { count: number } }>[]) =>
+    (await Promise.all(counts)).reduce((total, c) => total + c.data().count, 0)
 
   const [[files], messageCount, photoMessageCount, customerCount] = await Promise.all([
     getStorage().bucket().getFiles({ prefix: `teams/${teamId}/` }),
-    messages.count().get(),
-    messages.where('hasPhotos', '==', true).count().get(),
+    sum(collections.map((c) => c.count().get())),
+    sum(collections.map((c) => c.where('hasPhotos', '==', true).count().get())),
     db.collection('customers').where('teamId', '==', teamId).count().get(),
   ])
 
@@ -420,8 +449,8 @@ export const getUsage = onCall(async (req) => {
     },
     counts: {
       members: Object.keys(members).length,
-      messages: messageCount.data().count,
-      photoMessages: photoMessageCount.data().count,
+      messages: messageCount,
+      photoMessages: photoMessageCount,
       customers: customerCount.data().count,
     },
   }
@@ -436,28 +465,33 @@ export const deleteMessagesInRange = onCall(async (req) => {
   const dryRun = req.data?.dryRun === true
 
   const db = getFirestore()
-  const snap = await db
-    .collection(`teams/${teamId}/messages`)
-    .where('createdAt', '>=', Timestamp.fromMillis(from))
-    .where('createdAt', '<', Timestamp.fromMillis(to))
-    .select('attachments')
-    .get()
+  // 모든 채팅방에서 그 기간의 메시지를 찾는다.
+  const snaps = await Promise.all(
+    (await messageCollections(teamId)).map((c) =>
+      c
+        .where('createdAt', '>=', Timestamp.fromMillis(from))
+        .where('createdAt', '<', Timestamp.fromMillis(to))
+        .select('attachments')
+        .get(),
+    ),
+  )
+  const docs = snaps.flatMap((s) => s.docs)
 
   let photos = 0
   let bytes = 0
   const withPhotos: string[] = []
-  for (const doc of snap.docs) {
+  for (const doc of docs) {
     const attachments = (doc.get('attachments') ?? []) as { size?: number; thumbSize?: number }[]
     if (attachments.length > 0) withPhotos.push(doc.id)
     photos += attachments.length
     for (const a of attachments) bytes += (a.size ?? 0) + (a.thumbSize ?? 0)
   }
-  const result = { messages: snap.size, photos, bytes }
+  const result = { messages: docs.length, photos, bytes }
   if (dryRun) return result
 
   const bucket = getStorage().bucket()
   const writer = db.bulkWriter()
-  for (const doc of snap.docs) writer.delete(doc.ref)
+  for (const doc of docs) writer.delete(doc.ref)
   await writer.close()
   // 메시지 삭제 트리거도 사진을 지우지만, 결과를 바로 보여 주기 위해 여기서도 지운다.
   for (let i = 0; i < withPhotos.length; i += 10) {

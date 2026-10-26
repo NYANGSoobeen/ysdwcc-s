@@ -14,7 +14,7 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: 'demo-workphone',
   storageBucket: 'demo-workphone.appspot.com',
 })
-const { onCustomerDeleted, onMessageDeleted, onNoteDeleted } = await import('../functions/lib/index.js')
+const { onChannelDeleted, onChannelMessageDeleted, onCustomerDeleted, onMessageDeleted, onNoteDeleted } = await import('../functions/lib/index.js')
 const db = getFirestore()
 const bucket = getStorage().bucket()
 
@@ -49,4 +49,19 @@ test('메모를 지우면 수정 기록도 지워진다', async () => {
   await db.doc('customers/c2/notes/n1').delete()
   await onNoteDeleted.run({ params: { customerId: 'c2', noteId: 'n1' } })
   assert.ok((await db.collection('customers/c2/notes/n1/revisions').get()).empty, '수정 기록이 남아 있음')
+})
+
+test('만든 채팅방의 메시지를 지우면 사진도, 방을 지우면 방의 메시지가 모두 지워진다', async () => {
+  await db.doc('teams/t1/channels/c1').set({ name: '오전 근무', createdBy: 'ed' })
+  await db.doc('teams/t1/channels/c1/messages/cm1').set({ authorUid: 'ed', body: '사진' })
+  await db.doc('teams/t1/channels/c1/messages/cm2').set({ authorUid: 'ed', body: '글' })
+  await bucket.file('teams/t1/chat/cm1/0.jpg').save(Buffer.from([0xff, 0xd8]))
+
+  await db.doc('teams/t1/channels/c1/messages/cm1').delete()
+  await onChannelMessageDeleted.run({ params: { teamId: 't1', channelId: 'c1', msgId: 'cm1' } })
+  assert.equal((await bucket.getFiles({ prefix: 'teams/t1/chat/cm1/' }))[0].length, 0, '사진이 남아 있음')
+
+  await db.doc('teams/t1/channels/c1').delete()
+  await onChannelDeleted.run({ params: { teamId: 't1', channelId: 'c1' } })
+  assert.ok((await db.collection('teams/t1/channels/c1/messages').get()).empty, '방의 메시지가 남아 있음')
 })

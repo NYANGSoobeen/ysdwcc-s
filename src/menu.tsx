@@ -14,7 +14,6 @@ export type MenuItem = {
 
 export const MENU_ITEMS: MenuItem[] = [
   { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
-  { tab: 'chat', icon: '💬', label: '채팅', section: 'main' },
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
   { tab: 'members', icon: '👥', label: '팀원', section: 'main' },
   { tab: 'profile', icon: '⚙️', label: '내 정보', section: 'main' },
@@ -24,11 +23,14 @@ export const MENU_ITEMS: MenuItem[] = [
 
 // 메뉴 묶음. 제목이 있는 묶음은 제목을 눌러 접고 펼 수 있고, 접은 상태는 기기마다 기억한다.
 // (예: 관리자 전용, 앞으로 생길 단체 채팅방 목록)
-const SECTIONS: { id: MenuItem['section']; title?: string }[] = [
+const SECTIONS: { id: MenuItem['section'] | 'chat'; title?: string }[] = [
   { id: 'main' },
+  { id: 'chat', title: '단체 채팅' },
   { id: 'extra' },
   { id: 'admin', title: '관리자 전용' },
 ]
+
+export type ChatRoomItem = { id: string; name: string }
 
 const COLLAPSED_KEY = 'menu-collapsed'
 
@@ -70,12 +72,18 @@ type MenuListProps = {
   teamName: string
   userName: string
   onSelect: (tab: Tab) => void
+  // 단체 채팅방 (메뉴의 "단체 채팅" 묶음)
+  chatRooms?: ChatRoomItem[]
+  currentRoom?: string | null
+  onSelectRoom?: (id: string) => void
+  onCreateRoom?: () => void
   focusable?: boolean
   children?: ReactNode
 }
 
 // 메뉴 내용: 휴대폰의 ☰ 서랍과 PC의 왼쪽 고정 메뉴가 같이 쓴다.
-function MenuList({ current, isAdmin, superAdmin, teamName, userName, onSelect, focusable = true, children }: MenuListProps) {
+function MenuList(props: MenuListProps) {
+  const { current, isAdmin, superAdmin, teamName, userName, onSelect, focusable = true, children } = props
   const items = MENU_ITEMS.filter((i) => (!i.superAdminOnly || superAdmin) && (!i.adminOnly || isAdmin))
   const { collapsed, toggle } = useCollapsed()
   return (
@@ -91,6 +99,7 @@ function MenuList({ current, isAdmin, superAdmin, teamName, userName, onSelect, 
       </div>
       {children}
       {SECTIONS.map(({ id, title }) => {
+        if (id === 'chat') return <ChatRoomsSection key={id} {...props} title={title!} closed={collapsed.includes(id)} onToggle={() => toggle(id)} />
         const list = items.filter((i) => i.section === id)
         if (list.length === 0) return null
         // 지금 보고 있는 화면이 든 묶음은 접혀 있어도 그 항목만은 보인다.
@@ -134,9 +143,47 @@ function MenuList({ current, isAdmin, superAdmin, teamName, userName, onSelect, 
   )
 }
 
+function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolean; onToggle: () => void }) {
+  const { chatRooms, currentRoom, onSelectRoom, onCreateRoom, focusable = true, closed, onToggle, title } = props
+  if (!chatRooms || !onSelectRoom) return null
+  const shown = closed ? chatRooms.filter((r) => r.id === currentRoom) : chatRooms
+  const tabIndex = focusable ? 0 : -1
+  return (
+    <ul className="drawer-list">
+      <li>
+        <button type="button" className="drawer-label" aria-expanded={!closed} onClick={onToggle} tabIndex={tabIndex}>
+          {title}
+          <span aria-hidden="true">{closed ? '▸' : '▾'}</span>
+        </button>
+      </li>
+      {shown.map((room) => (
+        <li key={room.id}>
+          <button
+            type="button"
+            className={room.id === currentRoom ? 'drawer-item active' : 'drawer-item'}
+            aria-current={room.id === currentRoom ? 'page' : undefined}
+            onClick={() => onSelectRoom(room.id)}
+            tabIndex={tabIndex}
+          >
+            <span aria-hidden="true">💬</span>
+            {room.name}
+          </button>
+        </li>
+      ))}
+      {!closed && onCreateRoom && (
+        <li>
+          <button type="button" className="drawer-item add" onClick={onCreateRoom} tabIndex={tabIndex}>
+            <span aria-hidden="true">＋</span>새 채팅방
+          </button>
+        </li>
+      )}
+    </ul>
+  )
+}
+
 type DrawerProps = Omit<MenuListProps, 'focusable' | 'children'> & { open: boolean; onClose: () => void }
 
-export function MenuDrawer({ open, onClose, onSelect, ...rest }: DrawerProps) {
+export function MenuDrawer({ open, onClose, onSelect, onSelectRoom, onCreateRoom, ...rest }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -155,6 +202,20 @@ export function MenuDrawer({ open, onClose, onSelect, ...rest }: DrawerProps) {
             onSelect(tab)
             onClose()
           }}
+          onSelectRoom={
+            onSelectRoom &&
+            ((id) => {
+              onSelectRoom(id)
+              onClose()
+            })
+          }
+          onCreateRoom={
+            onCreateRoom &&
+            (() => {
+              onClose()
+              onCreateRoom()
+            })
+          }
         />
       </nav>
     </div>

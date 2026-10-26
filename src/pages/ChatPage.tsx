@@ -1,67 +1,199 @@
-import { collection, limit, onSnapshot, orderBy, query, type Timestamp } from 'firebase/firestore'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
-import { deleteMessage, sendMessage, type Attachment } from '../chat.ts'
+import {
+  createChannel,
+  deleteChannel,
+  deleteMessage,
+  MAIN_CHANNEL,
+  messagesRef,
+  renameChannel,
+  sendMessage,
+  type Channel,
+} from '../chat.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
-import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
+import { useMessages, type Message } from '../useMessages.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { MenuButton } from '../menu.tsx'
-import { useItemMenu } from '../ui/ContextMenu.tsx'
-import { ask, isTouchUi, toast } from '../ui/dialogs.tsx'
+import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
+import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
-const PAGE_SIZE = 50
 const MAX_PHOTOS = 10
 
-type Message = {
-  id: string
-  authorUid: string
-  body: string
-  attachments: Attachment[]
-  createdAt: Timestamp | null
-  pending: boolean
+type ChatProps = {
+  team: Team
+  uid: string
+  channels: Channel[] | null
+  channelId: string | null
+  desktop: boolean
+  onOpenChannel: (id: string | null) => void
 }
 
-export function ChatPage({ team, uid }: { team: Team; uid: string }) {
-  const [count, setCount] = useState(PAGE_SIZE)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [hasMore, setHasMore] = useState(false)
+// 채팅 탭. 휴대폰은 방 목록 → 방, PC는 왼쪽 메뉴에서 방을 고르고 여기에는 방만 보인다.
+export function ChatPage({ team, uid, channels, channelId, desktop, onOpenChannel }: ChatProps) {
+  if (!channels) return <div className="center muted">불러오는 중…</div>
+  if (!channelId && !desktop) return <ChatRoomList team={team} uid={uid} channels={channels} onOpen={onOpenChannel} />
+  const room = channels.find((c) => c.id === channelId) ?? channels[0]
+  return (
+    <ChatRoom
+      key={room.id}
+      team={team}
+      uid={uid}
+      room={room}
+      onBack={desktop ? undefined : () => onOpenChannel(null)}
+      onLeft={() => onOpenChannel(desktop ? MAIN_CHANNEL : null)}
+    />
+  )
+}
+
+// 새 채팅방 만들기 (편집 권한 이상)
+export async function promptCreateChannel(teamId: string) {
+  const name = await askText({ title: '새 채팅방', label: '채팅방 이름', placeholder: '예: 오전 근무', ok: '만들기', required: '이름을 입력하세요.' })
+  if (!name?.trim()) return null
+  try {
+    return await createChannel(teamId, name.trim().slice(0, 30))
+  } catch (err) {
+    toast(errorMessage(err), { error: true })
+    return null
+  }
+}
+
+function ChatRoomList({ team, uid, channels, onOpen }: { team: Team; uid: string; channels: Channel[]; onOpen: (id: string) => void }) {
+  const canWrite = team.members[uid] !== 'viewer'
+  return (
+    <div className="page">
+      <header className="page-header">
+        <MenuButton />
+        <h2>채팅</h2>
+        {canWrite ? (
+          <button
+            type="button"
+            className="ghost"
+            onClick={async () => {
+              const id = await promptCreateChannel(team.id)
+              if (id) onOpen(id)
+            }}
+          >
+            + 새 방
+          </button>
+        ) : (
+          <span />
+        )}
+      </header>
+      <div className="page-body">
+        <ul className="list">
+          {channels.map((c) => (
+            <li key={c.id}>
+              <button type="button" className="row row-button" onClick={() => onOpen(c.id)}>
+                <span className="room-icon" aria-hidden="true">
+                  💬
+                </span>
+                <div className="row-main">
+                  <strong>{c.name}</strong>
+                  {c.id === MAIN_CHANNEL && <span className="muted small">팀원 모두 · 기본 방</span>}
+                </div>
+                <span aria-hidden="true" className="muted">
+                  ›
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string; room: Channel; onBack?: () => void; onLeft: () => void }) {
+  const ref = useMemo(() => messagesRef(team.id, room.id), [team.id, room.id])
+  const { messages, hasMore, loaded, loadingOlder, loadOlder } = useMessages(ref)
   const [showGallery, setShowGallery] = useState(false)
   const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
   const profiles = useMemberProfiles(Object.keys(team.members))
-  const canWrite = team.members[uid] !== 'viewer'
+  const myRole = team.members[uid]
+  const canWrite = myRole !== 'viewer'
+  const isAdmin = myRole === 'admin'
+  const canManage = room.id === MAIN_CHANNEL ? isAdmin : isAdmin || (canWrite && room.createdBy === uid)
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
+  // 이전 메시지를 앞에 붙일 때 보던 자리를 유지하기 위한 값
+  const restore = useRef<{ height: number; top: number } | null>(null)
+  const [newBelow, setNewBelow] = useState(false)
+  const lastId = messages.at(-1)?.id
 
-  useEffect(() => {
-    const q = query(collection(db, 'teams', team.id, 'messages'), orderBy('createdAt', 'desc'), limit(count))
-    return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
-      setHasMore(snap.size >= count)
-      setMessages(
-        snap.docs
-          .map((d) => {
-            const data = d.data({ serverTimestamps: 'estimate' })
-            return {
-              id: d.id,
-              authorUid: data.authorUid,
-              body: data.body ?? '',
-              attachments: data.attachments ?? [],
-              createdAt: data.createdAt ?? null,
-              pending: d.metadata.hasPendingWrites,
-            }
-          })
-          .reverse(),
-      )
-    })
-  }, [team.id, count])
-
-  // 새 메시지가 오면 맨 아래로 내린다 (위로 스크롤해 읽는 중이면 그대로 둔다).
+  // 새 메시지가 오면, 맨 아래를 보고 있을 때만 따라 내려간다. 위에서 읽는 중이면 "새 메시지" 버튼을 띄운다.
   useLayoutEffect(() => {
     const el = listRef.current
-    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
+    if (!el) return
+    if (restore.current) {
+      el.scrollTop = el.scrollHeight - restore.current.height + restore.current.top
+      restore.current = null
+      return
+    }
+    if (stickToBottom.current) el.scrollTop = el.scrollHeight
   }, [messages])
+
+  useEffect(() => {
+    if (!lastId) return
+    if (stickToBottom.current) setNewBelow(false)
+    else if (messages.at(-1)?.authorUid !== uid) setNewBelow(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastId])
+
+  async function showOlder() {
+    const el = listRef.current
+    // 불러오는 중에 스크롤이 또 와도 처음 기록한 자리를 지키도록 한 번만 부른다.
+    if (!el || restore.current) return
+    restore.current = { height: el.scrollHeight, top: el.scrollTop }
+    const count = await loadOlder()
+    if (!count) restore.current = null
+  }
+
+  function toBottom() {
+    const el = listRef.current
+    if (!el) return
+    stickToBottom.current = true
+    setNewBelow(false)
+    el.scrollTop = el.scrollHeight
+  }
+
+  async function rename() {
+    const name = await askText({ title: '채팅방 이름 바꾸기', label: '채팅방 이름', value: room.name, ok: '바꾸기', required: '이름을 입력하세요.' })
+    if (!name?.trim() || name.trim() === room.name) return
+    try {
+      await renameChannel(team.id, room.id, name.trim().slice(0, 30))
+      toast('이름을 바꿨어요.')
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+
+  async function removeRoom() {
+    const ok = await ask({
+      title: '채팅방 삭제',
+      message: `"${room.name}" 방을 삭제할까요?\n방의 메시지와 사진이 모두 영구 삭제되며 되돌릴 수 없습니다.`,
+      ok: '삭제',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteChannel(team.id, room.id)
+      toast('채팅방을 삭제했어요.')
+      onLeft()
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+
+  const roomActions = (): MenuAction[] => [
+    { icon: '🖼️', label: '사진 모아보기', onSelect: () => setShowGallery(true) },
+    ...(canManage ? [{ icon: '✏️', label: '방 이름 바꾸기', onSelect: () => void rename() }] : []),
+    ...(canManage && room.id !== MAIN_CHANNEL
+      ? [{ icon: '🗑️', label: '방 삭제', danger: true, onSelect: () => void removeRoom() }]
+      : []),
+  ]
 
   // 🔍 채팅 검색: 대화는 그대로 두고 찾은 말 위치로 이동한다 (▲ 이전, ▼ 다음, Enter = 이전).
   // 지금은 불러온 메시지 안에서 찾는다.
@@ -118,13 +250,16 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
   function onScroll() {
     const el = listRef.current!
     stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (stickToBottom.current) setNewBelow(false)
+    // 위로 올려 맨 위 가까이 오면 이전 메시지를 더 불러온다.
+    if (el.scrollTop < 200 && hasMore && !loadingOlder) void showOlder()
   }
 
   async function remove(message: Message) {
     const photoNote = message.attachments.length ? ` 사진 ${message.attachments.length}장도 함께 지워집니다.` : ''
     if (!(await ask({ message: `이 메시지를 삭제할까요? 되돌릴 수 없습니다.${photoNote}`, ok: '삭제', danger: true }))) return
     try {
-      await deleteMessage(team.id, message.id)
+      await deleteMessage(team.id, room.id, message.id)
     } catch (err) {
       toast(errorMessage(err), { error: true })
     }
@@ -136,12 +271,17 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
     setViewer({ photos: message.attachments.map((attachment) => ({ attachment, author, createdAt })), index })
   }
 
-  let lastDay = ''
   return (
     <div className="chat">
       <header className="page-header">
-        <MenuButton />
-        <h2>{team.name}</h2>
+        {onBack ? (
+          <button type="button" className="ghost menu-button" onClick={onBack} aria-label="채팅방 목록">
+            ‹
+          </button>
+        ) : (
+          <MenuButton />
+        )}
+        <h2>{room.name}</h2>
         <div className="header-actions">
           <button
             type="button"
@@ -152,9 +292,7 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
           >
             🔍
           </button>
-          <button type="button" className="ghost" onClick={() => setShowGallery(true)}>
-            사진
-          </button>
+          <MoreButton actions={roomActions} title={room.name} label="채팅방 메뉴" />
         </div>
       </header>
       {searchOpen && (
@@ -186,33 +324,41 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
           if (e.pointerType !== 'mouse' && active instanceof HTMLTextAreaElement && active.closest('.composer')) active.blur()
         }}
       >
-        {hasMore && (
-          <button
-            type="button"
-            className="ghost more"
-            onClick={() => {
-              stickToBottom.current = false
-              setCount((c) => c + PAGE_SIZE)
-            }}
-          >
-            이전 메시지 더 보기
-          </button>
+        {loaded && (
+          <div className="history-edge muted small">
+            {loadingOlder ? (
+              '이전 메시지 불러오는 중…'
+            ) : hasMore ? (
+              <button type="button" className="ghost more" onClick={() => void showOlder()}>
+                이전 메시지 더 보기
+              </button>
+            ) : (
+              messages.length > 0 && '대화의 처음입니다'
+            )}
+          </div>
         )}
-        {messages.length === 0 && <p className="center muted">첫 메시지를 남겨 보세요.</p>}
-        {messages.map((m) => {
+        {loaded && messages.length === 0 && <p className="center muted">첫 메시지를 남겨 보세요.</p>}
+        {messages.map((m, i) => {
+          const prev = messages[i - 1]
+          const next = messages[i + 1]
           const date = m.createdAt?.toDate()
           const day = date ? date.toLocaleDateString('ko-KR', { dateStyle: 'full' }) : ''
-          const showDay = day && day !== lastDay
-          if (day) lastDay = day
+          const prevDay = prev?.createdAt?.toDate().toLocaleDateString('ko-KR', { dateStyle: 'full' }) ?? ''
+          const showDay = Boolean(day) && day !== prevDay
+          // 같은 사람이 같은 1분 안에 보낸 말은 묶는다: 이름·사진은 첫 말에만, 시간은 마지막 말에만.
+          const groupedWithPrev = !showDay && sameGroup(prev, m)
+          const groupedWithNext = sameGroup(m, next)
           const mine = m.authorUid === uid
           return (
-            <div key={m.id} data-msg={m.id}>
+            <div key={m.id} data-msg={m.id} className={groupedWithPrev ? 'msg-wrap grouped' : 'msg-wrap'}>
               {showDay && <div className="day">{day}</div>}
               <MessageItem
                 message={m}
                 mine={mine}
+                authorUid={m.authorUid}
                 author={profiles[m.authorUid]?.name ?? '나간 팀원'}
-                time={m.pending ? '보내는 중' : (date?.toLocaleTimeString('ko-KR', { timeStyle: 'short' }) ?? '')}
+                showAuthor={!mine && !groupedWithPrev}
+                time={groupedWithNext ? '' : m.pending ? '보내는 중' : (date?.toLocaleTimeString('ko-KR', { timeStyle: 'short' }) ?? '')}
                 highlight={currentMatch === m.id}
                 onOpenPhoto={(i) => openPhoto(m, i)}
                 onDelete={() => void remove(m)}
@@ -221,9 +367,15 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
           )
         })}
       </div>
+      {newBelow && (
+        <button type="button" className="new-below" onClick={toBottom}>
+          새 메시지 ↓
+        </button>
+      )}
       {canWrite ? (
         <Composer
           teamId={team.id}
+          channelId={room.id}
           onSent={() => {
             stickToBottom.current = true
           }}
@@ -231,7 +383,7 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
       ) : (
         <p className="composer muted small">보기 권한은 메시지를 보낼 수 없습니다.</p>
       )}
-      {showGallery && <PhotoGallery teamId={team.id} profiles={profiles} onClose={() => setShowGallery(false)} />}
+      {showGallery && <PhotoGallery messages={ref} profiles={profiles} onClose={() => setShowGallery(false)} />}
       {viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
     </div>
   )
@@ -240,7 +392,9 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
 function MessageItem(props: {
   message: Message
   mine: boolean
+  authorUid: string
   author: string
+  showAuthor: boolean
   time: string
   highlight: boolean
   onOpenPhoto: (index: number) => void
@@ -256,7 +410,8 @@ function MessageItem(props: {
   ])
   return (
     <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
-      {!mine && <div className="author">{props.author}</div>}
+      {!mine && (props.showAuthor ? <Avatar uid={props.authorUid} name={props.author} /> : <span className="avatar-space" />)}
+      {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
         <div className="bubble has-menu" {...menu}>
           {m.attachments.length > 0 && (
@@ -268,11 +423,31 @@ function MessageItem(props: {
           )}
           {m.body && <p>{m.body}</p>}
         </div>
-        <div className="meta">
-          <span>{props.time}</span>
-        </div>
+        {props.time && (
+          <div className="meta">
+            <span>{props.time}</span>
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+// 같은 사람, 같은 날 같은 분(시:분)이면 한 묶음
+function sameGroup(a: Message | undefined, b: Message | undefined) {
+  if (!a || !b || a.authorUid !== b.authorUid || !a.createdAt || !b.createdAt) return false
+  return Math.floor(a.createdAt.toMillis() / 60_000) === Math.floor(b.createdAt.toMillis() / 60_000)
+}
+
+// 프로필 사진 대신 이름 첫 글자 동그라미 (사람마다 색이 다르다)
+const AVATAR_COLORS = ['#16587b', '#3d7fa3', '#5b8a72', '#a0694b', '#7a5c99', '#b0516a', '#4f7d8c']
+function Avatar({ uid, name }: { uid: string; name: string }) {
+  let hash = 0
+  for (const ch of uid) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return (
+    <span className="avatar" style={{ background: AVATAR_COLORS[hash % AVATAR_COLORS.length] }} aria-hidden="true">
+      {name.slice(0, 1)}
+    </span>
   )
 }
 
@@ -285,7 +460,7 @@ async function copyText(text: string) {
   }
 }
 
-function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
+function Composer({ teamId, channelId, onSent }: { teamId: string; channelId: string; onSent: () => void }) {
   const [body, setBody] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const [uploading, setUploading] = useState(0)
@@ -311,7 +486,7 @@ function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
     setPhotos([])
     if (pics.length) setUploading((n) => n + 1)
     try {
-      await sendMessage(teamId, text, pics)
+      await sendMessage(teamId, channelId, text, pics)
     } catch (err) {
       setBody((now) => (now ? now : text))
       setPhotos((now) => (now.length ? now : pics))

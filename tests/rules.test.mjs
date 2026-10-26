@@ -167,3 +167,28 @@ test('본인은 사용 중지, 임시 비밀번호 표시를 스스로 바꿀 �
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { active: true }))
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { mustChangePassword: false }))
 })
+
+test('채팅방: 편집 이상이 만들고, 만든 사람·관리자만 이름 변경과 삭제, 기본 방은 삭제 불가', async () => {
+  const room = { name: '오전 근무', createdBy: 'ed', createdAt: 1 }
+  await assertFails(setDoc(doc(fs('viewer'), 'teams/t1/channels/r1'), { ...room, createdBy: 'viewer' }))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/channels/r1'), { ...room, createdBy: 'ed2' }))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/channels/r1'), { ...room, name: '' }))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/channels/r1'), room))
+  await assertSucceeds(getDoc(doc(fs('viewer'), 'teams/t1/channels/r1')))
+  await assertFails(getDoc(doc(fs('outsider'), 'teams/t1/channels/r1')))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/channels/r1'), { name: '남의 방' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/channels/r1'), { createdBy: 'ed2' }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/channels/r1'), { name: '오후 근무' }))
+  await assertSucceeds(updateDoc(doc(fs('admin'), 'teams/t1/channels/r1'), { name: '관리자가 바꿈' }))
+  // 방 메시지: 팀원만, viewer는 읽기만
+  await assertSucceeds(setDoc(doc(fs('ed2'), 'teams/t1/channels/r1/messages/x'), { authorUid: 'ed2', body: '안녕', createdAt: 1 }))
+  await assertFails(setDoc(doc(fs('viewer'), 'teams/t1/channels/r1/messages/y'), { authorUid: 'viewer', body: 'x', createdAt: 1 }))
+  await assertFails(getDoc(doc(fs('outsider'), 'teams/t1/channels/r1/messages/x')))
+  await assertFails(deleteDoc(doc(fs('ed'), 'teams/t1/channels/r1/messages/x')))
+  // 기본 방(main): 이름은 관리자만, 삭제는 아무도
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/channels/main'), { ...room, createdBy: 'ed' }))
+  await assertSucceeds(setDoc(doc(fs('admin'), 'teams/t1/channels/main'), { ...room, createdBy: 'admin' }))
+  await assertFails(deleteDoc(doc(fs('admin'), 'teams/t1/channels/main')))
+  await assertFails(deleteDoc(doc(fs('ed2'), 'teams/t1/channels/r1')))
+  await assertSucceeds(deleteDoc(doc(fs('ed'), 'teams/t1/channels/r1')))
+})

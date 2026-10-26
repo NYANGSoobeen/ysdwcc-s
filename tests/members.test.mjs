@@ -191,14 +191,23 @@ test('기간별 삭제: 미리 보기는 지우지 않고, 삭제는 그 기간�
   const day = 24 * 3600 * 1000
   const range = { teamId, from: 0, to: Date.now() - 180 * day }
 
+  // 만든 채팅방의 오래된 메시지도 함께 지운다.
+  await db.doc(`teams/${teamId}/channels/room1`).set({ name: '오전 근무', createdBy: adminUid })
+  await db.doc(`teams/${teamId}/channels/room1/messages/roomOld`).set({ authorUid: adminUid, body: '방 옛 글', attachments: [], createdAt: Timestamp.fromMillis(Date.now() - 400 * day) })
+  await db.doc(`teams/${teamId}/channels/room1/messages/roomNew`).set({ authorUid: adminUid, body: '방 새 글', attachments: [], createdAt: Timestamp.now() })
   const preview = await fn.deleteMessagesInRange.run(as(adminUid, { ...range, dryRun: true }))
-  assert.deepEqual(preview, { messages: 2, photos: 1, bytes: 3500 })
+  assert.deepEqual(preview, { messages: 3, photos: 1, bytes: 3500 })
   assert.equal((await db.collection(`teams/${teamId}/messages`).get()).size, 4)
 
   const result = await fn.deleteMessagesInRange.run(as(adminUid, { ...range, dryRun: false }))
   assert.deepEqual(result, preview)
   const left = (await db.collection(`teams/${teamId}/messages`).get()).docs.map((d) => d.id).sort()
   assert.deepEqual(left, ['new1', 'new2'])
+  const roomLeft = (await db.collection(`teams/${teamId}/channels/room1/messages`).get()).docs.map((d) => d.id)
+  assert.deepEqual(roomLeft, ['roomNew'])
+  const usage = await fn.getUsage.run(as(adminUid, { teamId }))
+  assert.equal(usage.counts.messages, 3, '용량의 메시지 수에 만든 방이 빠짐')
+  await db.recursiveDelete(db.doc(`teams/${teamId}/channels/room1`))
   const [oldFiles] = await bucket.getFiles({ prefix: `teams/${teamId}/chat/old1/` })
   const [newFiles] = await bucket.getFiles({ prefix: `teams/${teamId}/chat/new1/` })
   assert.equal(oldFiles.length, 0)

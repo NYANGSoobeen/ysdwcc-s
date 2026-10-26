@@ -2,11 +2,12 @@ import type { User } from 'firebase/auth'
 import { useEffect, useState } from 'react'
 import { api } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
+import { MAIN_CHANNEL, useChannels } from './chat.ts'
 import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
-import { ChatPage } from './pages/ChatPage.tsx'
+import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
@@ -42,6 +43,17 @@ function savedTab(): Tab {
   return 'customers'
 }
 
+const CHANNEL_KEY = 'chat-channel'
+
+function savedChannel() {
+  try {
+    const [teamId, id] = (sessionStorage.getItem(CHANNEL_KEY) ?? '').split(':')
+    return teamId ? { teamId, id: id || null } : null
+  } catch {
+    return null
+  }
+}
+
 const REMOVED_NOTICE = '팀에서 제외되어 더 이상 사용할 수 없습니다. 이 기기에 남은 팀 데이터를 지웠습니다.'
 
 const SIGNED_OUT_NOTICE = '로그인이 끊겼습니다 (로그인 만료 또는 계정 사용 중지). 다시 로그인해 주세요.'
@@ -69,10 +81,13 @@ function SignedIn({ user }: { user: User }) {
   const teamIds = profile?.teamIds ?? []
   const teamId = selectedTeamId && teamIds.includes(selectedTeamId) ? selectedTeamId : teamIds[0]
   const { team, denied } = useTeam(teamId)
+  const channels = useChannels(team?.id)
   const teamNames = useTeamNames(teamIds)
   const [tab, setTabState] = useState<Tab>(savedTab)
   const [menuOpen, setMenuOpen] = useState(false)
   const [queries, setQueries] = useState<Partial<Record<Tab, string>>>({})
+  // 보고 있는 채팅방 (F5 후에도 유지). 휴대폰에서 null이면 채팅방 목록.
+  const [channelState, setChannelState] = useState<{ teamId: string; id: string | null } | null>(savedChannel)
   const [searchFocused, setSearchFocused] = useState(false)
   const desktop = useIsDesktop()
 
@@ -147,7 +162,36 @@ function SignedIn({ user }: { user: User }) {
         </select>
       </label>
     ) : null
-  const menuProps = { current, isAdmin, superAdmin, teamName: team.name, userName: profile.name, onSelect: setTab }
+  const channelId = channelState?.teamId === team.id ? channelState.id : null
+  const roomId = channels?.some((c) => c.id === channelId) ? channelId : desktop ? MAIN_CHANNEL : null
+  function openChannel(id: string | null) {
+    setChannelState({ teamId: team!.id, id })
+    setQueries((prev) => ({ ...prev, chat: '' }))
+    setTab('chat')
+    try {
+      sessionStorage.setItem(CHANNEL_KEY, `${team!.id}:${id ?? ''}`)
+    } catch {
+      // 기억하지 못해도 동작에는 문제없다.
+    }
+  }
+  const canWrite = team.members[user.uid] !== 'viewer'
+  const menuProps = {
+    current,
+    isAdmin,
+    superAdmin,
+    teamName: team.name,
+    userName: profile.name,
+    onSelect: setTab,
+    chatRooms: channels ?? [],
+    currentRoom: current === 'chat' ? (roomId ?? null) : null,
+    onSelectRoom: openChannel,
+    onCreateRoom: canWrite
+      ? async () => {
+          const id = await promptCreateChannel(team.id)
+          if (id) openChannel(id)
+        }
+      : undefined,
+  }
   const search = {
     query: queries[current] ?? '',
     setQuery: (query: string) => setQueries((prev) => ({ ...prev, [current]: query })),
@@ -165,7 +209,16 @@ function SignedIn({ user }: { user: User }) {
           {!desktop && teamSelect && <div className="teambar">{teamSelect}</div>}
           <div className="shell-body">
             {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} />}
-            {current === 'chat' && <ChatPage team={team} uid={user.uid} />}
+            {current === 'chat' && (
+              <ChatPage
+                team={team}
+                uid={user.uid}
+                channels={channels}
+                channelId={roomId}
+                desktop={desktop}
+                onOpenChannel={openChannel}
+              />
+            )}
             {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
             {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('admin')} />}
             {current === 'admin' && (
@@ -184,7 +237,13 @@ function SignedIn({ user }: { user: User }) {
           {!desktop && (
             <nav className="tabbar">
               <TabButton active={current === 'customers'} onClick={() => setTab('customers')} icon="📇" label="고객" />
-              <TabButton active={current === 'chat'} onClick={() => setTab('chat')} icon="💬" label="채팅" />
+              <TabButton
+                active={current === 'chat'}
+                // 채팅방 안에서 한 번 더 누르면 방 목록으로
+                onClick={() => (current === 'chat' ? openChannel(null) : setTab('chat'))}
+                icon="💬"
+                label="채팅"
+              />
               <TabButton active={current === 'schedule'} onClick={() => setTab('schedule')} icon="📅" label="스케줄" />
               <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
               <TabButton active={current === 'profile'} onClick={() => setTab('profile')} icon="⚙️" label="내 정보" />

@@ -1,26 +1,25 @@
 import {
-  collection,
   getDocs,
   limit,
   orderBy,
   query,
   startAfter,
   where,
+  type CollectionReference,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Attachment } from '../chat.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
-import { db } from '../firebase.ts'
 import type { Profile } from '../hooks.ts'
 
 const PAGE_SIZE = 30
 
-type Props = { teamId: string; profiles: Record<string, Profile>; onClose: () => void }
+type Props = { messages: CollectionReference; profiles: Record<string, Profile>; onClose: () => void }
 
-// 채팅방에 올라온 사진을 최신순으로 모아 월별로 보여 준다.
-export function PhotoGallery({ teamId, profiles, onClose }: Props) {
+// 이 채팅방에 올라온 사진을 최신순으로 모아 월별로 보여 준다.
+export function PhotoGallery({ messages, profiles, onClose }: Props) {
   const [photos, setPhotos] = useState<(ViewerPhoto & { authorUid: string })[]>([])
   const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null)
   const [done, setDone] = useState(false)
@@ -33,7 +32,7 @@ export function PhotoGallery({ teamId, profiles, onClose }: Props) {
     setLoading(true)
     const constraints = [where('hasPhotos', '==', true), orderBy('createdAt', 'desc'), limit(PAGE_SIZE)]
     const q = query(
-      collection(db, 'teams', teamId, 'messages'),
+      messages,
       ...(cursor ? [...constraints, startAfter(cursor)] : constraints),
     )
     const snap = await getDocs(q)
@@ -51,7 +50,7 @@ export function PhotoGallery({ teamId, profiles, onClose }: Props) {
     setCursor(snap.docs.at(-1) ?? cursor)
     setDone(snap.size < PAGE_SIZE)
     setLoading(false)
-  }, [teamId, cursor, loading, done])
+  }, [messages, cursor, loading, done])
 
   // 맨 아래가 보이면 다음 사진을 불러온다.
   useEffect(() => {
