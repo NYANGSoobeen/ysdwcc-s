@@ -120,6 +120,16 @@ service cloud.firestore {
         allow delete: if channelId != 'main'
           && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid));
 
+        // 읽음 표시: 방마다 팀원별 마지막으로 읽은 시각. 팀원 모두 보고, 자기 것만 쓴다 (지금보다 미래 시각은 안 됨).
+        // (기본 방은 channels/main/reads, main 문서가 없어도 된다)
+        match /reads/{readerUid} {
+          allow read: if isMember(teamId);
+          allow create, update: if isMember(teamId) && readerUid == request.auth.uid
+            && request.resource.data.keys().hasOnly(['at'])
+            && request.resource.data.at is timestamp
+            && request.resource.data.at <= request.time;
+        }
+
         match /messages/{msgId} {
           allow read: if isMember(teamId);
           allow create: if canEdit(teamId)

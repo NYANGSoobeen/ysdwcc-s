@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore'
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes } from 'firebase/storage'
 
 const PROJECT = 'demo-workphone'
@@ -212,4 +212,19 @@ test('채팅 스티커(공감): 팀원 누구나 자기 것만 붙이고 떼며,
   await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/messages/m1'), { body: '고침', editedAt: 2 }))
   await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/messages/m1'), { reactions: {} }))
   await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/messages/m1'), { deleted: true, body: '', attachments: [] }))
+})
+
+test('읽음 표시: 팀원은 방의 읽음을 모두 보고, 자기 것만 지금까지의 시각으로 쓴다', async () => {
+  const main = 'teams/t1/channels/main/reads'
+  await assertSucceeds(setDoc(doc(fs('viewer'), `${main}/viewer`), { at: serverTimestamp() }))
+  await assertSucceeds(setDoc(doc(fs('ed'), `${main}/ed`), { at: Timestamp.fromMillis(Date.now() - 60_000) }))
+  await assertSucceeds(getDocs(collection(fs('viewer'), main)))
+  await assertFails(getDocs(collection(fs('outsider'), main)))
+  // 남의 것, 미래 시각, 다른 칸, 팀 밖 사람은 안 됨
+  await assertFails(setDoc(doc(fs('ed'), `${main}/viewer`), { at: serverTimestamp() }))
+  await assertFails(setDoc(doc(fs('ed'), `${main}/ed`), { at: Timestamp.fromMillis(Date.now() + 3_600_000) }))
+  await assertFails(setDoc(doc(fs('ed'), `${main}/ed`), { at: serverTimestamp(), x: 1 }))
+  await assertFails(setDoc(doc(fs('ed'), `${main}/ed`), { at: 'now' }))
+  await assertFails(setDoc(doc(fs('outsider'), `${main}/outsider`), { at: serverTimestamp() }))
+  await assertFails(deleteDoc(doc(fs('ed'), `${main}/ed`)))
 })

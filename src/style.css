@@ -527,6 +527,63 @@ h3 {
   font-weight: 600;
 }
 
+/* 안 읽은 수: 빨간 동그라미 (방 목록, 메뉴, ☰, 아래 채팅 탭) */
+.badge,
+.tab span.badge,
+.drawer-item span.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.drawer-item .badge,
+.row .badge {
+  margin-left: auto;
+}
+.drawer-label .badge {
+  margin: 0 8px 0 auto;
+}
+.tab .tab-icon,
+.menu-button {
+  position: relative;
+}
+.badge.on-icon,
+.tab span.badge.on-icon {
+  position: absolute;
+  top: -4px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  box-shadow: 0 0 0 2px var(--surface, #fff);
+}
+.menu-button .badge.on-icon {
+  top: 2px;
+  left: 28px;
+}
+
+/* 말풍선 옆 노란 숫자: 아직 안 읽은 팀원 수 */
+.meta .unread-count {
+  color: var(--unread-yellow, #b97c00);
+  font-weight: 700;
+  font-size: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  .meta .unread-count {
+    --unread-yellow: #ffc933;
+  }
+}
+
 /* 메뉴(휴대폰 ☰, PC 왼쪽 메뉴): Venice Blue 바탕에 Merino 글씨 */
 .drawer,
 .sidebar {

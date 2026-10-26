@@ -30,6 +30,7 @@ import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { useMessages, type Message } from '../useMessages.ts'
+import { badgeText, markRead, unreadBy, useRoomReads } from '../reads.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { MenuButton } from '../menu.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
@@ -43,13 +44,15 @@ type ChatProps = {
   channels: Channel[] | null
   channelId: string | null
   desktop: boolean
+  unread: Record<string, number>
   onOpenChannel: (id: string | null) => void
 }
 
 // 채팅 탭. 휴대폰은 방 목록 → 방, PC는 왼쪽 메뉴에서 방을 고르고 여기에는 방만 보인다.
-export function ChatPage({ team, uid, channels, channelId, desktop, onOpenChannel }: ChatProps) {
+export function ChatPage({ team, uid, channels, channelId, desktop, unread, onOpenChannel }: ChatProps) {
   if (!channels) return <div className="center muted">불러오는 중…</div>
-  if (!channelId && !desktop) return <ChatRoomList team={team} uid={uid} channels={channels} onOpen={onOpenChannel} />
+  if (!channelId && !desktop)
+    return <ChatRoomList team={team} uid={uid} channels={channels} unread={unread} onOpen={onOpenChannel} />
   const room = channels.find((c) => c.id === channelId) ?? channels[0]
   return (
     <ChatRoom
@@ -75,7 +78,14 @@ export async function promptCreateChannel(teamId: string) {
   }
 }
 
-function ChatRoomList({ team, uid, channels, onOpen }: { team: Team; uid: string; channels: Channel[]; onOpen: (id: string) => void }) {
+function ChatRoomList(props: {
+  team: Team
+  uid: string
+  channels: Channel[]
+  unread: Record<string, number>
+  onOpen: (id: string) => void
+}) {
+  const { team, uid, channels, unread, onOpen } = props
   const canWrite = team.members[uid] !== 'viewer'
   return (
     <div className="page">
@@ -109,6 +119,11 @@ function ChatRoomList({ team, uid, channels, onOpen }: { team: Team; uid: string
                   <strong>{c.name}</strong>
                   {c.id === MAIN_CHANNEL && <span className="muted small">팀원 모두 · 기본 방</span>}
                 </div>
+                {(unread[c.id] ?? 0) > 0 && (
+                  <span className="badge" aria-label={`안 읽은 메시지 ${unread[c.id]}개`}>
+                    {badgeText(unread[c.id])}
+                  </span>
+                )}
                 <span aria-hidden="true" className="muted">
                   ›
                 </span>
@@ -272,10 +287,44 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
     }
   }, [])
 
+  // 읽음 표시: 이 방을 보고 있고(앱이 앞에 있고) 맨 아래까지 봤으면, 남이 보낸 새 말이 있을 때 내 읽은 시각을 올린다.
+  // 쓰기를 아끼려고 3초에 한 번까지만.
+  const reads = useRoomReads(team.id, room.id)
+  const memberUids = useMemo(() => Object.keys(team.members), [team.members])
+  const lastMarked = useRef(0)
+  const markTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const maybeMarkRead = useCallback(() => {
+    if (!reads || document.hidden || !stickToBottom.current) return
+    const latestOther = [...peek()].reverse().find((m) => m.authorUid !== uid && !m.pending && m.createdAt)
+    const t = latestOther?.createdAt?.toMillis() ?? 0
+    if (!t || (reads[uid] ?? 0) >= t) return
+    clearTimeout(markTimer.current)
+    const wait = Math.max(0, lastMarked.current + 3000 - Date.now())
+    markTimer.current = setTimeout(() => {
+      lastMarked.current = Date.now()
+      markRead(team.id, room.id, uid).catch(() => {})
+    }, wait)
+  }, [reads, peek, uid, team.id, room.id])
+  useEffect(() => {
+    maybeMarkRead()
+  }, [maybeMarkRead, lastId])
+  useEffect(() => {
+    document.addEventListener('visibilitychange', maybeMarkRead)
+    window.addEventListener('focus', maybeMarkRead)
+    return () => {
+      document.removeEventListener('visibilitychange', maybeMarkRead)
+      window.removeEventListener('focus', maybeMarkRead)
+    }
+  }, [maybeMarkRead])
+  useEffect(() => () => clearTimeout(markTimer.current), [])
+
   function onScroll() {
     const el = listRef.current!
     stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-    if (stickToBottom.current) setNewBelow(false)
+    if (stickToBottom.current) {
+      setNewBelow(false)
+      maybeMarkRead()
+    }
     // 위로 올려 맨 위 가까이 오면 이전 메시지를 더 불러온다.
     if (el.scrollTop < 200 && hasMore && !loadingOlder) void showOlder()
   }
@@ -459,6 +508,11 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
                 author={profiles[m.authorUid]?.name ?? '나간 팀원'}
                 showAuthor={!mine && !groupedWithPrev}
                 time={groupedWithNext ? '' : m.pending ? '보내는 중' : (date?.toLocaleTimeString('ko-KR', { timeStyle: 'short' }) ?? '')}
+                unread={
+                  reads && m.createdAt && !m.pending && !m.deleted
+                    ? unreadBy(memberUids, reads, m.authorUid, m.createdAt.toMillis())
+                    : 0
+                }
                 highlight={currentMatch === m.id || flashId === m.id}
                 uid={uid}
                 canWrite={canWrite}
@@ -526,6 +580,7 @@ function MessageItem(props: {
   author: string
   showAuthor: boolean
   time: string
+  unread: number
   highlight: boolean
   uid: string
   canWrite: boolean
@@ -654,8 +709,13 @@ function MessageItem(props: {
             )}
           </div>
         )}
-        {(props.time || m.editedAt) && (
+        {(props.time || m.editedAt || props.unread > 0) && (
           <div className="meta">
+            {props.unread > 0 && (
+              <span className="unread-count" title={`${props.unread}명이 아직 안 읽었어요`}>
+                {badgeText(props.unread)}
+              </span>
+            )}
             {m.editedAt && !m.deleted && <span>수정됨</span>}
             {props.time && <span>{props.time}</span>}
           </div>

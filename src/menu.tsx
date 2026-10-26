@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { badgeText } from './reads.ts'
 
 // 왼쪽 위 ☰ 버튼으로 여는 메뉴. 기능이 늘어나면 MENU_ITEMS에 추가한다.
 export type Tab = 'customers' | 'chat' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
@@ -55,12 +56,20 @@ function useCollapsed() {
 }
 
 export const MenuContext = createContext<() => void>(() => {})
+// ☰ 버튼에 붙는 숫자 (안 읽은 채팅 합계)
+export const MenuBadgeContext = createContext(0)
 
 export function MenuButton() {
   const open = useContext(MenuContext)
+  const badge = useContext(MenuBadgeContext)
   return (
-    <button type="button" className="ghost menu-button" onClick={open} aria-label="메뉴 열기">
-      ☰
+    <button
+      type="button"
+      className="ghost menu-button"
+      onClick={open}
+      aria-label={badge > 0 ? `메뉴 열기 (안 읽은 메시지 ${badge}개)` : '메뉴 열기'}
+    >
+      ☰{badge > 0 && <span className="badge on-icon">{badgeText(badge)}</span>}
     </button>
   )
 }
@@ -77,6 +86,7 @@ type MenuListProps = {
   currentRoom?: string | null
   onSelectRoom?: (id: string) => void
   onCreateRoom?: () => void
+  unread?: Record<string, number>
   focusable?: boolean
   children?: ReactNode
 }
@@ -144,15 +154,18 @@ function MenuList(props: MenuListProps) {
 }
 
 function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolean; onToggle: () => void }) {
-  const { chatRooms, currentRoom, onSelectRoom, onCreateRoom, focusable = true, closed, onToggle, title } = props
+  const { chatRooms, currentRoom, onSelectRoom, onCreateRoom, focusable = true, closed, onToggle, title, unread = {} } = props
   if (!chatRooms || !onSelectRoom) return null
   const shown = closed ? chatRooms.filter((r) => r.id === currentRoom) : chatRooms
   const tabIndex = focusable ? 0 : -1
+  // 접어 두면 숨은 방들의 안 읽은 수를 제목 옆에 합쳐 보여 준다.
+  const hidden = chatRooms.filter((r) => !shown.includes(r)).reduce((sum, r) => sum + (unread[r.id] ?? 0), 0)
   return (
     <ul className="drawer-list">
       <li>
         <button type="button" className="drawer-label" aria-expanded={!closed} onClick={onToggle} tabIndex={tabIndex}>
           {title}
+          {hidden > 0 && <span className="badge">{badgeText(hidden)}</span>}
           <span aria-hidden="true">{closed ? '▸' : '▾'}</span>
         </button>
       </li>
@@ -167,6 +180,11 @@ function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolea
           >
             <span aria-hidden="true">💬</span>
             {room.name}
+            {(unread[room.id] ?? 0) > 0 && (
+              <span className="badge" aria-label={`안 읽은 메시지 ${unread[room.id]}개`}>
+                {badgeText(unread[room.id])}
+              </span>
+            )}
           </button>
         </li>
       ))}

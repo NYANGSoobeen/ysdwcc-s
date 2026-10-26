@@ -5,7 +5,8 @@ import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
 import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { useMentionAlerts } from './useMentionAlerts.ts'
-import { MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
+import { badgeText, useUnreadCounts } from './reads.ts'
+import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
@@ -154,6 +155,10 @@ function SignedIn({ user }: { user: User }) {
     onOpen: openChannel,
   })
 
+  // 방마다 안 읽은 메시지 수 (방 목록, 메뉴, ☰, 아래 채팅 탭에 표시)
+  const unread = useUnreadCounts(team?.id, channels, user.uid, tab === 'chat' ? roomId : null)
+  const unreadTotal = Object.values(unread).reduce((a, b) => a + b, 0)
+
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)
   // 관리자가 사용 중지하면 바로 로그아웃하고 로그인 화면에 이유를 보여 준다.
@@ -201,6 +206,7 @@ function SignedIn({ user }: { user: User }) {
     chatRooms: channels ?? [],
     currentRoom: current === 'chat' ? (roomId ?? null) : null,
     onSelectRoom: openChannel,
+    unread,
     onCreateRoom: canWrite
       ? async () => {
           const id = await promptCreateChannel(team.id)
@@ -218,6 +224,7 @@ function SignedIn({ user }: { user: User }) {
 
   return (
     <MenuContext.Provider value={() => setMenuOpen(true)}>
+     <MenuBadgeContext.Provider value={unreadTotal}>
      <SearchContext.Provider value={search}>
       <div className={`shell${desktop ? ' desktop' : ''}${searching ? ' searching' : ''}`}>
         {desktop && <Sidebar {...menuProps}>{teamSelect}</Sidebar>}
@@ -232,6 +239,7 @@ function SignedIn({ user }: { user: User }) {
                 channels={channels}
                 channelId={roomId}
                 desktop={desktop}
+                unread={unread}
                 onOpenChannel={openChannel}
               />
             )}
@@ -259,6 +267,7 @@ function SignedIn({ user }: { user: User }) {
                 onClick={() => (current === 'chat' ? openChannel(null) : setTab('chat'))}
                 icon="💬"
                 label="채팅"
+                badge={unreadTotal}
               />
               <TabButton active={current === 'schedule'} onClick={() => setTab('schedule')} icon="📅" label="스케줄" />
               <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
@@ -269,6 +278,7 @@ function SignedIn({ user }: { user: User }) {
         {!desktop && <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)} />}
       </div>
      </SearchContext.Provider>
+     </MenuBadgeContext.Provider>
     </MenuContext.Provider>
   )
 }
@@ -296,7 +306,7 @@ function FirstPassword({ name, loginId }: { name: string; loginId: string }) {
   )
 }
 
-function TabButton(props: { active: boolean; onClick: () => void; icon: string; label: string }) {
+function TabButton(props: { active: boolean; onClick: () => void; icon: string; label: string; badge?: number }) {
   return (
     <button
       type="button"
@@ -304,7 +314,10 @@ function TabButton(props: { active: boolean; onClick: () => void; icon: string; 
       onClick={props.onClick}
       aria-current={props.active ? 'page' : undefined}
     >
-      <span aria-hidden="true">{props.icon}</span>
+      <span aria-hidden="true" className="tab-icon">
+        {props.icon}
+        {(props.badge ?? 0) > 0 && <span className="badge on-icon">{badgeText(props.badge!)}</span>}
+      </span>
       {props.label}
     </button>
   )

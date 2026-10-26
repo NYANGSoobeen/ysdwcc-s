@@ -44,7 +44,8 @@ export const onChannelDeleted = onDocumentDeleted('teams/{teamId}/channels/{chan
   const { teamId, channelId } = event.params
   if (channelId === 'main') return
   const db = getFirestore()
-  await db.recursiveDelete(db.collection(`teams/${teamId}/channels/${channelId}/messages`))
+  // 방 아래 메시지와 읽음 표시를 모두 지운다.
+  await db.recursiveDelete(db.doc(`teams/${teamId}/channels/${channelId}`))
 })
 
 // 팀의 모든 채팅방 메시지 컬렉션 (기본 방 + 만든 방들)

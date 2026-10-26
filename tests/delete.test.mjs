@@ -55,6 +55,7 @@ test('만든 채팅방의 메시지를 지우면 사진도, 방을 지우면 방
   await db.doc('teams/t1/channels/c1').set({ name: '오전 근무', createdBy: 'ed' })
   await db.doc('teams/t1/channels/c1/messages/cm1').set({ authorUid: 'ed', body: '사진' })
   await db.doc('teams/t1/channels/c1/messages/cm2').set({ authorUid: 'ed', body: '글' })
+  await db.doc('teams/t1/channels/c1/reads/ed').set({ at: new Date() })
   await bucket.file('teams/t1/chat/cm1/0.jpg').save(Buffer.from([0xff, 0xd8]))
 
   await db.doc('teams/t1/channels/c1/messages/cm1').delete()
@@ -64,4 +65,5 @@ test('만든 채팅방의 메시지를 지우면 사진도, 방을 지우면 방
   await db.doc('teams/t1/channels/c1').delete()
   await onChannelDeleted.run({ params: { teamId: 't1', channelId: 'c1' } })
   assert.ok((await db.collection('teams/t1/channels/c1/messages').get()).empty, '방의 메시지가 남아 있음')
+  assert.ok((await db.collection('teams/t1/channels/c1/reads').get()).empty, '방의 읽음 표시가 남아 있음')
 })
