@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api.ts'
 import { errorMessage, logIn, takeLoginNotice, toEmail } from '../auth.ts'
+import { sharedComputer } from '../firebase.ts'
+import { PASSWORD_HINT, passwordProblem } from '../password.ts'
 
 // 페이지를 열 때 한 번만 읽는다 (읽으면 지워지므로 렌더링마다 읽으면 안 된다).
 const notice = takeLoginNotice()
@@ -70,6 +72,11 @@ function LoginForm() {
         {busy ? '로그인 중…' : '로그인'}
       </button>
       <p className="muted small">계정은 팀 관리자가 만들어 줍니다. 비밀번호를 잊으면 관리자에게 초기화를 요청하세요.</p>
+      {sharedComputer && (
+        <p className="muted small">
+          공용 컴퓨터 보호: 브라우저를 닫거나 15분 넘게 앱을 닫아 두면 자동으로 로그아웃됩니다.
+        </p>
+      )}
     </form>
   )
 }
@@ -84,6 +91,8 @@ function SetupForm() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const problem = passwordProblem(form.password, form.loginId)
+    if (problem) return setError(problem)
     if (form.password !== form.confirm) return setError('비밀번호가 서로 다릅니다.')
     setBusy(true)
     setError('')
@@ -121,9 +130,10 @@ function SetupForm() {
         <input value={form.loginId} onChange={set('loginId')} autoCapitalize="none" required />
       </label>
       <label>
-        비밀번호 (6자 이상)
-        <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" minLength={6} required />
+        비밀번호
+        <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" required />
       </label>
+      <p className="rule-check muted">{PASSWORD_HINT}</p>
       <label>
         비밀번호 확인
         <input type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" required />

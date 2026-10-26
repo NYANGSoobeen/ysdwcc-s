@@ -144,3 +144,26 @@ test('스케줄: 팀원만 보고, 올리기/삭제는 편집 이상, 스티커�
   await assertFails(deleteDoc(sched(fs('viewer'))))
   await assertSucceeds(deleteDoc(sched(fs('ed'))))
 })
+
+test('사용 중지된 계정은 팀 데이터를 못 읽고 못 쓰지만, 자기 프로필(중지 이유)은 읽는다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', teamIds: ['t1'], active: false, disabledReason: '휴직' })
+    await setDoc(doc(ctx.firestore(), 'users/ed2'), { name: '편집2', teamIds: ['t1'], active: true })
+  })
+  await assertFails(getDoc(doc(fs('ed'), 'customers/c1')))
+  await assertFails(getDoc(doc(fs('ed'), 'teams/t1/messages/m1')))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/messages/m9'), { authorUid: 'ed', body: 'x', createdAt: 2 }))
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { name: '바꿈' }))
+  await assertSucceeds(getDoc(doc(fs('ed'), 'users/ed')))
+  // active: true이거나 표시가 없는(예전) 계정은 그대로 쓴다
+  await assertSucceeds(getDoc(doc(fs('ed2'), 'customers/c1')))
+  await assertSucceeds(getDoc(doc(fs('viewer'), 'customers/c1')))
+})
+
+test('본인은 사용 중지, 임시 비밀번호 표시를 스스로 바꿀 수 없다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', teamIds: ['t1'], active: false, mustChangePassword: true })
+  })
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { active: true }))
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { mustChangePassword: false }))
+})

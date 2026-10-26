@@ -3,13 +3,20 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // 사용 중지된 계정(users.active == false)은 막는다.
+    function active() {
+      let user = /databases/(default)/documents/users/$(request.auth.uid);
+      return !firestore.exists(user) || firestore.get(user).data.get('active', true) != false;
+    }
+
     function role(teamId) {
-      return firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid];
+      return active() ? firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid] : null;
     }
 
     // 근무표(스케줄): 쪽 그림(PNG/JPEG)과 원본 PDF(1MB 이하만). 교체·삭제 시 Functions가 폴더째 지운다.
     match /teams/{teamId}/schedule/{uploadId}/{fileName} {
       allow read: if request.auth != null
+        && active()
         && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
       allow create: if request.auth != null
         && role(teamId) in ['admin', 'editor']
@@ -24,6 +31,7 @@ service firebase.storage {
     // 채팅 사진: 압축본과 썸네일. 메시지가 삭제되면 Functions가 폴더째 지운다.
     match /teams/{teamId}/chat/{msgId}/{fileName} {
       allow read: if request.auth != null
+        && active()
         && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
       allow create: if request.auth != null
         && role(teamId) in ['admin', 'editor']

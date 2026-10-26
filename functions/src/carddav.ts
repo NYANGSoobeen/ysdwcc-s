@@ -80,11 +80,12 @@ async function authenticate(req: DavRequest): Promise<Session | null> {
 
 // ── 주소록 내용 ──────────────────────────────────────────────
 
-// 이 사람이 지금 속한 팀들. 제외됐거나 계정이 지워졌으면 빈 목록.
+// 이 사람이 지금 속한 팀들. 제외됐거나 계정이 지워졌거나 사용 중지됐으면 빈 목록.
 async function memberTeams(session: Session) {
   if (session.disabled) return []
   const db = getFirestore()
   const user = await db.doc(`users/${session.uid}`).get()
+  if (user.get('active') === false) return []
   const teamIds = (user.get('teamIds') ?? []) as string[]
   if (teamIds.length === 0) return []
   const teams = await db.getAll(...teamIds.map((id) => db.doc(`teams/${id}`)))

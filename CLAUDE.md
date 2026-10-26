@@ -24,6 +24,12 @@
 - **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원 지원팀"). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 지원팀 앱의 파란색 `#1f6feb`를 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`.
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전이 나오면 하단 알림을 띄우고 누르면 업데이트한다 (`src/update.ts`).
 - **로그인과 계정:** 이메일/비밀번호 로그인. 계정은 관리자만 만든다 (콘솔에서 가입 기능을 끈다). "@" 없는 아이디는 `아이디@workphone.local`로 저장하며 실제 메일이 아니므로 비밀번호 분실 시 관리자가 초기화한다. 프로젝트에 팀이 없을 때만 로그인 화면에 "처음 시작하기"(첫 관리자 만들기)가 나온다.
+- **로그인 보안 (공통 기능 1번):**
+  - 비밀번호 규칙: 8자 이상, 영문+숫자, 1234·abcd·qwer·aaaa처럼 4글자 이상 이어지거나 반복 금지, 아이디 포함 금지. 규칙 파일은 `src/password.ts`와 `functions/src/password.ts` 두 곳에 똑같이 두며(테스트가 같은지 확인), 서버(`changeMyPassword`, `createFirstAdmin`)도 검사한다.
+  - 관리자가 정한 비밀번호(새 계정, 초기화)는 임시 비밀번호(6자 이상)이고 `users.mustChangePassword`가 붙어, 처음 로그인하면 "비밀번호 정하기" 화면이 먼저 나온다. 비밀번호 바꾸기는 재인증 후 `changeMyPassword`(5분 안 재인증만 허용) → 새 비밀번호로 다시 로그인.
+  - 휴대폰(그리고 갤럭시 앱)은 로그인 유지. **PC는 공용 컴퓨터**로 본다(`src/firebase.ts`의 `sharedComputer`: 마우스 기기이고 갤럭시 앱이 아님): 세션 저장(브라우저 닫으면 로그아웃), Firestore 메모리 캐시(디스크에 고객 정보 안 남김), 1분마다 localStorage `alive-at` 기록 → 15분 넘게 끊겼으면 로그아웃(`src/session.ts`).
+  - 계정 사용 중지(`setMemberActive`, 이유 필수): `users.active=false` + 이유, Auth 계정 disabled + 토큰 폐기. 열린 앱은 바로 로그아웃하고 로그인 화면에 이유를 보여 준다. Firestore/Storage 규칙(`isActive`)과 CardDAV도 막는다. 팀 소속과 데이터는 그대로이며 "다시 사용"으로 푼다. 자기 자신, 최고 관리자, 마지막 관리자는 중지할 수 없다. (요청서의 `uids/{uid}` 문서 대신 기존 `users/{uid}`를 쓴다.)
+  - 로그아웃 버튼 없이 로그인이 풀리면(만료, 중지) 기기에 남은 팀 데이터를 지운다.
 - **팀원 관리:** 팀 생성, 팀원 추가, 권한 변경, 삭제, 비밀번호 초기화는 모두 Functions(callable)로만 한다. 마지막 관리자는 강등하거나 삭제할 수 없다. 팀에서 삭제하면 보안 규칙상 즉시 접근이 막히고, 그 사람 앱은 로그아웃하면서 기기 캐시를 지운다. 속한 팀이 없어지면 Auth 계정도 지운다.
 - **여러 팀과 최고 관리자:** 처음 만든 관리자는 최고 관리자(`users.superAdmin`, `meta/setup.ownerUid`, Functions만 씀)다. 최고 관리자만 새 팀을 만들 수 있고(`createTeam`), 만든 팀에 관리자로 자동으로 들어가 모든 팀을 본다. 다른 관리자는 최고 관리자를 빼거나 강등할 수 없다. 팀이 2개 이상이면 팀 바꾸기 칸이 나온다 (휴대폰은 화면 맨 위, PC는 왼쪽 메뉴). 관리자는 관리자 화면에서 팀 이름을 바꾼다.
 - **PC와 휴대폰 화면:** 가로 1024px 이상(`src/useMedia.ts`의 `useIsDesktop`)은 PC 화면: 왼쪽 고정 메뉴(`Sidebar`, 팀 바꾸기 포함), 하단 탭과 ☰ 없음, 고객은 왼쪽 목록 | 오른쪽 상세 2단, 내 정보·관리자는 2열(`.page-body.two-col` + `.col`), 용량은 카드 여러 열(`.masonry`), 채팅·스케줄은 넓게. 스타일은 `src/style.css` 끝의 `.shell.desktop` 규칙에 모아 둔다. 그보다 좁으면 휴대폰 화면.
@@ -75,7 +81,9 @@
 ## Firestore 데이터 구조 초안
 
 ```
-users/{uid}                      name, email, teamIds[], superAdmin, platform, settings{}   (Functions가 생성, 본인은 name/platform/settings만 수정)
+users/{uid}                      name, email, teamIds[], superAdmin, platform, settings{},
+                                 active, disabledReason, disabledAt, disabledBy, mustChangePassword, passwordChangedAt
+                                 (Functions가 생성, 본인은 name/platform/settings만 수정)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
 meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)

@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { api, ROLE_LABELS, type Role } from '../api.ts'
 import { errorMessage, toEmail, toLoginId } from '../auth.ts'
 import { db } from '../firebase.ts'
-import { useMemberProfiles, useTeamsSummary, type Team } from '../hooks.ts'
+import { useMemberProfiles, useTeamsSummary, type Profile, type Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
 
 export const ROLE_HELP: Record<Role, string> = {
@@ -60,6 +60,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
                 memberUid={memberUid}
                 name={profiles[memberUid]?.name ?? '…'}
                 loginId={toLoginId(profiles[memberUid]?.email)}
+                profile={profiles[memberUid]}
                 isMe={memberUid === uid}
                 canManage
               />
@@ -67,6 +68,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
           </ul>
           <p className="muted small">
             팀에서 삭제하면 그 사람은 바로 팀 데이터에 접근할 수 없고, 폰에 남은 데이터도 다음에 앱을 열 때 지워집니다.
+            잠시 막기만 하려면 "사용 중지"를 쓰세요 (데이터와 팀 소속은 그대로, 다시 사용으로 풀 수 있음).
           </p>
         </section>
         </div>
@@ -142,10 +144,12 @@ function MemberRow(props: {
   memberUid: string
   name: string
   loginId: string
+  profile?: Profile
   isMe: boolean
   canManage: boolean
 }) {
-  const { team, memberUid, name, loginId, isMe, canManage } = props
+  const { team, memberUid, name, loginId, profile, isMe, canManage } = props
+  const inactive = profile?.active === false
   const role = team.members[memberUid]
   const [busy, setBusy] = useState(false)
 
@@ -167,11 +171,26 @@ function MemberRow(props: {
   }
 
   function resetPassword() {
-    const password = prompt(`${name}님의 새 비밀번호 (6자 이상)`)
+    const password = prompt(`${name}님의 임시 비밀번호 (6자 이상)\n다음에 로그인하면 새 비밀번호를 정하게 됩니다.`)
     if (!password) return
     void run(
       () => api.resetMemberPassword({ teamId: team.id, uid: memberUid, password }),
-      `비밀번호를 바꿨습니다. ${name}님에게 새 비밀번호를 알려 주세요.`,
+      `임시 비밀번호로 바꿨습니다. ${name}님에게 알려 주세요.\n로그인하면 새 비밀번호를 정하게 됩니다.`,
+    )
+  }
+
+  function toggleActive() {
+    if (inactive) {
+      if (!confirm(`${name}님의 계정을 다시 사용하게 할까요?`)) return
+      void run(() => api.setMemberActive({ teamId: team.id, uid: memberUid, active: true }), `${name}님이 다시 로그인할 수 있습니다.`)
+      return
+    }
+    const reason = prompt(`${name}님의 계정을 사용 중지합니다.\n열려 있는 앱은 바로 로그아웃되고, 로그인 화면에 이유가 표시됩니다.\n\n중지 이유:`, '')
+    if (reason === null) return
+    if (!reason.trim()) return alert('중지 이유를 입력하세요.')
+    void run(
+      () => api.setMemberActive({ teamId: team.id, uid: memberUid, active: false, reason: reason.trim() }),
+      `${name}님의 계정을 사용 중지했습니다.`,
     )
   }
 
@@ -189,8 +208,11 @@ function MemberRow(props: {
         <strong>
           {name}
           {isMe && <span className="badge">나</span>}
+          {inactive && <span className="badge danger">사용 중지</span>}
+          {profile?.mustChangePassword && !inactive && <span className="badge">임시 비밀번호</span>}
         </strong>
         <span className="muted small">{loginId}</span>
+        {inactive && profile?.disabledReason && <span className="small error">이유: {profile.disabledReason}</span>}
       </div>
       {canManage ? (
         <div className="row-actions">
@@ -205,6 +227,9 @@ function MemberRow(props: {
             <>
               <button type="button" className="link" onClick={resetPassword} disabled={busy}>
                 비밀번호
+              </button>
+              <button type="button" className="link" onClick={toggleActive} disabled={busy}>
+                {inactive ? '다시 사용' : '사용 중지'}
               </button>
               <button type="button" className="link danger" onClick={remove} disabled={busy}>
                 삭제
@@ -241,7 +266,7 @@ function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void 
       alert(
         existed
           ? `${form.name}님을 추가했습니다. 이미 있던 계정이라 비밀번호는 그대로입니다.`
-          : `${form.name}님을 추가했습니다.\n아이디: ${form.loginId.trim()}\n비밀번호: ${form.password}\n로그인 후 "내 정보"에서 비밀번호를 바꾸도록 안내하세요.`,
+          : `${form.name}님을 추가했습니다.\n아이디: ${form.loginId.trim()}\n임시 비밀번호: ${form.password}\n처음 로그인하면 새 비밀번호를 정하게 됩니다.`,
       )
       onDone()
     } catch (err) {
@@ -263,7 +288,7 @@ function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void 
         <input value={form.loginId} onChange={set('loginId')} autoCapitalize="none" required />
       </label>
       <label>
-        처음 비밀번호 (6자 이상)
+        임시 비밀번호 (6자 이상, 처음 로그인 때 바꿈)
         <input value={form.password} onChange={set('password')} minLength={6} required />
       </label>
       <label>

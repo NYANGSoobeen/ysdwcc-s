@@ -155,14 +155,25 @@ h3 {
   margin: 0;
   color: var(--danger);
   font-size: 14px;
+  white-space: pre-line;
 }
 
 .notice {
   margin: 0;
+  white-space: pre-line;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--notice-bg);
   font-size: 14px;
+}
+
+.rule-check {
+  margin: 0;
+  font-size: 13px;
+}
+
+.rule-check.ok {
+  color: var(--accent);
 }
 
 .card {
@@ -213,6 +224,11 @@ h3 {
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
+}
+
+.badge.danger {
+  background: var(--danger);
+  color: #fff;
 }
 
 /* ── 로그인 ── */

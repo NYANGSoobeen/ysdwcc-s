@@ -136,6 +136,13 @@ test('팀에서 제외되면 빈 주소록이 되어 폰에서 고객 연락처�
   assert.equal((await fetchCards()).cards.length, 3)
 })
 
+test('계정을 사용 중지하면 빈 주소록, 다시 사용하면 돌아온다', async () => {
+  await db.doc('users/ed').update({ active: false })
+  assert.equal((await fetchCards()).cards.length, 0)
+  await db.doc('users/ed').update({ active: true })
+  assert.equal((await fetchCards()).cards.length, 3)
+})
+
 test('계정이 삭제돼도(프로필 없음) 빈 주소록을 준다', async () => {
   await db.doc('users/ed').delete()
   assert.equal((await fetchCards()).cards.length, 0)

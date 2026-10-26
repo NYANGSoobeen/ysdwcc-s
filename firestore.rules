@@ -11,8 +11,15 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/teams/$(teamId)).data.members;
     }
 
+    // 관리자가 사용 중지한 계정(users.active == false)은 로그인 토큰이 남아 있어도 팀 데이터를 못 쓴다.
+    // (프로필 문서가 없는 경우는 막지 않는다: 팀 소속은 teams.members가 따로 확인한다.)
+    function isActive() {
+      let user = /databases/$(database)/documents/users/$(request.auth.uid);
+      return !exists(user) || get(user).data.get('active', true) != false;
+    }
+
     function isMember(teamId) {
-      return signedIn() && request.auth.uid in members(teamId);
+      return signedIn() && request.auth.uid in members(teamId) && isActive();
     }
 
     function canEdit(teamId) {
@@ -32,10 +39,12 @@ service cloud.firestore {
     }
 
     // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다.
-    // 프로필은 Functions가 만들고, 본인은 이름과 설정만 바꿀 수 있다 (teamIds는 바꿀 수 없음).
+    // (사용 중지된 사람도 자기 문서는 읽어야 중지 이유를 보고 로그아웃할 수 있다.)
+    // 프로필은 Functions가 만들고, 본인은 이름과 설정만 바꿀 수 있다
+    // (teamIds, active, mustChangePassword 등은 바꿀 수 없음).
     match /users/{uid} {
       allow read: if signedIn();
-      allow update: if signedIn() && request.auth.uid == uid
+      allow update: if signedIn() && request.auth.uid == uid && isActive()
         && onlyChanges(['name', 'platform', 'settings']);
 
       // 연락처 동기화 상태 등 본인만 보는 정보. Functions만 쓴다.

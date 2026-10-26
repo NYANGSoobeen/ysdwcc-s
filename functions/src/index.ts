@@ -6,6 +6,7 @@ import { setGlobalOptions } from 'firebase-functions/v2'
 import { onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https'
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
+import { passwordProblem } from './password.js'
 
 // Firestore와 같은 리전. 무료 사용량을 넘지 않도록 동시 실행 수를 제한한다.
 setGlobalOptions({ region: 'us-west1', maxInstances: 3 })
@@ -83,6 +84,14 @@ function password(value: unknown) {
   return value
 }
 
+// 본인이 정하는 비밀번호(첫 관리자, 비밀번호 바꾸기)는 규칙(password.ts)을 지켜야 한다.
+// 관리자가 정하는 임시 비밀번호는 6자 이상이면 되고, 받은 사람이 처음 로그인할 때 바꾼다.
+function strongPassword(value: unknown, loginId: string) {
+  const problem = typeof value === 'string' ? passwordProblem(value, loginId) : '비밀번호를 입력하세요.'
+  if (problem) throw new HttpsError('invalid-argument', problem)
+  return value as string
+}
+
 function role(value: unknown): Role {
   if (!ROLES.includes(value as Role)) throw new HttpsError('invalid-argument', '권한이 올바르지 않습니다.')
   return value as Role
@@ -132,7 +141,7 @@ export const createFirstAdmin = onCall(async (req) => {
   const teamName = text(req.data?.teamName, '팀 이름')
   const name = text(req.data?.name, '이름')
   const userEmail = email(req.data?.email)
-  const userPassword = password(req.data?.password)
+  const userPassword = strongPassword(req.data?.password, userEmail)
 
   const db = getFirestore()
   try {
@@ -157,7 +166,7 @@ export const createFirstAdmin = onCall(async (req) => {
     members: { [uid]: 'admin' },
     createdAt: FieldValue.serverTimestamp(),
   })
-  batch.set(db.doc(`users/${uid}`), { name, email: userEmail, teamIds: [team.id], superAdmin: true })
+  batch.set(db.doc(`users/${uid}`), { name, email: userEmail, teamIds: [team.id], superAdmin: true, active: true })
   batch.update(db.doc('meta/setup'), { firstTeamId: team.id, ownerUid: uid })
   await batch.commit()
   return { teamId: team.id }
@@ -250,7 +259,8 @@ export const addMember = onCall(async (req) => {
     db.doc(`users/${uid}`),
     existed
       ? { email: userEmail, teamIds: FieldValue.arrayUnion(teamId) }
-      : { name, email: userEmail, teamIds: [teamId] },
+      : // 새 계정은 관리자가 정한 임시 비밀번호라, 처음 로그인하면 바꾸게 한다.
+        { name, email: userEmail, teamIds: [teamId], active: true, mustChangePassword: true },
     { merge: true },
   )
   await batch.commit()
@@ -303,6 +313,55 @@ export const resetMemberPassword = onCall(async (req) => {
   const uid = requireMember(members, req.data?.uid)
   await getAuth().updateUser(uid, { password: password(req.data?.password) })
   // 다른 기기에 남은 로그인은 토큰이 갱신될 때 끊긴다.
+  await getAuth().revokeRefreshTokens(uid)
+  // 초기화한 비밀번호도 임시 비밀번호이므로 다음 로그인 때 바꾸게 한다.
+  await getFirestore().doc(`users/${uid}`).set({ mustChangePassword: true }, { merge: true })
+  return { ok: true }
+})
+
+// 본인 비밀번호 바꾸기 (첫 로그인 때 임시 비밀번호 바꾸기 포함).
+// 앱이 지금 비밀번호로 다시 로그인(재인증)한 직후에만 부른다. 규칙 검사는 서버에서도 한다.
+export const changeMyPassword = onCall(async (req) => {
+  const uid = requireUid(req)
+  const authTime = Number(req.auth?.token.auth_time ?? 0)
+  if (Date.now() / 1000 - authTime > 5 * 60) {
+    throw new HttpsError('unauthenticated', '지금 비밀번호를 다시 확인해 주세요.')
+  }
+  const user = await getAuth().getUser(uid)
+  const next = strongPassword(req.data?.password, user.email ?? '')
+  await getAuth().updateUser(uid, { password: next })
+  await getFirestore()
+    .doc(`users/${uid}`)
+    .set({ mustChangePassword: FieldValue.delete(), passwordChangedAt: FieldValue.serverTimestamp() }, { merge: true })
+  return { ok: true }
+})
+
+// 계정 사용 중지/다시 사용. 중지하면 로그인할 수 없고, 열려 있던 앱은 바로 로그아웃되며
+// 로그인 화면에 이유가 나온다. 보안 규칙도 users.active를 보고 팀 데이터를 막는다.
+// 계정 단위라 여러 팀에 속한 사람은 모든 팀에서 막힌다.
+export const setMemberActive = onCall(async (req) => {
+  const { uid: adminUid, members } = await requireAdmin(req, req.data?.teamId)
+  const uid = requireMember(members, req.data?.uid)
+  const active = req.data?.active === true
+  const db = getFirestore()
+  if (active) {
+    await getAuth().updateUser(uid, { disabled: false })
+    await db.doc(`users/${uid}`).set(
+      { active: true, disabledReason: FieldValue.delete(), disabledAt: FieldValue.delete(), disabledBy: FieldValue.delete() },
+      { merge: true },
+    )
+    return { ok: true }
+  }
+  if (uid === adminUid) throw new HttpsError('failed-precondition', '내 계정은 사용 중지할 수 없습니다.')
+  await protectSuperAdmin(uid)
+  if (isLastAdmin(members, uid)) throw new HttpsError('failed-precondition', '관리자가 최소 1명은 있어야 합니다.')
+  const reason = text(req.data?.reason, '중지 이유', 200)
+  // 앱이 이 문서를 보고 바로 로그아웃하므로, 계정을 막기 전에 먼저 쓴다.
+  await db.doc(`users/${uid}`).set(
+    { active: false, disabledReason: reason, disabledAt: FieldValue.serverTimestamp(), disabledBy: adminUid },
+    { merge: true },
+  )
+  await getAuth().updateUser(uid, { disabled: true })
   await getAuth().revokeRefreshTokens(uid)
   return { ok: true }
 })

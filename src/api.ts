@@ -42,6 +42,10 @@ export const api = {
   resetMemberPassword: call<{ teamId: string; uid: string; password: string }, { ok: true }>(
     'resetMemberPassword',
   ),
+  changeMyPassword: call<{ password: string }, { ok: true }>('changeMyPassword'),
+  setMemberActive: call<{ teamId: string; uid: string; active: boolean; reason?: string }, { ok: true }>(
+    'setMemberActive',
+  ),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
   getMyAccess: call<void, { superAdmin: boolean }>('getMyAccess'),
   createTeam: call<{ name: string }, { teamId: string }>('createTeam'),

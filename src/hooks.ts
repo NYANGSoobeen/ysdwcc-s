@@ -4,7 +4,15 @@ import { useEffect, useState } from 'react'
 import type { Role } from './api.ts'
 import { auth, db } from './firebase.ts'
 
-export type Profile = { name: string; email: string; teamIds: string[]; superAdmin?: boolean }
+export type Profile = {
+  name: string
+  email: string
+  teamIds: string[]
+  superAdmin?: boolean
+  active?: boolean // false면 관리자가 사용 중지한 계정
+  disabledReason?: string
+  mustChangePassword?: boolean // 임시 비밀번호(새 계정, 초기화) → 처음 로그인하면 바꾼다
+}
 export type Team = { id: string; name: string; members: Record<string, Role> }
 
 export function useAuthUser() {

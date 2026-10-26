@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth'
 import { useEffect, useState } from 'react'
 import { api } from './api.ts'
-import { logOutAndWipe } from './auth.ts'
+import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { useAuthUser, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
@@ -10,9 +10,11 @@ import { ChatPage } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
+import { PasswordForm } from './pages/PasswordForm.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
 import { SchedulePage } from './pages/SchedulePage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
+import { IDLE_NOTICE, rememberSignedIn, wasSignedIn, watchIdle } from './session.ts'
 import { useIsDesktop } from './useMedia.ts'
 
 const TEAM_KEY = 'selected-team'
@@ -27,11 +29,23 @@ function savedTeam() {
 
 const REMOVED_NOTICE = '팀에서 제외되어 더 이상 사용할 수 없습니다. 이 기기에 남은 팀 데이터를 지웠습니다.'
 
+const SIGNED_OUT_NOTICE = '로그인이 끊겼습니다 (로그인 만료 또는 계정 사용 중지). 다시 로그인해 주세요.'
+
 export function App() {
   const { user, loading } = useAuthUser()
-  if (loading) return <Loading />
+  // 로그아웃 버튼을 누르지 않았는데 로그인이 풀렸으면(계정 사용 중지, 비밀번호 초기화 등)
+  // 이 기기에 남은 팀 데이터를 지운다.
+  const lost = !loading && !user && wasSignedIn()
+  useEffect(() => {
+    if (lost) void logOutAndWipe(SIGNED_OUT_NOTICE)
+  }, [lost])
+  if (loading || lost) return <Loading />
   if (!user) return <LoginPage />
   return <SignedIn key={user.uid} user={user} />
+}
+
+function disabledNotice(reason: string | undefined) {
+  return `관리자가 계정 사용을 중지했습니다.${reason ? `\n이유: ${reason}` : ''}\n이 기기에 남은 팀 데이터를 지웠습니다.`
 }
 
 function SignedIn({ user }: { user: User }) {
@@ -65,13 +79,25 @@ function SignedIn({ user }: { user: User }) {
   // 갤럭시 앱: 폰 연락처의 "지원팀" 계정을 내 모든 팀의 고객과 맞춘다.
   useNativeContactsSync(teamIds)
 
+  useEffect(() => rememberSignedIn(user.uid), [user.uid])
+
+  // 공용 컴퓨터(PC): 15분 넘게 앱을 닫아 두었으면 다시 로그인하게 한다.
+  useEffect(() => watchIdle(() => void logOutAndWipe(IDLE_NOTICE)), [])
+
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)
+  // 관리자가 사용 중지하면 바로 로그아웃하고 로그인 화면에 이유를 보여 준다.
+  const disabled = profile?.active === false
   useEffect(() => {
-    if (removed) void logOutAndWipe(REMOVED_NOTICE)
-  }, [removed])
+    if (disabled) {
+      rememberDisabledReason(user.email ?? '', profile?.disabledReason ?? '')
+      void logOutAndWipe(disabledNotice(profile?.disabledReason))
+    } else if (removed) void logOutAndWipe(REMOVED_NOTICE)
+  }, [removed, disabled, profile?.disabledReason, user.email])
 
-  if (removed) return <Loading message="로그아웃하는 중…" />
+  if (removed || disabled) return <Loading message="로그아웃하는 중…" />
+  // 임시 비밀번호(새 계정, 관리자가 초기화)로 들어오면 먼저 비밀번호를 바꾼다.
+  if (profile?.mustChangePassword) return <FirstPassword name={profile.name} loginId={toLoginId(user.email)} />
   if (denied) return <Loading message="팀 정보를 확인하는 중…" />
   if (!profile || !team) return <Loading />
 
@@ -133,6 +159,29 @@ function SignedIn({ user }: { user: User }) {
         {!desktop && <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)} />}
       </div>
     </MenuContext.Provider>
+  )
+}
+
+function FirstPassword({ name, loginId }: { name: string; loginId: string }) {
+  return (
+    <main className="login">
+      <div className="login-brand">
+        <img src="/icons/icon-192.png" alt="" />
+        <h1>비밀번호 정하기</h1>
+      </div>
+      <PasswordForm
+        title={`${name || loginId}님, 환영합니다`}
+        intro={
+          <p className="muted small">
+            관리자가 알려 준 임시 비밀번호로 로그인했습니다. 앞으로 쓸 비밀번호를 정해 주세요.
+          </p>
+        }
+        currentLabel="임시 비밀번호"
+      />
+      <button type="button" className="link" onClick={() => void logOutAndWipe()}>
+        로그아웃
+      </button>
+    </main>
   )
 }
 

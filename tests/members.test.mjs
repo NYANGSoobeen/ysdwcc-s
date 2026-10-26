@@ -36,7 +36,7 @@ before(async () => {
 test('첫 관리자는 한 번만 만들 수 있다', async () => {
   assert.deepEqual(await fn.setupStatus.run(as(null, {})), { needsSetup: true })
   const res = await fn.createFirstAdmin.run(
-    as(null, { teamName: '영업1팀', name: '관리자', email: 'boss@workphone.local', password: 'secret1' }),
+    as(null, { teamName: '영업1팀', name: '관리자', email: 'boss@workphone.local', password: 'Yangsan2468' }),
   )
   teamId = res.teamId
   adminUid = (await getAuth().getUserByEmail('boss@workphone.local')).uid
@@ -44,7 +44,7 @@ test('첫 관리자는 한 번만 만들 수 있다', async () => {
   assert.equal(team.members[adminUid], 'admin')
   assert.deepEqual(await fn.setupStatus.run(as(null, {})), { needsSetup: false })
   await expectError(
-    fn.createFirstAdmin.run(as(null, { teamName: 'x', name: 'x', email: 'x@workphone.local', password: 'secret1' })),
+    fn.createFirstAdmin.run(as(null, { teamName: 'x', name: 'x', email: 'x@workphone.local', password: 'Yangsan2468' })),
     'failed-precondition',
   )
 })
@@ -84,6 +84,54 @@ test('권한 변경과 비밀번호 초기화', async () => {
   assert.equal((await db.doc(`teams/${teamId}`).get()).get(`members.${kim}`), 'viewer')
   await fn.resetMemberPassword.run(as(adminUid, { teamId, uid: kim, password: 'newpass1' }))
   await expectError(fn.resetMemberPassword.run(as(kim, { teamId, uid: adminUid, password: 'hacked1' })), 'permission-denied')
+})
+
+const fresh = () => ({ auth_time: Math.floor(Date.now() / 1000) })
+const asFresh = (uid, data) => ({ data, auth: { uid, token: fresh() }, rawRequest: {} })
+
+test('첫 관리자 비밀번호도 규칙을 지켜야 한다 (1234, abcd 같은 연속 글자 금지)', async () => {
+  for (const password of ['qwer5678x', 'pass1234', 'abcd9753', 'short1']) {
+    await expectError(
+      fn.createFirstAdmin.run(as(null, { teamName: 'x', name: 'x', email: 'y@workphone.local', password })),
+      'invalid-argument',
+    )
+  }
+})
+
+test('새 계정과 초기화한 계정은 처음 로그인할 때 비밀번호를 바꿔야 하고, 바꾸면 표시가 지워진다', async () => {
+  const kim = (await getAuth().getUserByEmail('kim@workphone.local')).uid
+  assert.equal((await db.doc(`users/${kim}`).get()).get('mustChangePassword'), true)
+  // 재인증하지 않은(오래된) 로그인으로는 바꿀 수 없다
+  await expectError(fn.changeMyPassword.run(as(kim, { password: 'Busan7319k' })), 'unauthenticated')
+  // 규칙 위반
+  await expectError(fn.changeMyPassword.run(asFresh(kim, { password: 'abc12345' })), 'invalid-argument')
+  await expectError(fn.changeMyPassword.run(asFresh(kim, { password: 'kim97531x' })), 'invalid-argument') // 아이디 포함
+  await fn.changeMyPassword.run(asFresh(kim, { password: 'Busan7319k' }))
+  assert.equal((await db.doc(`users/${kim}`).get()).get('mustChangePassword'), undefined)
+
+  await fn.resetMemberPassword.run(as(adminUid, { teamId, uid: kim, password: 'temp999' }))
+  assert.equal((await db.doc(`users/${kim}`).get()).get('mustChangePassword'), true)
+})
+
+test('사용 중지: 계정이 막히고 이유가 남으며, 다시 사용하면 풀린다', async () => {
+  const kim = (await getAuth().getUserByEmail('kim@workphone.local')).uid
+  await expectError(fn.setMemberActive.run(as(kim, { teamId, uid: adminUid, active: false, reason: 'x' })), 'permission-denied')
+  await expectError(fn.setMemberActive.run(as(adminUid, { teamId, uid: adminUid, active: false, reason: 'x' })), 'failed-precondition')
+  await expectError(fn.setMemberActive.run(as(adminUid, { teamId, uid: kim, active: false })), 'invalid-argument') // 이유 없음
+
+  await fn.setMemberActive.run(as(adminUid, { teamId, uid: kim, active: false, reason: '휴직' }))
+  const user = (await db.doc(`users/${kim}`).get()).data()
+  assert.equal(user.active, false)
+  assert.equal(user.disabledReason, '휴직')
+  assert.equal((await getAuth().getUser(kim)).disabled, true)
+  // 팀 소속은 그대로
+  assert.equal((await db.doc(`teams/${teamId}`).get()).get(`members.${kim}`), 'viewer')
+
+  await fn.setMemberActive.run(as(adminUid, { teamId, uid: kim, active: true }))
+  const back = (await db.doc(`users/${kim}`).get()).data()
+  assert.equal(back.active, true)
+  assert.equal(back.disabledReason, undefined)
+  assert.equal((await getAuth().getUser(kim)).disabled, false)
 })
 
 test('팀에서 삭제하면 팀원 목록에서 빠지고, 다른 팀이 없으면 계정도 지워진다', async () => {
