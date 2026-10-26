@@ -4,6 +4,7 @@ import { errorMessage } from '../auth.ts'
 import type { Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
 import { ask, askText, toast } from '../ui/dialogs.tsx'
+import { fileName, saveFile } from '../download.ts'
 import { findCell } from '../schedule/cells.ts'
 import {
   changeMarks,
@@ -365,15 +366,20 @@ function FileMenu(props: {
   onDelete: () => void
 }) {
   const { schedule, canEdit, onClose, onUpload, onRename, onDelete } = props
-  const [links, setLinks] = useState<{ label: string; url: string }[] | null>(null)
+  const [links, setLinks] = useState<{ label: string; name: string; url: string }[] | null>(null)
 
   useEffect(() => {
     let active = true
+    const base = schedule.fileName.replace(/\.[^.]+$/, '')
     const files = [
-      ...(schedule.assetId ? [{ label: `원본 (${schedule.fileName})`, id: schedule.assetId }] : []),
-      ...schedule.images.map((p) => ({ label: `${p.name} 그림`, id: p.assetId })),
+      ...(schedule.assetId ? [{ label: `원본 (${schedule.fileName})`, id: schedule.assetId, name: fileName(base, 'pdf') }] : []),
+      ...schedule.images.map((p) => ({
+        label: `${p.name} 그림`,
+        id: p.assetId,
+        name: fileName(`${base} ${p.name}`, p.assetId.split('.').pop() ?? 'png'),
+      })),
     ]
-    Promise.all(files.map(async (f) => ({ label: f.label, url: await downloadUrl(f.id) }))).then(
+    Promise.all(files.map(async (f) => ({ label: f.label, name: f.name, url: await downloadUrl(f.id) }))).then(
       (list) => active && setLinks(list),
       () => active && setLinks([]),
     )
@@ -415,9 +421,17 @@ function FileMenu(props: {
           <span className="muted small">다운로드 주소 준비 중…</span>
         ) : (
           links.map((l) => (
-            <a key={l.url} href={l.url} target="_blank" rel="noopener" download>
-              ⬇ {l.label}
-            </a>
+            <button
+              key={l.url}
+              type="button"
+              className="link"
+              onClick={() => {
+                onClose()
+                void saveFile(l.url, l.name)
+              }}
+            >
+              💾 {l.label}
+            </button>
           ))
         )}
       </div>

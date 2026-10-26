@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type W
 import { StickerLayer } from './StickerLayer.tsx'
 import type { SchedulePage } from './data.ts'
 import type { Mark } from './stickers.ts'
+import { fileName, saveFile } from '../download.ts'
 
 type Props = {
   src: string
@@ -91,8 +92,15 @@ export function ZoomViewer({ src, page, marks, title, onClose }: Props) {
         </button>
         <div className="viewer-info">
           <strong>{title}</strong>
-          <span>두 손가락으로 확대 · 두 번 눌러 확대/원래대로 · 길게 눌러 저장</span>
+          <span>두 손가락으로 확대 · 두 번 눌러 확대/원래대로</span>
         </div>
+        <button
+          type="button"
+          className="ghost light"
+          onClick={() => void saveFile(src, fileName(`근무표 ${title}`, src.startsWith('blob:') ? 'png' : 'jpg'))}
+        >
+          💾 저장
+        </button>
       </header>
       <div
         className="viewer-stage zoom-stage"

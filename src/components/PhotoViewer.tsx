@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { photoUrl, type Attachment } from '../chat.ts'
+import { fileName, prepareFile, saveFile } from '../download.ts'
 import { StorageImage } from './StorageImage.tsx'
 
 export type ViewerPhoto = { attachment: Attachment; author: string; createdAt: Date | null }
@@ -24,8 +25,16 @@ export function PhotoViewer({ photos, index: start, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  async function openOriginal() {
-    window.open(await photoUrl(photo.attachment.path), '_blank', 'noopener')
+  // 아이폰 공유 창은 누른 직후에만 열리므로, 보고 있는 사진을 미리 받아 둔다.
+  useEffect(() => {
+    if (photo) photoUrl(photo.attachment.path).then(prepareFile).catch(() => {})
+  }, [photo])
+
+  async function save() {
+    const d = photo.createdAt ?? new Date()
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+    const ext = photo.attachment.path.split('.').pop() ?? 'jpg'
+    await saveFile(await photoUrl(photo.attachment.path), fileName(`지원팀_${stamp}_${index + 1}`, ext))
   }
 
   if (!photo) return null
@@ -66,8 +75,8 @@ export function PhotoViewer({ photos, index: start, onClose }: Props) {
         )}
       </div>
       <footer className="viewer-bar">
-        <button type="button" className="ghost light" onClick={openOriginal}>
-          원본 열기 (길게 눌러 저장)
+        <button type="button" className="ghost light" onClick={() => void save()}>
+          💾 저장
         </button>
       </footer>
     </div>

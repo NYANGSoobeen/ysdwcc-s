@@ -56,6 +56,8 @@ body,
 body {
   margin: 0;
   background: var(--bg);
+  /* 당겨서 새로 고침, 화면 끝 튕김이 앱 화면을 흔들지 않게 */
+  overscroll-behavior: none;
 }
 
 button,
@@ -269,7 +271,7 @@ h3 {
 .login {
   max-width: 420px;
   margin: 0 auto;
-  padding: calc(48px + env(safe-area-inset-top)) 16px 32px;
+  padding: calc(48px + var(--safe-area-inset-top, env(safe-area-inset-top))) 16px 32px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -296,11 +298,18 @@ h3 {
 
 /* ── 앱 틀과 하단 탭 ── */
 .shell {
+  /* 키보드가 열려도 화면을 키보드 위 영역에 맞춘다 (src/mobile.ts가 --vv-height, --vv-top을 넣음) */
+  position: fixed;
+  top: var(--vv-top, 0px);
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: var(--vv-height, 100dvh);
   max-width: 720px;
   margin: 0 auto;
+  padding-left: var(--safe-area-inset-left, env(safe-area-inset-left));
+  padding-right: var(--safe-area-inset-right, env(safe-area-inset-right));
   background: var(--bg);
 }
 
@@ -315,7 +324,7 @@ h3 {
   display: flex;
   border-top: 1px solid var(--border);
   background: var(--surface);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
 }
 
 .tab {
@@ -355,7 +364,7 @@ h3 {
   grid-template-columns: minmax(72px, auto) 1fr minmax(72px, auto);
   align-items: center;
   min-height: 52px;
-  padding: env(safe-area-inset-top) 4px 0;
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top)) 4px 0;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -428,7 +437,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));
+  padding: calc(16px + var(--safe-area-inset-top, env(safe-area-inset-top))) 12px calc(16px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   background: var(--surface);
   box-shadow: 4px 0 24px rgb(0 0 0 / 0.2);
   overflow-y: auto;
@@ -556,7 +565,7 @@ h3 {
 
 /* ── 팀 바꾸기 (팀이 2개 이상일 때 맨 위) ── */
 .teambar {
-  padding: calc(6px + env(safe-area-inset-top)) 12px 6px;
+  padding: calc(6px + var(--safe-area-inset-top, env(safe-area-inset-top))) 12px 6px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -955,7 +964,7 @@ input[type='date']::-webkit-date-and-time-value {
 .overlay-body {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
 }
 
 .month {
@@ -1007,12 +1016,12 @@ input[type='date']::-webkit-date-and-time-value {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: calc(4px + env(safe-area-inset-top)) 8px 4px;
+  padding: calc(4px + var(--safe-area-inset-top, env(safe-area-inset-top))) 8px 4px;
 }
 
 footer.viewer-bar {
   justify-content: center;
-  padding: 4px 8px calc(8px + env(safe-area-inset-bottom));
+  padding: 4px 8px calc(8px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
 }
 
 .viewer-info {
@@ -1443,7 +1452,7 @@ details.small summary {
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: calc(80px + env(safe-area-inset-bottom));
+  bottom: calc(80px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   z-index: 70;
   transform: translateX(-50%);
   display: flex;
@@ -1558,7 +1567,7 @@ button.primary.danger-fill {
 .item-menu.sheet {
   position: static;
   width: 100%;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  padding: 8px 8px calc(8px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   border: 0;
   border-radius: 16px 16px 0 0;
   animation: sheet-in 0.18s ease-out;
@@ -1759,7 +1768,7 @@ button.primary.danger-fill {
   position: fixed;
   left: 16px;
   right: 16px;
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   z-index: 30;
   display: flex;
   align-items: center;
@@ -2118,4 +2127,36 @@ body:has(.shell.desktop) .toasts {
 
 .shell.desktop .split-list .search-bar {
   padding: 10px 20px;
+}
+
+/* ── 휴대폰 최적화 (공통 기능 3번) ── */
+
+/* 입력칸을 누를 때 아이폰이 화면을 확대하지 않도록 글자는 16px 이상 */
+@media (hover: none) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
+/* 키보드가 열려 있는 동안 아래 탭을 숨겨 채팅 입력칸이 키보드 바로 위에 오게 한다 */
+.keyboard-open .shell:not(.desktop) .tabbar {
+  display: none;
+}
+
+/* 앱 설치 안내 */
+.install-steps {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.7;
+}
+
+/* 입력칸을 누르면 앱 색상 테두리 (브라우저 기본 주황/검정 테두리 대신) */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--rock);
+  outline-offset: 0;
+  border-color: var(--accent);
 }

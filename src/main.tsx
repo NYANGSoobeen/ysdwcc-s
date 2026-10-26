@@ -4,6 +4,7 @@ import { App } from './App.tsx'
 import './style.css'
 import { ContextMenuHost } from './ui/ContextMenu.tsx'
 import { DialogHost } from './ui/dialogs.tsx'
+import { setupInstallPrompt, setupMobileViewport } from './mobile.ts'
 import { setupUpdateNotice } from './update.ts'
 
 createRoot(document.getElementById('app')!).render(
@@ -15,3 +16,5 @@ createRoot(document.getElementById('app')!).render(
 )
 
 setupUpdateNotice()
+setupMobileViewport()
+setupInstallPrompt()

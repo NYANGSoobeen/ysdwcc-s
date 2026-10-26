@@ -9,7 +9,7 @@ import { useMemberProfiles, type Team } from '../hooks.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { MenuButton } from '../menu.tsx'
 import { useItemMenu } from '../ui/ContextMenu.tsx'
-import { ask, toast } from '../ui/dialogs.tsx'
+import { ask, isTouchUi, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 const PAGE_SIZE = 50
@@ -95,6 +95,26 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
   const older = () => matches.length && setPicked(matches[matchIndex <= 0 ? matches.length - 1 : matchIndex - 1])
   const newer = () => matches.length && setPicked(matches[matchIndex >= matches.length - 1 ? 0 : matchIndex + 1])
 
+  // 키보드가 열려 화면이 줄거나 사진이 늦게 떠서 길어져도, 맨 아래를 보고 있었으면 맨 아래를 유지한다.
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const keep = () => {
+      if (stickToBottom.current) el.scrollTop = el.scrollHeight
+    }
+    const observer = new ResizeObserver(keep)
+    observer.observe(el)
+    for (const child of el.children) observer.observe(child)
+    const mo = new MutationObserver(() => {
+      for (const child of el.children) observer.observe(child)
+    })
+    mo.observe(el, { childList: true })
+    return () => {
+      observer.disconnect()
+      mo.disconnect()
+    }
+  }, [])
+
   function onScroll() {
     const el = listRef.current!
     stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -156,7 +176,16 @@ export function ChatPage({ team, uid }: { team: Team; uid: string }) {
           )}
         </SearchBar>
       )}
-      <div className="messages" ref={listRef} onScroll={onScroll}>
+      <div
+        className="messages"
+        ref={listRef}
+        onScroll={onScroll}
+        // 휴대폰: 대화 영역을 누르면 키보드를 닫는다.
+        onPointerDown={(e) => {
+          const active = document.activeElement
+          if (e.pointerType !== 'mouse' && active instanceof HTMLTextAreaElement && active.closest('.composer')) active.blur()
+        }}
+      >
         {hasMore && (
           <button
             type="button"
@@ -259,28 +288,47 @@ async function copyText(text: string) {
 function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
   const [body, setBody] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
-  const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
+  const textarea = useRef<HTMLTextAreaElement>(null)
   const previews = usePreviews(photos)
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (!body.trim() && photos.length === 0) return
-    setBusy(true)
+  // 입력칸은 글이 길어지면 5줄까지 늘어난다.
+  useLayoutEffect(() => {
+    const el = textarea.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [body])
+
+  // 보내기: 입력칸을 바로 비우고(키보드는 그대로 열어 둠) 뒤에서 보낸다. 실패하면 글을 되돌린다.
+  async function send() {
+    const text = body.trim()
+    const pics = photos
+    if (!text && pics.length === 0) return
+    onSent()
+    setBody('')
+    setPhotos([])
+    if (pics.length) setUploading((n) => n + 1)
     try {
-      onSent()
-      await sendMessage(teamId, body.trim(), photos)
-      setBody('')
-      setPhotos([])
+      await sendMessage(teamId, text, pics)
     } catch (err) {
+      setBody((now) => (now ? now : text))
+      setPhotos((now) => (now.length ? now : pics))
       toast(errorMessage(err), { error: true })
     } finally {
-      setBusy(false)
+      if (pics.length) setUploading((n) => n - 1)
     }
   }
 
   return (
-    <form className="composer" onSubmit={submit}>
+    <form
+      className="composer"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault()
+        void send()
+      }}
+    >
       {photos.length > 0 && (
         <div className="previews">
           {previews.map((url, i) => (
@@ -297,8 +345,9 @@ function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
           ))}
         </div>
       )}
+      {uploading > 0 && <p className="muted small uploading">사진 올리는 중…</p>}
       <div className="composer-row">
-        <button type="button" className="ghost icon" onClick={() => fileInput.current?.click()} aria-label="사진 추가" disabled={busy}>
+        <button type="button" className="ghost icon" onClick={() => fileInput.current?.click()} aria-label="사진 추가">
           📷
         </button>
         <input
@@ -314,14 +363,34 @@ function Composer({ teamId, onSent }: { teamId: string; onSent: () => void }) {
           }}
         />
         <textarea
+          ref={textarea}
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            // PC: Enter = 보내기, Shift/Ctrl+Enter = 줄바꿈. 휴대폰: Enter = 줄바꿈(보내기는 버튼).
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing || isTouchUi()) return
+            if (e.shiftKey) return
+            e.preventDefault()
+            if (e.ctrlKey || e.metaKey) {
+              const el = e.currentTarget
+              const { selectionStart: a, selectionEnd: b } = el
+              setBody(body.slice(0, a) + '\n' + body.slice(b))
+              requestAnimationFrame(() => el.setSelectionRange(a + 1, a + 1))
+              return
+            }
+            void send()
+          }}
           placeholder="메시지 입력"
           rows={1}
-          disabled={busy}
+          enterKeyHint={isTouchUi() ? 'enter' : 'send'}
         />
-        <button className="primary" disabled={busy || (!body.trim() && photos.length === 0)}>
-          {busy ? '…' : '보내기'}
+        <button
+          className="primary"
+          disabled={!body.trim() && photos.length === 0}
+          // 보내기를 눌러도 입력칸에서 포커스가 빠지지 않게 → 휴대폰 키보드가 닫히지 않는다.
+          onPointerDown={(e) => e.preventDefault()}
+        >
+          보내기
         </button>
       </div>
     </form>

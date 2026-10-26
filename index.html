@@ -2,9 +2,13 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- viewport-fit=cover: 아이폰 노치·홈 바 영역까지 쓰고 safe-area로 비켜 간다.
+         interactive-widget=resizes-content: 갤럭시 크롬에서 키보드가 열리면 화면을 키보드 위로 줄인다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#16587b" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <!-- 아이폰 홈 화면 아이콘 아래 이름 -->
     <meta name="apple-mobile-web-app-title" content="양산동원지원팀" />
     <!-- 파일 경로를 바꾸면 브라우저가 기억해 둔 옛 파비콘 대신 새 파일을 받는다 -->

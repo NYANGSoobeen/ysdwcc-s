@@ -7,6 +7,7 @@ import { PasswordForm } from './PasswordForm.tsx'
 import { ask, toast } from '../ui/dialogs.tsx'
 import { db } from '../firebase.ts'
 import { ContactsSync } from './ContactsSync.tsx'
+import { InstallCard } from './InstallCard.tsx'
 import type { Profile, Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
 
@@ -26,6 +27,7 @@ export function ProfilePage({ user, profile, team }: Props) {
       </header>
       <div className="page-body two-col">
         <div className="col">
+        <InstallCard />
         <section className="card">
           <NameForm uid={user.uid} name={profile.name} />
           <dl className="stats">

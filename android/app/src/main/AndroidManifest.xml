@@ -63,6 +63,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 사진·파일 저장 (안드로이드 9 이하만 필요) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <!-- 고객을 "지원팀" 전용 연락처 계정에 넣고 지우기 위한 권한. 개인 연락처는 건드리지 않는다. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
