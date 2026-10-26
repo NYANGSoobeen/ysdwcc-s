@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { badgeText } from './reads.ts'
 
 // 왼쪽 위 ☰ 버튼으로 여는 메뉴. 기능이 늘어나면 MENU_ITEMS에 추가한다.
-export type Tab = 'customers' | 'chat' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
+export type Tab = 'customers' | 'chat' | 'front' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
 
 export type MenuItem = {
   tab: Tab
@@ -18,6 +18,8 @@ export const MENU_ITEMS: MenuItem[] = [
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
   { tab: 'members', icon: '👥', label: '팀원', section: 'main' },
   { tab: 'profile', icon: '⚙️', label: '내 정보', section: 'main' },
+  // 프론트 앱 채팅방에 타부서 게스트로 들어가기 (src/front/)
+  { tab: 'front', icon: '🏌️', label: '프론트 채팅', section: 'extra' },
   { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },
   { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
 ]
@@ -87,6 +89,8 @@ type MenuListProps = {
   onSelectRoom?: (id: string) => void
   onCreateRoom?: () => void
   unread?: Record<string, number>
+  // 메뉴 항목 옆 빨간 숫자 (프론트 채팅의 안 읽은 수)
+  badges?: Partial<Record<Tab, number>>
   focusable?: boolean
   children?: ReactNode
 }
@@ -142,6 +146,7 @@ function MenuList(props: MenuListProps) {
                 >
                   <span aria-hidden="true">{item.icon}</span>
                   {item.label}
+                  {(props.badges?.[item.tab] ?? 0) > 0 && <span className="badge">{badgeText(props.badges![item.tab]!)}</span>}
                 </button>
               </li>
             ))}

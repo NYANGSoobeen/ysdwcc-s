@@ -857,6 +857,25 @@ input[type='date']::-webkit-date-and-time-value {
   font-size: 12px;
 }
 
+/* 🏌️ 프론트 채팅: "○○님이 들어왔어요" 같은 가운데 안내줄, 이모티콘 */
+.system-line {
+  margin: 8px auto;
+  width: fit-content;
+  max-width: 90%;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.55);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.front-sticker {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+
 .message {
   display: flex;
   flex-direction: column;
@@ -1922,17 +1941,17 @@ button.primary.danger-fill {
 }
 
 /* 머리줄: ☰ 버튼 없이 제목을 왼쪽에 */
-.shell.desktop .page-header:has(> .menu-button) {
+.shell.desktop .page-header:has(> .menu-button:not(.back-button)) {
   grid-template-columns: 1fr auto;
   min-height: 64px;
   padding: 0 32px;
 }
 
-.shell.desktop .page-header:has(> .menu-button) .menu-button {
+.shell.desktop .page-header:has(> .menu-button:not(.back-button)) .menu-button {
   display: none;
 }
 
-.shell.desktop .page-header:has(> .menu-button) h2 {
+.shell.desktop .page-header:has(> .menu-button:not(.back-button)) h2 {
   text-align: left;
   font-size: 20px;
 }
@@ -2006,7 +2025,7 @@ button.primary.danger-fill {
   border-right: 1px solid var(--border);
 }
 
-.shell.desktop .split-list .page-header:has(> .menu-button) {
+.shell.desktop .split-list .page-header:has(> .menu-button:not(.back-button)) {
   padding: 0 20px;
 }
 

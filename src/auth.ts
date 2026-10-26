@@ -4,6 +4,7 @@ import { api } from './api.ts'
 import { applyKeepSignedIn, auth, db, keepSignedIn } from './firebase.ts'
 import { clearNativeContacts } from './native.ts'
 import { passwordProblem } from './password.ts'
+import { disconnectFront } from './front/ydr.ts'
 import { forgetSignedIn, markAlive } from './session.ts'
 
 // 이메일이 없는 직원도 쓸 수 있게, "@"가 없는 아이디는 이 도메인을 붙여 계정을 만든다.
@@ -89,6 +90,8 @@ export async function logOutAndWipe(notice?: string) {
   forgetSignedIn()
   // 갤럭시 앱이면 폰 연락처에 넣은 고객도 지운다 (데이터 저장 규칙: 계정째 삭제).
   await clearNativeContacts()
+  // 프론트 채팅(게스트) 로그인도 끊는다.
+  await disconnectFront()
   await signOut(auth).catch(() => {})
   await terminate(db)
   await clearIndexedDbPersistence(db).catch(() => {})

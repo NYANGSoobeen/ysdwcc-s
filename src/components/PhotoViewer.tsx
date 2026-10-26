@@ -3,7 +3,9 @@ import { photoUrl, type Attachment } from '../chat.ts'
 import { fileName, prepareFile, saveFile } from '../download.ts'
 import { StorageImage } from './StorageImage.tsx'
 
-export type ViewerPhoto = { attachment: Attachment; author: string; createdAt: Date | null }
+// load: 우리 Storage가 아닌 곳의 사진(프론트 채팅)은 주소를 얻는 방법을 따로 준다.
+export type ViewerPhoto = { attachment: Attachment; author: string; createdAt: Date | null; load?: () => Promise<string> }
+const urlOf = (p: ViewerPhoto) => (p.load ? p.load() : photoUrl(p.attachment.path))
 
 type Props = { photos: ViewerPhoto[]; index: number; onClose: () => void }
 
@@ -92,14 +94,14 @@ export function PhotoViewer({ photos, index: start, onClose }: Props) {
 
   // 아이폰 공유 창은 누른 직후에만 열리므로, 보고 있는 사진을 미리 받아 둔다.
   useEffect(() => {
-    if (photo) photoUrl(photo.attachment.path).then(prepareFile).catch(() => {})
+    if (photo) urlOf(photo).then(prepareFile).catch(() => {})
   }, [photo])
 
   async function save() {
     const d = photo.createdAt ?? new Date()
     const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
     const ext = photo.attachment.path.split('.').pop() ?? 'jpg'
-    await saveFile(await photoUrl(photo.attachment.path), fileName(`지원팀_${stamp}_${index + 1}`, ext))
+    await saveFile(await urlOf(photo), fileName(`지원팀_${stamp}_${index + 1}`, photo.load ? 'jpg' : ext))
   }
 
   if (!photo) return null
@@ -129,7 +131,7 @@ export function PhotoViewer({ photos, index: start, onClose }: Props) {
           className="viewer-zoom"
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
         >
-          <StorageImage key={photo.attachment.path} path={photo.attachment.path} className="viewer-image" />
+          <StorageImage key={photo.attachment.path} path={photo.attachment.path} load={photo.load} className="viewer-image" />
         </div>
         {index > 0 && (
           <button type="button" className="viewer-nav prev" onClick={() => go(-1)} aria-label="이전 사진">

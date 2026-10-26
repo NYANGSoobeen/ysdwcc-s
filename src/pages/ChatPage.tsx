@@ -883,7 +883,7 @@ function linkify(text: string, names: string[] = [], myName = '') {
   return parts
 }
 
-function photoCols(n: number) {
+export function photoCols(n: number) {
   if (n === 1) return 1
   if (n === 2 || n === 4) return 2
   return 3
@@ -918,7 +918,7 @@ function sameGroup(a: Message | undefined, b: Message | undefined) {
 
 // 프로필 사진 대신 이름 첫 글자 동그라미 (사람마다 색이 다르다)
 const AVATAR_COLORS = ['#16587b', '#3d7fa3', '#5b8a72', '#a0694b', '#7a5c99', '#b0516a', '#4f7d8c']
-function Avatar({ uid, name }: { uid: string; name: string }) {
+export function Avatar({ uid, name }: { uid: string; name: string }) {
   let hash = 0
   for (const ch of uid) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   return (
@@ -928,7 +928,7 @@ function Avatar({ uid, name }: { uid: string; name: string }) {
   )
 }
 
-async function copyText(text: string) {
+export async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
     toast('복사했습니다.')

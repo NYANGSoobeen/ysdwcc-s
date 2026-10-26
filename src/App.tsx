@@ -6,6 +6,8 @@ import { MAIN_CHANNEL, useChannels } from './chat.ts'
 import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { useMentionAlerts } from './useMentionAlerts.ts'
 import { badgeText, useUnreadCounts } from './reads.ts'
+import { FrontChatPage } from './front/FrontChatPage.tsx'
+import { resumeFront, useFrontUnread } from './front/ydr.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
@@ -33,7 +35,7 @@ function savedTeam() {
 
 // F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
 const TAB_KEY = 'current-tab'
-const TABS: Tab[] = ['customers', 'chat', 'schedule', 'members', 'admin', 'usage', 'profile']
+const TABS: Tab[] = ['customers', 'chat', 'front', 'schedule', 'members', 'admin', 'usage', 'profile']
 
 function savedTab(): Tab {
   try {
@@ -46,6 +48,7 @@ function savedTab(): Tab {
 }
 
 const CHANNEL_KEY = 'chat-channel'
+const FRONT_ROOM_KEY = 'front-room'
 
 function savedChannel() {
   try {
@@ -159,6 +162,27 @@ function SignedIn({ user }: { user: User }) {
   const unread = useUnreadCounts(team?.id, channels, user.uid, tab === 'chat' ? roomId : null)
   const unreadTotal = Object.values(unread).reduce((a, b) => a + b, 0)
 
+  // 🏌️ 프론트 채팅 (프론트 앱 채팅방에 타부서 게스트로): 보던 방은 F5 후에도 유지
+  const [frontRoom, setFrontRoomState] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(FRONT_ROOM_KEY) || null
+    } catch {
+      return null
+    }
+  })
+  function openFrontRoom(id: string | null) {
+    setFrontRoomState(id)
+    setTab('front')
+    try {
+      sessionStorage.setItem(FRONT_ROOM_KEY, id ?? '')
+    } catch {
+      // 기억하지 못해도 동작에는 문제없다.
+    }
+  }
+  useEffect(() => resumeFront(), [user.uid])
+  const frontUnread = useFrontUnread(tab === 'front' ? frontRoom : null)
+  const frontUnreadTotal = Object.values(frontUnread).reduce((a, b) => a + b, 0)
+
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)
   // 관리자가 사용 중지하면 바로 로그아웃하고 로그인 화면에 이유를 보여 준다.
@@ -207,6 +231,7 @@ function SignedIn({ user }: { user: User }) {
     currentRoom: current === 'chat' ? (roomId ?? null) : null,
     onSelectRoom: openChannel,
     unread,
+    badges: { front: frontUnreadTotal },
     onCreateRoom: canWrite
       ? async () => {
           const id = await promptCreateChannel(team.id)
@@ -224,7 +249,7 @@ function SignedIn({ user }: { user: User }) {
 
   return (
     <MenuContext.Provider value={() => setMenuOpen(true)}>
-     <MenuBadgeContext.Provider value={unreadTotal}>
+     <MenuBadgeContext.Provider value={unreadTotal + frontUnreadTotal}>
      <SearchContext.Provider value={search}>
       <div className={`shell${desktop ? ' desktop' : ''}${searching ? ' searching' : ''}`}>
         {desktop && <Sidebar {...menuProps}>{teamSelect}</Sidebar>}
@@ -256,6 +281,7 @@ function SignedIn({ user }: { user: User }) {
               />
             )}
             {current === 'usage' && <UsagePage team={team} />}
+            {current === 'front' && <FrontChatPage roomId={frontRoom} onOpenRoom={openFrontRoom} unread={frontUnread} />}
             {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
           </div>
           {!desktop && (
