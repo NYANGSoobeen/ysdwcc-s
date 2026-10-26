@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- 양산동원 지원팀 앱 아이콘 원본. 프론트 앱 아이콘과 같은 구성(원 테두리, 왕관)에 지원팀 앱의 파란색(#1f6feb)을 쓴다.
+  <!-- 양산동원 지원팀 앱 아이콘 원본. 프론트 앱 아이콘과 같은 구성(원 테두리, 왕관)에 지원팀 앱 색상(Venice Blue #16587B 바탕, Merino #F5EEDD 글씨)을 쓴다.
        안쪽 내용은 지름 820 안전 영역(안드로이드 maskable) 안에 있다. public/icons/의 PNG는 이 파일을 Pretendard 글꼴로 렌더링해 만들었다. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6EA8FA"/>
-      <stop offset="0.55" stop-color="#2F7BF0"/>
-      <stop offset="1" stop-color="#1550B8"/>
+      <stop offset="0" stop-color="#4F8DB0"/>
+      <stop offset="0.55" stop-color="#16587B"/>
+      <stop offset="1" stop-color="#0E3A52"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.28" cy="0.18" r="0.75">
       <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
@@ -14,22 +14,22 @@
   </defs>
   <rect width="1024" height="1024" fill="url(#bg)"/>
   <rect width="1024" height="1024" fill="url(#glow)"/>
-  <g fill="none" stroke="#F5F9FF">
+  <g fill="none" stroke="#F5EEDD">
     <circle cx="512" cy="512" r="368" stroke-width="10" stroke-opacity="0.95"/>
     <circle cx="512" cy="512" r="344" stroke-width="3" stroke-opacity="0.55"/>
   </g>
-  <g fill="#F5F9FF">
+  <g fill="#F5EEDD">
     <path d="M422 398 L404 292 L466 344 L512 270 L558 344 L620 292 L602 398 Z"/>
     <rect x="422" y="414" width="180" height="22" rx="6"/>
     <circle cx="404" cy="288" r="13"/>
     <circle cx="512" cy="264" r="14"/>
     <circle cx="620" cy="288" r="13"/>
   </g>
-  <text x="512" y="572" text-anchor="middle" fill="#F5F9FF"
+  <text x="512" y="572" text-anchor="middle" fill="#F5EEDD"
         font-family="Pretendard, 'Apple SD Gothic Neo', sans-serif" font-weight="800"
         font-size="104" letter-spacing="7">YANGSAN</text>
-  <rect x="422" y="612" width="180" height="4" rx="2" fill="#F5F9FF" fill-opacity="0.6"/>
-  <text x="512" y="696" text-anchor="middle" fill="#F5F9FF"
+  <rect x="422" y="612" width="180" height="4" rx="2" fill="#F5EEDD" fill-opacity="0.6"/>
+  <text x="512" y="696" text-anchor="middle" fill="#F5EEDD"
         font-family="Pretendard, 'Apple SD Gothic Neo', sans-serif" font-weight="600"
         font-size="66" letter-spacing="2">동원로얄 지원팀</text>
 </svg>

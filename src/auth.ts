@@ -1,7 +1,7 @@
 import { EmailAuthProvider, reauthenticateWithCredential, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore'
 import { api } from './api.ts'
-import { auth, db } from './firebase.ts'
+import { applyKeepSignedIn, auth, db, keepSignedIn } from './firebase.ts'
 import { clearNativeContacts } from './native.ts'
 import { passwordProblem } from './password.ts'
 import { forgetSignedIn, markAlive } from './session.ts'
@@ -20,8 +20,9 @@ export function toLoginId(email: string | null | undefined) {
   return email.endsWith(`@${LOGIN_DOMAIN}`) ? email.slice(0, -(LOGIN_DOMAIN.length + 1)) : email
 }
 
-export async function logIn(loginId: string, password: string) {
+export async function logIn(loginId: string, password: string, keep = keepSignedIn()) {
   const email = toEmail(loginId)
+  await applyKeepSignedIn(keep)
   markAlive()
   try {
     await signInWithEmailAndPassword(auth, email, password)

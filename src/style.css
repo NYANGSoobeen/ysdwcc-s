@@ -208,6 +208,12 @@ h3 {
   color: var(--muted);
 }
 
+.form .checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
 .form label.check {
   flex-direction: row;
   align-items: center;

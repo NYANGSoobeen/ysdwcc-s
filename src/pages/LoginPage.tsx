@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api.ts'
 import { errorMessage, logIn, takeLoginNotice, toEmail } from '../auth.ts'
-import { sharedComputer } from '../firebase.ts'
+import { isNativeApp, keepSignedIn } from '../firebase.ts'
 import { PASSWORD_HINT, passwordProblem } from '../password.ts'
 
 // 페이지를 열 때 한 번만 읽는다 (읽으면 지워지므로 렌더링마다 읽으면 안 된다).
@@ -50,6 +50,7 @@ function saveLoginId(loginId: string | null) {
 function LoginForm() {
   const [loginId, setLoginId] = useState(() => savedLoginId() ?? '')
   const [remember, setRemember] = useState(() => savedLoginId() !== null)
+  const [keep, setKeep] = useState(keepSignedIn)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -59,7 +60,7 @@ function LoginForm() {
     setBusy(true)
     setError('')
     try {
-      await logIn(loginId, password)
+      await logIn(loginId, password, keep)
       saveLoginId(remember ? loginId.trim() : null)
     } catch (err) {
       setError(errorMessage(err))
@@ -91,20 +92,30 @@ function LoginForm() {
           required
         />
       </label>
-      <label className="check">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        아이디 저장
-      </label>
+      <div className="checks">
+        {!isNativeApp && (
+          <label className="check">
+            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+            로그인 유지
+          </label>
+        )}
+        <label className="check">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          아이디 저장
+        </label>
+      </div>
+      {!isNativeApp && (
+        <p className="rule-check muted">
+          {keep
+            ? '로그아웃할 때까지 로그인이 유지됩니다. 여러 사람이 쓰는 컴퓨터에서는 끄세요.'
+            : '브라우저를 닫거나 15분 넘게 앱을 닫아 두면 자동으로 로그아웃됩니다.'}
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
       <button className="primary" disabled={busy}>
         {busy ? '로그인 중…' : '로그인'}
       </button>
       <p className="muted small">계정은 팀 관리자가 만들어 줍니다. 비밀번호를 잊으면 관리자에게 초기화를 요청하세요.</p>
-      {sharedComputer && (
-        <p className="muted small">
-          공용 컴퓨터 보호: 브라우저를 닫거나 15분 넘게 앱을 닫아 두면 자동으로 로그아웃됩니다.
-        </p>
-      )}
     </form>
   )
 }
