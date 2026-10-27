@@ -339,6 +339,56 @@ export const removeMember = onCall(async (req) => {
   return { accountDeleted: true }
 })
 
+// 부서(팀) 이동: 한 부서에서 빼고 다른 부서에 넣는다 (한 번에, 중간 상태 없이).
+// 옮기는 사람은 두 부서 모두의 관리자이거나 최고 관리자. 최고 관리자와 원래 부서의 마지막 관리자는 옮길 수 없다.
+// 원래 부서에서 이 사람이 담당하던 고객은 원래 부서의 다른 팀원(newOwnerUid)에게 넘긴다 (옮긴 뒤에는 그 부서 고객을 못 보므로).
+export const moveMember = onCall(async (req) => {
+  const actor = requireUid(req)
+  const fromId = text(req.data?.fromTeamId, '원래 부서')
+  const toId = text(req.data?.toTeamId, '옮길 부서')
+  if (fromId === toId) throw new HttpsError('invalid-argument', '같은 부서로는 옮길 수 없습니다.')
+  const db = getFirestore()
+  const [fromSnap, toSnap] = await Promise.all([db.doc(`teams/${fromId}`).get(), db.doc(`teams/${toId}`).get()])
+  if (!fromSnap.exists || !toSnap.exists) throw new HttpsError('not-found', '부서를 찾을 수 없습니다.')
+  const fromMembers = (fromSnap.get('members') ?? {}) as Record<string, Role>
+  const toMembers = (toSnap.get('members') ?? {}) as Record<string, Role>
+  const superAdmin = await isSuperAdmin(actor)
+  if (!superAdmin && (fromMembers[actor] !== 'admin' || toMembers[actor] !== 'admin')) {
+    throw new HttpsError('permission-denied', '두 부서 모두의 관리자(또는 최고 관리자)만 옮길 수 있습니다.')
+  }
+  const uid = requireMember(fromMembers, req.data?.uid)
+  if (uid === actor) throw new HttpsError('failed-precondition', '자기 자신은 옮길 수 없습니다. 다른 관리자에게 부탁하세요.')
+  await protectSuperAdmin(uid)
+  if (isLastAdmin(fromMembers, uid)) {
+    throw new HttpsError('failed-precondition', '원래 부서에 관리자가 최소 1명은 있어야 합니다. 다른 사람을 먼저 관리자로 정하세요.')
+  }
+  const newRole = req.data?.role === undefined ? fromMembers[uid] : role(req.data?.role)
+
+  // 담당 고객 넘기기
+  const owned = await db.collection('customers').where('teamId', '==', fromId).where('ownerUid', '==', uid).get()
+  let newOwner: string | null = null
+  if (!owned.empty) {
+    newOwner = requireMember(fromMembers, req.data?.newOwnerUid)
+    if (newOwner === uid) throw new HttpsError('invalid-argument', '담당 고객은 원래 부서에 남는 사람에게 넘겨야 합니다.')
+  }
+
+  // 부서가 하나도 없는 순간이 생기면 그 사람 앱이 로그아웃되므로 소속은 한 번에 바꾼다.
+  await db.runTransaction(async (tx) => {
+    const user = await tx.get(db.doc(`users/${uid}`))
+    const teamIds = ((user.get('teamIds') ?? []) as string[]).filter((t) => t !== fromId)
+    tx.update(db.doc(`teams/${fromId}`), { [`members.${uid}`]: FieldValue.delete() })
+    tx.update(db.doc(`teams/${toId}`), { [`members.${uid}`]: toMembers[uid] ?? newRole })
+    tx.set(db.doc(`users/${uid}`), { teamIds: teamIds.includes(toId) ? teamIds : [...teamIds, toId] }, { merge: true })
+  })
+
+  for (let i = 0; i < owned.docs.length; i += 400) {
+    const batch = db.batch()
+    for (const d of owned.docs.slice(i, i + 400)) batch.update(d.ref, { ownerUid: newOwner, updatedAt: FieldValue.serverTimestamp() })
+    await batch.commit()
+  }
+  return { ok: true, movedCustomers: owned.size }
+})
+
 export const resetMemberPassword = onCall(async (req) => {
   const { members } = await requireAdmin(req, req.data?.teamId)
   const uid = requireMember(members, req.data?.uid)

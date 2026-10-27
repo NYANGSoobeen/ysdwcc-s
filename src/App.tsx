@@ -7,7 +7,7 @@ import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } fro
 import { useMentionAlerts } from './useMentionAlerts.ts'
 import { useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
-import { resumeFront, useFrontUnread } from './front/ydr.ts'
+import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
 import { listenOpenRequests, refreshPush, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
@@ -186,7 +186,10 @@ function SignedIn({ user }: { user: User }) {
   useEffect(() => {
     if (profileReady) resumeFront(frontJoined)
   }, [user.uid, profileReady, frontJoined])
-  const frontUnread = useFrontUnread(tab === 'front' ? frontRoom : null)
+  // 보던 프론트 방이 없으면(처음, 나간 방) 첫 방
+  const front = useFront()
+  const frontRoomId = front.rooms.some((r) => r.id === frontRoom) ? frontRoom : (front.rooms[0]?.id ?? null)
+  const frontUnread = useFrontUnread(tab === 'front' ? frontRoomId : null)
 
   // 🔔 푸시 알림: 켜 둔 기기면 등록을 새로 적고, 알림을 눌러 들어오면 그 방을 연다.
   useEffect(() => void refreshPush(), [user.uid])
@@ -257,7 +260,10 @@ function SignedIn({ user }: { user: User }) {
       .filter((m) => m.name)
       .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     unread,
-    badges: { front: frontUnreadTotal },
+    frontRooms: front.rooms,
+    currentFrontRoom: current === 'front' ? frontRoomId : null,
+    frontUnread,
+    onSelectFrontRoom: openFrontRoom,
     onCreateRoom: canWrite
       ? async () => {
           const id = await promptCreateChannel(team.id)
@@ -304,7 +310,7 @@ function SignedIn({ user }: { user: User }) {
               />
             )}
             {current === 'usage' && <UsagePage team={team} />}
-            {current === 'front' && <FrontChatPage roomId={frontRoom} onOpenRoom={openFrontRoom} unread={frontUnread} />}
+            {current === 'front' && <FrontChatPage roomId={frontRoomId} onOpenRoom={openFrontRoom} />}
             {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
           </div>
         </div>

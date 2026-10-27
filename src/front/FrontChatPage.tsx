@@ -6,7 +6,6 @@ import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols } from '../pages/ChatPage.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
-import { badgeText } from '../reads.ts'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import {
@@ -29,51 +28,14 @@ import {
 const PAGE = 100
 const MAX_TEXT = 4000
 
-export function FrontChatPage(props: { roomId: string | null; onOpenRoom: (id: string | null) => void; unread: Record<string, number> }) {
+// 프론트 채팅방은 우리 단체 채팅방과 같이 메뉴의 "단체 채팅" 묶음에 보인다. 여기서는 고른 방(없으면 첫 방)을 보여 준다.
+export function FrontChatPage(props: { roomId: string | null; onOpenRoom: (id: string | null) => void }) {
   const front = useFront()
   if (front.status === 'connecting') return <div className="center muted">프론트 채팅에 연결하는 중…</div>
   if (front.status === 'off' || !front.uid) return <JoinPage />
-  const room = front.rooms.find((r) => r.id === props.roomId)
-  if (room) return <FrontRoomView key={room.id} room={room} uid={front.uid} onBack={() => props.onOpenRoom(null)} />
-  return (
-    <div className="page">
-      <header className="page-header">
-        <MenuButton />
-        <h2>프론트 채팅</h2>
-        <button type="button" className="ghost" onClick={() => void joinWithCode()}>
-          + 초대 코드
-        </button>
-      </header>
-      <div className="page-body">
-        <p className="muted small">
-          양산동원로얄CC 프론트 채팅방에 <strong>{front.name || '타부서'}</strong>(으)로 들어가 있어요. 프론트 직원이 초대한 방만 보여요.
-        </p>
-        <ul className="list">
-          {front.rooms.map((r) => (
-            <li key={r.id}>
-              <button type="button" className="row row-button" onClick={() => props.onOpenRoom(r.id)}>
-                <span className="room-icon" aria-hidden="true">
-                  🏌️
-                </span>
-                <div className="row-main">
-                  <strong>{r.name}</strong>
-                  <span className="muted small">프론트 채팅방</span>
-                </div>
-                {(props.unread[r.id] ?? 0) > 0 && (
-                  <span className="badge" aria-label={`안 읽은 메시지 ${props.unread[r.id]}개`}>
-                    {badgeText(props.unread[r.id])}
-                  </span>
-                )}
-                <span aria-hidden="true" className="muted">
-                  ›
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
+  const room = front.rooms.find((r) => r.id === props.roomId) ?? front.rooms[0]
+  if (!room) return <JoinPage />
+  return <FrontRoomView key={room.id} room={room} uid={front.uid} myName={front.name} onLeft={() => props.onOpenRoom(null)} />
 }
 
 async function joinWithCode() {
@@ -149,7 +111,7 @@ function JoinPage() {
 }
 
 // ── 방 ────────────────────────────────────────────────────────
-function FrontRoomView({ room, uid, onBack }: { room: FrontRoom; uid: string; onBack: () => void }) {
+function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: string; myName: string; onLeft: () => void }) {
   const [limitN, setLimitN] = useState(PAGE)
   const [messages, setMessages] = useState<FrontMessage[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -264,7 +226,7 @@ function FrontRoomView({ room, uid, onBack }: { room: FrontRoom; uid: string; on
     try {
       await leaveFrontRoom(room.id)
       toast('방에서 나왔어요.')
-      onBack()
+      onLeft()
     } catch (err) {
       toast((err as Error).message, { error: true })
     }
@@ -301,15 +263,18 @@ function FrontRoomView({ room, uid, onBack }: { room: FrontRoom; uid: string; on
 
   return (
     <div className="chat front-chat">
-      <header className="page-header">
-        <button type="button" className="ghost menu-button back-button" onClick={onBack} aria-label="프론트 채팅방 목록">
-          ‹
-        </button>
-        <h2>🏌️ {room.name}</h2>
+      <header className="page-header chat-header">
+        <MenuButton />
+        <h2>
+          <span aria-hidden="true">🏌️</span> <span className="room-title">{room.name}</span>
+        </h2>
         <div className="header-actions">
           <MoreButton
-            actions={() => [{ icon: '🚪', label: '이 방 나가기', danger: true, onSelect: () => void leave() }]}
-            title={room.name}
+            actions={() => [
+              { icon: '＋', label: '다른 방 초대 코드 넣기', onSelect: () => void joinWithCode() },
+              { icon: '🚪', label: '이 방 나가기', danger: true, onSelect: () => void leave() },
+            ]}
+            title={`${room.name} · ${myName || '타부서'}(으)로 참여 중`}
             label="채팅방 메뉴"
           />
         </div>

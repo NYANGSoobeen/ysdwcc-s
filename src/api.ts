@@ -40,6 +40,10 @@ export const api = {
     { uid: string; existed: boolean }
   >('addMember'),
   updateMemberRole: call<{ teamId: string; uid: string; role: Role }, { ok: true }>('updateMemberRole'),
+  moveMember: call<
+    { fromTeamId: string; toTeamId: string; uid: string; role?: Role; newOwnerUid?: string },
+    { ok: true; movedCustomers: number }
+  >('moveMember'),
   removeMember: call<{ teamId: string; uid: string }, { accountDeleted: boolean }>('removeMember'),
   resetMemberPassword: call<{ teamId: string; uid: string; password: string }, { ok: true }>(
     'resetMemberPassword',

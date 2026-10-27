@@ -3,7 +3,8 @@ import { useState, type FormEvent } from 'react'
 import { api, ROLE_LABELS, type Role } from '../api.ts'
 import { errorMessage, toEmail, toLoginId } from '../auth.ts'
 import { db } from '../firebase.ts'
-import { useMemberProfiles, useTeamsSummary, type Profile, type Team } from '../hooks.ts'
+import { useMemberProfiles, useTeamNames, useTeamsSummary, type Profile, type Team } from '../hooks.ts'
+import { MoveMemberDialog } from './MoveMemberDialog.tsx'
 import { MenuButton } from '../menu.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, tell, toast } from '../ui/dialogs.tsx'
@@ -29,6 +30,10 @@ type Props = {
 export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpenUsage }: Props) {
   const uids = Object.keys(team.members)
   const profiles = useMemberProfiles(uids)
+  // 부서 이동: 내가 속한 다른 팀(부서)으로 옮길 수 있다 (서버가 두 부서의 관리자인지 다시 확인)
+  const teamNames = useTeamNames(teamIds)
+  const otherTeams = teamIds.filter((id) => id !== team.id).map((id) => ({ id, name: teamNames[id] ?? '' }))
+  const memberNames = Object.fromEntries(uids.map((u) => [u, profiles[u]?.name ?? '']))
   const [adding, setAdding] = useState(false)
   const { query } = useTabSearch()
   const sorted = filterMembers(sortMembers(team, profiles), profiles, query)
@@ -70,6 +75,9 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
                 profile={profiles[memberUid]}
                 isMe={memberUid === uid}
                 canManage
+                myUid={uid}
+                otherTeams={otherTeams}
+                names={memberNames}
               />
             ))}
           </ul>
@@ -165,8 +173,12 @@ function MemberRow(props: {
   profile?: Profile
   isMe: boolean
   canManage: boolean
+  myUid: string
+  otherTeams: { id: string; name: string }[] // 옮길 수 있는 다른 부서 (내가 속한 팀)
+  names: Record<string, string>
 }) {
   const { team, memberUid, name, loginId, profile, isMe, canManage } = props
+  const [moving, setMoving] = useState(false)
   const inactive = profile?.active === false
   const role = team.members[memberUid]
   const [busy, setBusy] = useState(false)
@@ -254,6 +266,7 @@ function MemberRow(props: {
           ...(Object.keys(ROLE_LABELS) as Role[])
             .filter((r) => r !== role)
             .map((r) => ({ icon: '🔑', label: `권한: ${ROLE_LABELS[r]}(으)로`, onSelect: () => changeRole(r) })),
+          ...(props.otherTeams.length ? [{ icon: '🔀', label: '부서 이동', onSelect: () => setMoving(true) }] : []),
           { icon: '🔒', label: '비밀번호 초기화', onSelect: () => void resetPassword() },
           inactive
             ? { icon: '✅', label: '다시 사용', onSelect: () => void toggleActive() }
@@ -264,6 +277,7 @@ function MemberRow(props: {
   const menu = useItemMenu(actions, name)
 
   return (
+    <>
     <li className={canManage && !isMe ? 'row has-menu' : 'row'} {...(canManage && !isMe ? menu : {})}>
       <div className="row-main">
         <strong>
@@ -290,6 +304,18 @@ function MemberRow(props: {
         <span className="badge">{ROLE_LABELS[role]}</span>
       )}
     </li>
+      {moving && (
+        <MoveMemberDialog
+          team={team}
+          memberUid={memberUid}
+          name={name}
+          myUid={props.myUid}
+          otherTeams={props.otherTeams}
+          names={props.names}
+          onClose={() => setMoving(false)}
+        />
+      )}
+    </>
   )
 }
 

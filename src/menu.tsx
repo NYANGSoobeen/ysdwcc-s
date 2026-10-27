@@ -3,7 +3,7 @@ import { badgeText } from './reads.ts'
 import { Avatar } from './ui/Avatar.tsx'
 
 // 왼쪽 메뉴 (휴대폰 ☰ 서랍, PC 왼쪽 고정 메뉴). 프론트 앱과 같은 구조:
-// 내 프로필 → 팀원 → 단체 채팅(+) → 메뉴 → 관리자 전용. 기능이 늘어나면 MENU_ITEMS에 추가한다.
+// 내 프로필 → 단체 채팅(우리 방 + 🏌️ 프론트 채팅방, +) → 팀원 → 메뉴 → 관리자 전용. 기능이 늘어나면 MENU_ITEMS에 추가한다.
 export type Tab = 'customers' | 'chat' | 'front' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
 
 export type MenuItem = {
@@ -19,16 +19,14 @@ export type MenuItem = {
 export const MENU_ITEMS: MenuItem[] = [
   { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
-  // 프론트 앱 채팅방에 타부서 게스트로 들어가기 (src/front/)
-  { tab: 'front', icon: '🏌️', label: '프론트 채팅', section: 'main' },
   { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },
   { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
 ]
 
 // 메뉴 묶음. 제목이 있는 묶음은 제목을 눌러 접고 펼 수 있고, 접은 상태는 기기마다 기억한다.
 const SECTIONS: { id: MenuItem['section'] | 'members' | 'chat'; title?: string }[] = [
-  { id: 'members', title: '팀원' },
   { id: 'chat', title: '단체 채팅' },
+  { id: 'members', title: '팀원' },
   { id: 'main' },
   { id: 'admin', title: '관리자 전용' },
 ]
@@ -93,7 +91,12 @@ type MenuListProps = {
   onSelectRoom?: (id: string) => void
   onCreateRoom?: () => void
   unread?: Record<string, number>
-  // 메뉴 항목 옆 빨간 숫자 (프론트 채팅의 안 읽은 수)
+  // 🏌️ 프론트 채팅방 (프론트 앱 방에 타부서 게스트로, src/front/). 단체 채팅 묶음 안에 같이 보인다.
+  frontRooms?: ChatRoomItem[]
+  currentFrontRoom?: string | null
+  frontUnread?: Record<string, number>
+  onSelectFrontRoom?: (id: string | null) => void
+  // 메뉴 항목 옆 빨간 숫자
   badges?: Partial<Record<Tab, number>>
   focusable?: boolean
   children?: ReactNode
@@ -218,11 +221,16 @@ function MembersSection(props: MenuListProps & { closed: boolean; onToggle: () =
 
 function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolean; onToggle: () => void }) {
   const { chatRooms, currentRoom, onSelectRoom, onCreateRoom, focusable = true, closed, onToggle, title, unread = {} } = props
+  const { frontRooms = [], currentFrontRoom = null, frontUnread = {}, onSelectFrontRoom } = props
   if (!chatRooms || !onSelectRoom) return null
-  const shown = closed ? chatRooms.filter((r) => r.id === currentRoom) : chatRooms
+  const rooms = [
+    ...chatRooms.map((r) => ({ ...r, front: false, count: unread[r.id] ?? 0, active: r.id === currentRoom })),
+    ...frontRooms.map((r) => ({ ...r, front: true, count: frontUnread[r.id] ?? 0, active: r.id === currentFrontRoom })),
+  ]
+  const shown = closed ? rooms.filter((r) => r.active) : rooms
   const tabIndex = focusable ? 0 : -1
   // 접어 두면 숨은 방들의 안 읽은 수를 제목 옆에 합쳐 보여 준다.
-  const hidden = chatRooms.filter((r) => !shown.includes(r)).reduce((sum, r) => sum + (unread[r.id] ?? 0), 0)
+  const hidden = rooms.filter((r) => !shown.includes(r)).reduce((sum, r) => sum + r.count, 0)
   return (
     <ul className="drawer-list">
       <li>
@@ -244,24 +252,38 @@ function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolea
         />
       </li>
       {shown.map((room) => (
-        <li key={room.id}>
+        <li key={`${room.front ? 'front' : 'team'}-${room.id}`}>
           <button
             type="button"
-            className={room.id === currentRoom ? 'drawer-item active' : 'drawer-item'}
-            aria-current={room.id === currentRoom ? 'page' : undefined}
-            onClick={() => onSelectRoom(room.id)}
+            className={room.active ? 'drawer-item active' : 'drawer-item'}
+            aria-current={room.active ? 'page' : undefined}
+            onClick={() => (room.front ? onSelectFrontRoom?.(room.id) : onSelectRoom(room.id))}
             tabIndex={tabIndex}
+            title={room.front ? '프론트 앱 채팅방 (타부서로 참여)' : undefined}
           >
-            <span aria-hidden="true">💬</span>
+            <span aria-hidden="true">{room.front ? '🏌️' : '💬'}</span>
             {room.name}
-            {(unread[room.id] ?? 0) > 0 && (
-              <span className="badge" aria-label={`안 읽은 메시지 ${unread[room.id]}개`}>
-                {badgeText(unread[room.id])}
+            {room.count > 0 && (
+              <span className="badge" aria-label={`안 읽은 메시지 ${room.count}개`}>
+                {badgeText(room.count)}
               </span>
             )}
           </button>
         </li>
       ))}
+      {/* 프론트 채팅방에 아직 안 들어갔으면 들어가는 곳 */}
+      {!closed && onSelectFrontRoom && frontRooms.length === 0 && (
+        <li>
+          <button
+            type="button"
+            className={props.current === 'front' ? 'drawer-item add active' : 'drawer-item add'}
+            onClick={() => onSelectFrontRoom(null)}
+            tabIndex={tabIndex}
+          >
+            <span aria-hidden="true">🏌️</span>프론트 채팅 들어가기
+          </button>
+        </li>
+      )}
     </ul>
   )
 }
