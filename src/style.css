@@ -303,7 +303,7 @@ h3 {
   font-size: 24px;
 }
 
-/* ── 앱 틀과 하단 탭 ── */
+/* ── 앱 틀 ── */
 .shell {
   /* 키보드가 열려도 화면을 키보드 위 영역에 맞춘다 (src/mobile.ts가 --vv-height, --vv-top을 넣음) */
   position: fixed;
@@ -325,37 +325,6 @@ h3 {
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.tabbar {
-  display: flex;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
-}
-
-.tab {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: 56px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.tab span {
-  font-size: 20px;
-}
-
-.tab.active {
-  color: var(--accent);
-  font-weight: 600;
-  box-shadow: inset 0 3px 0 var(--accent);
 }
 
 .page,
@@ -529,7 +498,6 @@ h3 {
 
 /* 안 읽은 수: 빨간 동그라미 (방 목록, 메뉴, ☰, 아래 채팅 탭) */
 .badge,
-.tab span.badge,
 .drawer-item span.badge {
   display: inline-flex;
   align-items: center;
@@ -552,12 +520,10 @@ h3 {
 .drawer-label .badge {
   margin: 0 8px 0 auto;
 }
-.tab .tab-icon,
 .menu-button {
   position: relative;
 }
-.badge.on-icon,
-.tab span.badge.on-icon {
+.badge.on-icon {
   position: absolute;
   top: -4px;
   left: calc(50% + 6px);
@@ -625,29 +591,6 @@ h3 {
   .drawer-backdrop {
     transition: none;
   }
-}
-
-/* ── 팀 바꾸기 (팀이 2개 이상일 때 맨 위) ── */
-.teambar {
-  padding: calc(6px + var(--safe-area-inset-top, env(safe-area-inset-top))) 12px 6px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.teambar label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.teambar select {
-  min-height: 36px;
-  padding: 6px 10px;
-  font-weight: 600;
-}
-
-.teambar + .shell-body .page-header {
-  padding-top: 0;
 }
 
 /* ── 관리자 ── */
@@ -1749,8 +1692,7 @@ button.primary.danger-fill {
   background: var(--notice-bg);
 }
 
-/* 휴대폰: 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다 */
-.shell.searching .tabbar,
+/* 휴대폰: 검색칸을 누르고 있는 동안 채팅 입력칸을 숨긴다 */
 .shell.searching .composer {
   display: none;
 }
@@ -2776,4 +2718,324 @@ textarea:focus-visible {
 }
 dd.break {
   word-break: break-all;
+}
+
+/* ══════════════════════════════════════════════════════════
+   프론트 앱과 같은 구조 (2026-10)
+   왼쪽 메뉴: 내 프로필 → 팀원 → 단체 채팅(+) → 메뉴 → 관리자 전용
+   휴대폰: 아래 탭 없이 ☰ 메뉴, 채팅방 머리줄 ☰ · 💬 방 이름 · ⋯ · 검색칸, 둥근 ＋ 😊 입력칸 ↑
+   ══════════════════════════════════════════════════════════ */
+.menu-button,
+.ghost.menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  margin-left: 8px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 18px;
+}
+.menu-button .badge.on-icon {
+  top: -6px;
+  left: 26px;
+}
+
+/* 메뉴 맨 위: 내 프로필 (누르면 내 정보) */
+.menu-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.menu-profile .avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  font-size: 17px;
+  box-shadow: 0 0 0 2px var(--rock);
+}
+.menu-profile-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+.menu-profile-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-profile-text .small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.menu-profile.active .menu-profile-text .small {
+  color: var(--text);
+}
+
+/* 팀원 목록 */
+.drawer-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.drawer-member .avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.drawer-member strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.drawer-member .small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* 묶음 제목: ▾ 제목 …(빨간 숫자) ＋ */
+.drawer-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.drawer-label-row .drawer-label {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 6px;
+}
+.drawer-label .caret {
+  font-size: 10px;
+}
+.drawer-label-row .badge {
+  margin: 0;
+}
+.section-add {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--text);
+  font-size: 18px;
+}
+.app-version {
+  overflow-wrap: anywhere;
+}
+
+/* 채팅방 머리줄: ☰ · 💬 방 이름 · ⋯ · 검색칸 */
+.page-header.chat-header {
+  display: flex;
+  gap: 8px;
+  padding-right: 10px;
+}
+.chat-header h2 {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 17px;
+}
+.chat-header .room-title {
+  color: var(--accent);
+}
+.chat-header .header-actions {
+  gap: 8px;
+  flex-shrink: 0;
+}
+.chat-header .more-button {
+  min-width: 40px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.search-bar.header-search {
+  gap: 4px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.header-search input {
+  width: 96px;
+  min-height: 36px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transition: width 0.15s;
+}
+.header-search input:focus {
+  outline: none;
+  width: 150px;
+}
+.header-search:focus-within {
+  outline: 2px solid var(--rock);
+}
+.header-search .search-clear {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+/* 휴대폰: 검색칸을 누르면 방 이름을 숨기고 검색칸을 넓힌다 */
+.shell:not(.desktop) .chat-header:focus-within h2 {
+  display: none;
+}
+.shell:not(.desktop) .chat-header:focus-within .header-actions {
+  flex: 1;
+}
+.shell:not(.desktop) .chat-header:focus-within .header-search {
+  flex: 1;
+}
+.shell:not(.desktop) .chat-header:focus-within .header-search input {
+  width: 100%;
+}
+.search-results {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* 채팅 안내줄과 빈 방 */
+.chat-hint {
+  margin: 0;
+  padding: 6px 14px;
+  color: var(--muted);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-empty {
+  margin: 48px auto 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+html.keyboard-open .chat-hint {
+  display: none;
+}
+
+/* 입력칸: 둥근 ＋ · 😊 · 입력칸 · ↑ 보내기 */
+.composer-row {
+  align-items: center;
+  gap: 8px;
+}
+.round-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 20px;
+}
+.composer textarea {
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 22px;
+  background: var(--bg);
+}
+.send-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 22px;
+  font-weight: 700;
+}
+.send-button:disabled {
+  opacity: 0.45;
+}
+.emoji-root {
+  position: relative;
+  flex-shrink: 0;
+}
+.emoji-panel {
+  position: absolute;
+  bottom: 52px;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(8, 38px);
+  gap: 2px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.emoji-panel button {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+}
+.emoji-panel button:hover {
+  background: var(--bg);
+}
+
+/* PC */
+.shell.desktop .page-header.chat-header {
+  padding: 0 24px;
+}
+.shell.desktop .header-search input {
+  width: 180px;
+}
+.shell.desktop .header-search input:focus {
+  width: 240px;
+}
+.shell.desktop .chat-hint {
+  padding: 8px 24px;
+}
+.shell.desktop .composer {
+  padding: 12px 24px;
+}
+
+.app-version .app-name {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+  opacity: 0.9;
 }

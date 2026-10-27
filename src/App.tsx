@@ -1,11 +1,11 @@
 import type { User } from 'firebase/auth'
 import { useEffect, useRef, useState } from 'react'
-import { api } from './api.ts'
+import { api, ROLE_LABELS } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
 import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { useMentionAlerts } from './useMentionAlerts.ts'
-import { badgeText, useUnreadCounts } from './reads.ts'
+import { useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
 import { resumeFront, useFrontUnread } from './front/ydr.ts'
 import { listenOpenRequests, refreshPush, type OpenRequest } from './push.ts'
@@ -136,7 +136,8 @@ function SignedIn({ user }: { user: User }) {
 
   // 보고 있는 채팅방 (휴대폰에서 null이면 방 목록)
   const channelId = team && channelState?.teamId === team.id ? channelState.id : null
-  const roomId = channels?.some((c) => c.id === channelId) ? channelId : desktop ? MAIN_CHANNEL : null
+  // 고른 방이 없으면(처음, 지워진 방) 기본 방 (프론트 앱처럼 채팅 화면은 늘 방 하나를 보여 준다)
+  const roomId = channels?.some((c) => c.id === channelId) ? channelId : MAIN_CHANNEL
   function openChannel(id: string | null) {
     if (!team) return
     setChannelState({ teamId: team.id, id })
@@ -248,6 +249,13 @@ function SignedIn({ user }: { user: User }) {
     chatRooms: channels ?? [],
     currentRoom: current === 'chat' ? (roomId ?? null) : null,
     onSelectRoom: openChannel,
+    uid: user.uid,
+    roleLabel: superAdmin ? '최고 관리자' : ROLE_LABELS[team.members[user.uid]],
+    members: Object.keys(team.members)
+      .filter((m) => m !== user.uid)
+      .map((m) => ({ uid: m, name: memberProfiles[m]?.name ?? '', role: ROLE_LABELS[team.members[m]] }))
+      .filter((m) => m.name)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     unread,
     badges: { front: frontUnreadTotal },
     onCreateRoom: canWrite
@@ -272,7 +280,6 @@ function SignedIn({ user }: { user: User }) {
       <div className={`shell${desktop ? ' desktop' : ''}${searching ? ' searching' : ''}`}>
         {desktop && <Sidebar {...menuProps}>{teamSelect}</Sidebar>}
         <div className="shell-main">
-          {!desktop && teamSelect && <div className="teambar">{teamSelect}</div>}
           <div className="shell-body">
             {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} />}
             {current === 'chat' && (
@@ -281,8 +288,6 @@ function SignedIn({ user }: { user: User }) {
                 uid={user.uid}
                 channels={channels}
                 channelId={roomId}
-                desktop={desktop}
-                unread={unread}
                 onOpenChannel={openChannel}
               />
             )}
@@ -302,24 +307,12 @@ function SignedIn({ user }: { user: User }) {
             {current === 'front' && <FrontChatPage roomId={frontRoom} onOpenRoom={openFrontRoom} unread={frontUnread} />}
             {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
           </div>
-          {!desktop && (
-            <nav className="tabbar">
-              <TabButton active={current === 'customers'} onClick={() => setTab('customers')} icon="📇" label="고객" />
-              <TabButton
-                active={current === 'chat'}
-                // 채팅방 안에서 한 번 더 누르면 방 목록으로
-                onClick={() => (current === 'chat' ? openChannel(null) : setTab('chat'))}
-                icon="💬"
-                label="채팅"
-                badge={unreadTotal}
-              />
-              <TabButton active={current === 'schedule'} onClick={() => setTab('schedule')} icon="📅" label="스케줄" />
-              <TabButton active={current === 'members'} onClick={() => setTab('members')} icon="👥" label="팀원" />
-              <TabButton active={current === 'profile'} onClick={() => setTab('profile')} icon="⚙️" label="내 정보" />
-            </nav>
-          )}
         </div>
-        {!desktop && <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)} />}
+        {!desktop && (
+          <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)}>
+            {teamSelect}
+          </MenuDrawer>
+        )}
       </div>
      </SearchContext.Provider>
      </MenuBadgeContext.Provider>
@@ -347,23 +340,6 @@ function FirstPassword({ name, loginId }: { name: string; loginId: string }) {
         로그아웃
       </button>
     </main>
-  )
-}
-
-function TabButton(props: { active: boolean; onClick: () => void; icon: string; label: string; badge?: number }) {
-  return (
-    <button
-      type="button"
-      className={props.active ? 'tab active' : 'tab'}
-      onClick={props.onClick}
-      aria-current={props.active ? 'page' : undefined}
-    >
-      <span aria-hidden="true" className="tab-icon">
-        {props.icon}
-        {(props.badge ?? 0) > 0 && <span className="badge on-icon">{badgeText(props.badge!)}</span>}
-      </span>
-      {props.label}
-    </button>
   )
 }
 

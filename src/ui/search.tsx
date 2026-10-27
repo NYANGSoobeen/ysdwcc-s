@@ -14,9 +14,12 @@ export const useTabSearch = () => useContext(SearchContext)
 
 export function SearchBar(props: {
   placeholder: string
+  label?: string
   onEnter?: () => void
   onCancel?: () => void
   autoFocus?: boolean
+  // 머리줄 안의 작은 검색칸 (채팅방: 프론트 앱처럼 ⋯ 옆)
+  inline?: boolean
   children?: ReactNode
 }) {
   const { query, setQuery, setFocused } = useTabSearch()
@@ -27,7 +30,7 @@ export function SearchBar(props: {
     return () => setFocused(false)
   }, [setFocused])
   return (
-    <div className="search-bar" role="search">
+    <div className={props.inline ? 'search-bar header-search' : 'search-bar'} role="search">
       <span aria-hidden="true">🔍</span>
       <input
         ref={input}
@@ -49,7 +52,7 @@ export function SearchBar(props: {
           }
         }}
         placeholder={props.placeholder}
-        aria-label={props.placeholder}
+        aria-label={props.label ?? props.placeholder}
       />
       {props.children}
       {(query || props.onCancel) && (

@@ -33,6 +33,7 @@ import { useMessages, type Message } from '../useMessages.ts'
 import { badgeText, markRead, unreadBy, useRoomReads } from '../reads.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { MenuButton } from '../menu.tsx'
+import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
@@ -43,27 +44,14 @@ type ChatProps = {
   uid: string
   channels: Channel[] | null
   channelId: string | null
-  desktop: boolean
-  unread: Record<string, number>
   onOpenChannel: (id: string | null) => void
 }
 
-// 채팅 탭. 휴대폰은 방 목록 → 방, PC는 왼쪽 메뉴에서 방을 고르고 여기에는 방만 보인다.
-export function ChatPage({ team, uid, channels, channelId, desktop, unread, onOpenChannel }: ChatProps) {
+// 채팅 탭: 고른 방 하나를 보여 준다 (방은 ☰·PC 왼쪽 메뉴의 "단체 채팅"에서 고른다, 프론트 앱과 같은 구조).
+export function ChatPage({ team, uid, channels, channelId, onOpenChannel }: ChatProps) {
   if (!channels) return <div className="center muted">불러오는 중…</div>
-  if (!channelId && !desktop)
-    return <ChatRoomList team={team} uid={uid} channels={channels} unread={unread} onOpen={onOpenChannel} />
   const room = channels.find((c) => c.id === channelId) ?? channels[0]
-  return (
-    <ChatRoom
-      key={room.id}
-      team={team}
-      uid={uid}
-      room={room}
-      onBack={desktop ? undefined : () => onOpenChannel(null)}
-      onLeft={() => onOpenChannel(desktop ? MAIN_CHANNEL : null)}
-    />
-  )
+  return <ChatRoom key={room.id} team={team} uid={uid} room={room} onLeft={() => onOpenChannel(MAIN_CHANNEL)} />
 }
 
 // 새 채팅방 만들기 (편집 권한 이상)
@@ -78,65 +66,7 @@ export async function promptCreateChannel(teamId: string) {
   }
 }
 
-function ChatRoomList(props: {
-  team: Team
-  uid: string
-  channels: Channel[]
-  unread: Record<string, number>
-  onOpen: (id: string) => void
-}) {
-  const { team, uid, channels, unread, onOpen } = props
-  const canWrite = team.members[uid] !== 'viewer'
-  return (
-    <div className="page">
-      <header className="page-header">
-        <MenuButton />
-        <h2>채팅</h2>
-        {canWrite ? (
-          <button
-            type="button"
-            className="ghost"
-            onClick={async () => {
-              const id = await promptCreateChannel(team.id)
-              if (id) onOpen(id)
-            }}
-          >
-            + 새 방
-          </button>
-        ) : (
-          <span />
-        )}
-      </header>
-      <div className="page-body">
-        <ul className="list">
-          {channels.map((c) => (
-            <li key={c.id}>
-              <button type="button" className="row row-button" onClick={() => onOpen(c.id)}>
-                <span className="room-icon" aria-hidden="true">
-                  💬
-                </span>
-                <div className="row-main">
-                  <strong>{c.name}</strong>
-                  {c.id === MAIN_CHANNEL && <span className="muted small">팀원 모두 · 기본 방</span>}
-                </div>
-                {(unread[c.id] ?? 0) > 0 && (
-                  <span className="badge" aria-label={`안 읽은 메시지 ${unread[c.id]}개`}>
-                    {badgeText(unread[c.id])}
-                  </span>
-                )}
-                <span aria-hidden="true" className="muted">
-                  ›
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
-function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string; room: Channel; onBack?: () => void; onLeft: () => void }) {
+function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: Channel; onLeft: () => void }) {
   const ref = useMemo(() => messagesRef(team.id, room.id), [team.id, room.id])
   const { messages, hasMore, loaded, loadingOlder, loadOlder, peek } = useMessages(ref)
   const [showGallery, setShowGallery] = useState(false)
@@ -267,7 +197,6 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
   // 🔍 채팅 검색: 대화는 그대로 두고 찾은 말 위치로 이동한다 (▲ 이전, ▼ 다음, Enter = 이전).
   // 불러온 메시지에 없거나 가장 오래된 결과에서 ▲를 누르면 이전 메시지를 300개씩 더 불러와 찾는다 (최대 3000개).
   const { query: searchQuery } = useTabSearch()
-  const [searchOpen, setSearchOpen] = useState(() => Boolean(searchQuery))
   const q = searchQuery.trim().toLowerCase()
   const qRef = useRef(q)
   qRef.current = q
@@ -516,53 +445,43 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
       }}
     >
       {dragging && <div className="drop-overlay">여기에 놓으면 보낼 사진·파일로 추가돼요</div>}
-      <header className="page-header">
-        {onBack ? (
-          <button type="button" className="ghost menu-button" onClick={onBack} aria-label="채팅방 목록">
-            ‹
-          </button>
-        ) : (
-          <MenuButton />
-        )}
-        <h2>{room.name}</h2>
+      {/* 머리줄: ☰ · 💬 방 이름 · ⋯ · 검색칸 (프론트 앱과 같은 구조) */}
+      <header className="page-header chat-header">
+        <MenuButton />
+        <h2>
+          <span aria-hidden="true">💬</span> <span className="room-title">{room.name}</span>
+        </h2>
         <div className="header-actions">
-          <button
-            type="button"
-            className={searchOpen ? 'ghost icon active' : 'ghost icon'}
-            onClick={() => setSearchOpen(!searchOpen)}
-            aria-label="채팅 검색"
-            aria-pressed={searchOpen}
-          >
-            🔍
-          </button>
           <MoreButton actions={roomActions} title={room.name} label="채팅방 메뉴" />
+          <SearchBar inline placeholder="검색" label="대화 내용 검색" onEnter={() => void older()} />
         </div>
       </header>
-      {searchOpen && (
-        <SearchBar placeholder="대화 내용 검색" autoFocus onEnter={() => void older()} onCancel={() => setSearchOpen(false)}>
-          {q && (
-            <span className="search-nav">
-              <span className="small muted" aria-live="polite">
-                {searching
-                  ? '이전 메시지에서 찾는 중…'
-                  : matches.length
-                    ? `${matchIndex + 1} / ${matches.length}건`
-                    : capped
-                      ? '0건 (최근 3000개)'
-                      : '0건'}
-              </span>
-              <button type="button" className="ghost icon" onClick={() => void older()} disabled={!matches.length || searching} aria-label="이전 찾기"
-                onPointerDown={(e) => e.preventDefault()}>
-                ▲
-              </button>
-              <button type="button" className="ghost icon" onClick={newer} disabled={!matches.length} aria-label="다음 찾기"
-                onPointerDown={(e) => e.preventDefault()}>
-                ▼
-              </button>
-            </span>
-          )}
-        </SearchBar>
+      {q && (
+        <div className="search-results" aria-live="polite">
+          <span className="small muted">
+            {searching
+              ? '이전 메시지에서 찾는 중…'
+              : matches.length
+                ? `${matchIndex + 1} / ${matches.length}건`
+                : capped
+                  ? '0건 (최근 3000개)'
+                  : '0건'}
+          </span>
+          <span className="search-nav">
+            <button type="button" className="ghost icon" onClick={() => void older()} disabled={!matches.length || searching} aria-label="이전 찾기"
+              onPointerDown={(e) => e.preventDefault()}>
+              ▲
+            </button>
+            <button type="button" className="ghost icon" onClick={newer} disabled={!matches.length} aria-label="다음 찾기"
+              onPointerDown={(e) => e.preventDefault()}>
+              ▼
+            </button>
+          </span>
+        </div>
       )}
+      <p className="chat-hint">
+        💡 메시지를 길게 누르거나(PC는 오른쪽 클릭) 답장·복사·수정·삭제할 수 있어요
+      </p>
       <div
         className="messages"
         ref={listRef}
@@ -592,7 +511,7 @@ function ChatRoom({ team, uid, room, onBack, onLeft }: { team: Team; uid: string
             )}
           </div>
         )}
-        {loaded && messages.length === 0 && <p className="center muted">첫 메시지를 남겨 보세요.</p>}
+        {loaded && messages.length === 0 && <p className="chat-empty">아직 메시지가 없어요 🎈</p>}
         {messages.map((m, i) => {
           const prev = messages[i - 1]
           const next = messages[i + 1]
@@ -916,18 +835,6 @@ function sameGroup(a: Message | undefined, b: Message | undefined) {
   return Math.floor(a.createdAt.toMillis() / 60_000) === Math.floor(b.createdAt.toMillis() / 60_000)
 }
 
-// 프로필 사진 대신 이름 첫 글자 동그라미 (사람마다 색이 다르다)
-const AVATAR_COLORS = ['#16587b', '#3d7fa3', '#5b8a72', '#a0694b', '#7a5c99', '#b0516a', '#4f7d8c']
-export function Avatar({ uid, name }: { uid: string; name: string }) {
-  let hash = 0
-  for (const ch of uid) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
-  return (
-    <span className="avatar" style={{ background: AVATAR_COLORS[hash % AVATAR_COLORS.length] }} aria-hidden="true">
-      {name.slice(0, 1)}
-    </span>
-  )
-}
-
 export async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
@@ -1112,6 +1019,18 @@ function Composer(props: {
     }
   }
 
+  // 😊 고른 이모지를 커서 자리에 넣는다.
+  function insertText(text: string) {
+    const el = textarea.current
+    const a = el?.selectionStart ?? body.length
+    const b = el?.selectionEnd ?? body.length
+    setBody(body.slice(0, a) + text + body.slice(b))
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(a + text.length, a + text.length)
+    })
+  }
+
   return (
     <form
       className="composer"
@@ -1181,9 +1100,10 @@ function Composer(props: {
         </ul>
       )}
       <div className="composer-row">
-        <button type="button" className="ghost icon attach-button" onClick={openAttachMenu} aria-label="사진·파일 보내기" disabled={Boolean(editing)}>
+        <button type="button" className="round-button attach-button" onClick={openAttachMenu} aria-label="사진·파일 보내기" disabled={Boolean(editing)}>
           ＋
         </button>
+        <EmojiButton onPick={insertText} />
         <input ref={galleryInput} type="file" accept="image/*" multiple hidden onChange={pickInput} />
         <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={pickInput} />
         <input
@@ -1238,17 +1158,19 @@ function Composer(props: {
             }
             void send()
           }}
-          placeholder="메시지 입력"
+          placeholder={isTouchUi() ? '메시지 입력...' : '메시지 입력... (Enter 전송 · Ctrl+Enter 줄바꿈)'}
           rows={1}
           enterKeyHint={isTouchUi() ? 'enter' : 'send'}
         />
         <button
-          className="primary"
+          className="send-button"
+          aria-label={editing ? '수정' : '보내기'}
+          title={editing ? '수정' : '보내기'}
           disabled={editing ? !body.trim() : !body.trim() && photos.length === 0 && files.length === 0}
           // 보내기를 눌러도 입력칸에서 포커스가 빠지지 않게 → 휴대폰 키보드가 닫히지 않는다.
           onPointerDown={(e) => e.preventDefault()}
         >
-          {editing ? '수정' : '보내기'}
+          {editing ? '✓' : '↑'}
         </button>
       </div>
     </form>
@@ -1279,4 +1201,49 @@ function usePreviews(files: File[]) {
     return () => next.forEach((u) => URL.revokeObjectURL(u))
   }, [files])
   return urls
+}
+
+// 😊 이모지 고르기 (입력칸 옆). 자주 쓰는 것만 모아 둔다.
+const EMOJIS = '😀 😂 🥹 😊 😍 🥰 😘 😎 🤔 😮 😢 😭 😡 🙏 👍 👏 🙌 💪 👌 ✌️ 🤝 🙇 ❤️ 💙 🔥 ✨ 🎉 🎈 ☕ 🍚 ⛳ 🏌️ 📞 📅 ✅ ❌ ⚠️ ❗ ❓ 💯'.split(' ')
+
+export function EmojiButton({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('pointerdown', close, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', close, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+  return (
+    <div className="emoji-root" ref={root}>
+      <button
+        type="button"
+        className="round-button"
+        aria-label="이모지"
+        aria-expanded={open}
+        // 입력칸 포커스를 뺏지 않아 휴대폰 키보드가 그대로 남는다.
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        😊
+      </button>
+      {open && (
+        <div className="emoji-panel" role="listbox" aria-label="이모지 고르기">
+          {EMOJIS.map((e) => (
+            <button key={e} type="button" role="option" aria-selected={false} onPointerDown={(ev) => ev.preventDefault()} onClick={() => onPick(e)}>
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

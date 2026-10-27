@@ -21,7 +21,7 @@
   - 앱에서 건 전화(`tel:`)는 앱으로 돌아오면 메모 창을 띄운다 (화면 6)
   - 받은 전화는 "방금 받은 전화 메모하기" 버튼으로 기록한다 (화면 7)
   - Call Directory Extension으로 전화 올 때 고객 이름을 표시한다
-- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 위, 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
+- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 맨 아래(버전 위), 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
 - **앱 색상:** Merino `#F5EEDD`(바탕) · Rock Blue `#84B3CE`(보조) · Venice Blue `#16587B`(주색, 버튼·내 말풍선·메뉴 바탕). `src/style.css` 맨 위 `:root` 토큰에서 바꾼다 (어두운 모드는 Venice 계열 바탕 + Rock Blue 강조). 메뉴(☰, PC 왼쪽 메뉴)는 Venice Blue 바탕에 Merino 글씨. 채팅방 바탕은 Rock Blue를 Merino 쪽으로 누그러뜨린 `#BED3DC`(`--chat-bg`), 남의 말풍선은 미색, 내 말풍선은 Venice Blue, 날짜 줄은 짙은 남색 반투명.
 - **글꼴:** 본문 Noto Sans KR(400·500·700, 기본 16px), 제목·화면 이름·내 이름 Noto Serif KR(500·700, 내 이름 14px), 채팅 말풍선 14.5px·줄 간격 1.55, 메뉴 14px, 작은 안내 10.5~12.5px. 구글 폰트를 `index.html`에서 불러오고 서비스 워커가 기기에 저장(`google-fonts` 캐시). 입력칸은 아이폰 확대 방지로 16px 유지. 토큰은 `style.css`의 `--font-sans`, `--font-serif`.
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전이 나오면 하단 알림을 띄우고 누르면 업데이트한다 (`src/update.ts`).
@@ -37,9 +37,13 @@
   - 로그인 화면 "아이디 저장": 체크하면 아이디만 이 기기에 기억한다 (비밀번호는 저장 안 함, localStorage `saved-login-id`).
   - 로그아웃 버튼 없이 로그인이 풀리면(만료, 중지) 기기에 남은 팀 데이터를 지운다.
 - **팀원 관리:** 팀 생성, 팀원 추가, 권한 변경, 삭제, 비밀번호 초기화는 모두 Functions(callable)로만 한다. 마지막 관리자는 강등하거나 삭제할 수 없다. 팀에서 삭제하면 보안 규칙상 즉시 접근이 막히고, 그 사람 앱은 로그아웃하면서 기기 캐시를 지운다. 속한 팀이 없어지면 Auth 계정도 지운다.
-- **여러 팀과 최고 관리자:** 처음 만든 관리자는 최고 관리자(`users.superAdmin`, `meta/setup.ownerUid`, Functions만 씀)다. 최고 관리자만 새 팀을 만들 수 있고(`createTeam`), 만든 팀에 관리자로 자동으로 들어가 모든 팀을 본다. 다른 관리자는 최고 관리자를 빼거나 강등할 수 없다. 팀이 2개 이상이면 팀 바꾸기 칸이 나온다 (휴대폰은 화면 맨 위, PC는 왼쪽 메뉴). 관리자는 관리자 화면에서 팀 이름을 바꾼다.
+- **여러 팀과 최고 관리자:** 처음 만든 관리자는 최고 관리자(`users.superAdmin`, `meta/setup.ownerUid`, Functions만 씀)다. 최고 관리자만 새 팀을 만들 수 있고(`createTeam`), 만든 팀에 관리자로 자동으로 들어가 모든 팀을 본다. 다른 관리자는 최고 관리자를 빼거나 강등할 수 없다. 팀이 2개 이상이면 팀 바꾸기 칸이 나온다 (메뉴 맨 위 내 프로필 아래, 휴대폰·PC 같음). 관리자는 관리자 화면에서 팀 이름을 바꾼다.
 - **PC와 휴대폰 화면:** 가로 1024px 이상(`src/useMedia.ts`의 `useIsDesktop`)은 PC 화면: 왼쪽 고정 메뉴(`Sidebar`, 팀 바꾸기 포함), 하단 탭과 ☰ 없음, 고객은 왼쪽 목록 | 오른쪽 상세 2단, 내 정보·관리자는 2열(`.page-body.two-col` + `.col`), 용량은 카드 여러 열(`.masonry`), 채팅·스케줄은 넓게. 스타일은 `src/style.css` 끝의 `.shell.desktop` 규칙에 모아 둔다. 그보다 좁으면 휴대폰 화면.
-- **화면 구성 (휴대폰):** 하단 탭(고객, 채팅, 스케줄, 팀원, 내 정보) + 왼쪽 위 ☰ 메뉴(`src/menu.tsx`의 `MENU_ITEMS`, PC 왼쪽 메뉴와 같은 목록). 새 기능은 메뉴에 추가한다. 메뉴의 "관리자 전용" 칸: **관리자(팀원 관리)** 화면(`src/pages/AdminPage.tsx`, 그 팀 관리자만)과 **용량 관리**(최고 관리자만). 팀원 탭은 모두가 보는 보기 전용 목록이다. 관리자 화면에서 팀 이름, 팀원 추가/권한/비밀번호/삭제를 하고, 최고 관리자는 모든 팀 목록, 팀 만들기, 용량 관리로 가기도 여기서 한다.
+- **화면 구성 (프론트 앱과 같은 구조, 2026-10):** 아래 탭은 없다. 휴대폰은 머리줄 왼쪽 ☰(테두리 있는 네모, 안 읽은 합계 빨간 숫자)로 서랍 메뉴를 열고, PC는 같은 메뉴가 왼쪽에 고정. 메뉴(`src/menu.tsx` `MenuList`) 순서: **내 프로필**(이름, "권한 · 내 정보 ✏️", 누르면 내 정보) → 팀 바꾸기(팀 2개 이상) → **팀원**(나를 뺀 팀원 이름·권한, 누르면 팀원 화면) → **단체 채팅**(방 목록 + 제목 줄 ＋ = 새 채팅방) → 메뉴(`MENU_ITEMS`: 고객, 스케줄, 🏌️ 프론트 채팅) → **관리자 전용**(관리자 화면, 용량 관리) → 맨 아래 앱 이름·팀·버전. 제목 있는 묶음은 접고 편다. 새 기능은 `MENU_ITEMS`에 추가한다.
+  - 채팅 화면은 늘 방 하나를 보여 준다(고른 방이 없으면 기본 방, 휴대폰 "방 목록" 화면은 없앰). 머리줄: ☰ · 💬 방 이름 · ⋯(방 메뉴) · 🔍 검색칸(머리줄 안, 휴대폰은 누르면 넓어짐, 찾은 결과 "1 / 3건 ▲ ▼"는 머리줄 아래 줄). 그 아래 안내줄 "💡 메시지를 길게 누르거나(PC는 오른쪽 클릭) …"(키보드 열리면 숨김), 빈 방은 "아직 메시지가 없어요 🎈".
+  - 입력칸: 둥근 ＋(사진·파일) · 😊(자주 쓰는 이모지 고르기, `EmojiButton`) · 둥근 입력칸(PC 안내 "Enter 전송 · Ctrl+Enter 줄바꿈") · 둥근 ↑ 보내기(수정 중엔 ✓). 프론트 채팅방도 같은 입력칸(＋ 없음).
+  - 색은 우리 앱 색 그대로(메뉴 Venice Blue, 채팅 바탕 `--chat-bg`). 프론트 앱 오른쪽 위 게임·씨앗 버튼은 만들지 않는다.
+  - 관리자 화면(그 팀 관리자만), 용량 관리(최고 관리자만), 팀원 화면(보기 전용 목록)은 그대로.
 - **화면 기본 틀 (공통 기능 2번):**
   - 브라우저 기본 `alert/confirm/prompt`는 쓰지 않는다. `src/ui/dialogs.tsx`의 `ask()`(확인), `askText()`(입력), `tell()`(꼭 읽어야 할 알림), `toast()`(잠깐 뜨는 알림, 오류는 `{ error: true }`)를 쓴다. 창 틀은 `Modal`.
   - 바깥을 눌러 닫기는 휴대폰(터치)만. PC는 바깥 클릭·창 안에서 끌다 바깥에서 놓기로 닫히지 않고 Esc나 버튼으로 닫는다.
@@ -47,7 +51,7 @@
   - 메뉴 묶음: 제목 있는 묶음(지금은 "관리자 전용")은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`). 새 묶음은 `src/menu.tsx`의 `SECTIONS`에 추가.
   - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면(고객). 요청서의 "공지" 탭이 생기면 그것을 첫 화면으로 바꾼다.
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
-  - 앱 버전: 메뉴 왼쪽 아래(`v0.2.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
+  - 앱 버전: 메뉴 맨 아래(`팀 · v0.5.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
   - 입력칸 글자는 16px 이상 (아이폰이 입력칸을 누를 때 화면을 확대하지 않게, `style.css` 끝 `@media (hover: none)` 규칙).
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.
@@ -76,7 +80,7 @@
 - **링크 미리보기와 @멘션 (공통 기능 4-4):**
   - 링크: 보낸 뒤 앱이 서버 함수 `linkPreview`(`functions/src/linkPreview.ts`)를 불러 그 페이지의 og:title·description·image(없으면 <title>)를 읽어 메시지 `link {url, title, desc, image, site}`에 붙인다. 팀원만 부를 수 있고, 같은 주소는 7일 동안 `linkPreviews/{sha1}`(앱 접근 불가)에 저장해 다시 쓴다. 내부망·서버 주소(localhost, 10.x, 192.168.x, 169.254.x 등)와 80/443 외 포트는 읽지 않고(넘겨 주는 주소도 매번 검사), 6초·512KB까지만 읽는다. euc-kr 페이지도 읽는다.
   - @멘션: 입력칸에서 "@"를 치면 직원 목록(맨 위 @모두)이 뜨고 글자로 걸러진다. ↑↓·Enter·Tab·Esc, 휴대폰은 눌러서 고른다. 보낼 때 글 속 "@이름"/"@모두"로 `mentions[uid]`를 만든다(@모두 = 나를 뺀 팀원 전부). 말풍선의 @이름은 색칠, 나를 부른 말은 노란 테두리와 내 이름 노란 칠.
-  - 알림 "○○님이 나를 불렀어요"(`src/useMentionAlerts.ts`): 앱이 열려 있으면 방마다 나를 부른 최신 메시지 1개만 지켜보다가(읽기 절약) 새로 오면 화면 아래 알림, 누르면 그 방으로. 지금 그 방을 보고 있으면 알리지 않는다. PC는 다른 창을 보고 있고 브라우저 알림을 허용해 두었으면 바탕화면 알림도. **앱이 꺼져 있을 때의 푸시 알림은 아직 없다** (알림 기능을 만들 때 FCM으로 붙인다. 갤럭시 앱은 알림 플러그인과 APK 재빌드 필요).
+  - 알림 "○○님이 나를 불렀어요"(`src/useMentionAlerts.ts`): 앱이 열려 있으면 방마다 나를 부른 최신 메시지 1개만 지켜보다가(읽기 절약) 새로 오면 화면 아래 알림, 누르면 그 방으로. 지금 그 방을 보고 있으면 알리지 않는다. PC는 다른 창을 보고 있고 브라우저 알림을 허용해 두었으면 바탕화면 알림도. 앱이 꺼져 있을 때는 아래 "푸시 알림".
   - 색인: `firestore.indexes.json`에 messages `mentions`(배열 포함) + `createdAt` 내림차순.
 - **읽음 표시 (공통 기능 4-5, `src/reads.ts`):**
   - 방마다 `teams/{teamId}/channels/{channelId}/reads/{uid} = {at}`(기본 방은 `channels/main/reads`). 팀원은 모두 읽고, 자기 것만 지금까지의 시각으로 쓴다(규칙). 방을 지우면 `onChannelDeleted`가 같이 지운다.
@@ -97,9 +101,17 @@
   - 읽음 `channels/{방}/reads/{g_uid} = {at: ms}`(맨 아래까지 봤을 때, 3초에 한 번, 방을 나갈 때 남은 것은 바로). 안 읽은 수는 방 목록·메뉴 "프론트 채팅"·☰ 합계.
   - 화면: 메뉴 "🏌️ 프론트 채팅"(탭 `front`, 보던 방 sessionStorage `front-room`) → 초대 코드 입력 → 방 목록(+ 초대 코드) → 방(⋯ 이 방 나가기 = `guestLeave`). PC에서도 방 머리줄 ‹(`.back-button`)으로 목록에 돌아간다.
   - 로그아웃(`logOutAndWipe`)하면 프론트 로그인도 끊는다(`disconnectFront`).
-  - **아직 안 한 것:** 앱이 꺼져 있을 때의 알림(GUEST_LINK 7번 `ydrGuestPush`)은 우리 쪽 푸시(FCM)를 만들 때 붙인다. 프론트 쪽에서 할 일: 관리자 → ⚙️ 타부서 연동 설정에 프로젝트 ID `ysdwcc-s`, 그리고 프론트 프로젝트 IAM(서비스 계정 토큰 생성자).
+  - 알림(GUEST_LINK 7번): 우리 함수 `ydrGuestPush`(아래 "푸시 알림"). 프론트 앱 ⚙️ 타부서 연동 설정에 프로젝트 ID `ysdwcc-s`, 함수 주소, 알림 비밀값(관리자 화면 → 🏌️ 프론트 채팅 알림 연동에서 만듦)을 넣는다. 프론트 프로젝트 IAM(서비스 계정 토큰 생성자)도 필요.
   - 사용량은 프론트 프로젝트의 읽기·쓰기로 잡힌다(우리 무료 사용량과 무관).
   - 테스트: 에뮬레이터에 `demo-ydr` 프로젝트로 프론트 규칙을 올리고, 프론트의 `functions/guest.js`를 그대로 돌려 확인함.
+- **🔔 푸시 알림 (FCM, `src/push.ts`, `functions/src/push.ts`, `public/push-sw.js`):**
+  - 기기마다 `pushTokens/{sha256(token)}` = {uid, token, platform 'web'|'android', mode 'all'|'mentions', updatedAt}. 본인만 만들고 지운다(규칙), 같은 기기(같은 토큰)를 다른 사람이 로그인해 쓰면 그 사람 것으로 바뀐다. 로그아웃하면 지운다.
+  - 켜기: 내 정보 → 🔔 알림(`PushCard`)에서 "모든 새 메시지 / 나를 부른 말만"을 누르면 허용 창 → 토큰 저장. 앱을 열 때 토큰이 바뀌었는지 확인하고 일주일에 한 번 다시 적는다(`refreshPush`). 웹 푸시 공개 키는 비우면 Firebase 기본 키, 바꾸려면 `VITE_FIREBASE_VAPID_KEY`.
+  - 아이폰은 **홈 화면에 추가한 앱**에서만 알림 가능(Safari에서는 안내만). 갤럭시 앱은 아직 안 됨: Firebase 콘솔에 안드로이드 앱(`kr.yangsan.support`)을 추가해 받은 `google-services.json` + 알림 플러그인 + APK 다시 만들기가 필요하다. 그동안 크롬으로 열면 알림 가능.
+  - 서버: `onMessageCreatedPush`/`onChannelMessageCreatedPush`가 새 메시지마다 보낸 사람을 뺀 팀원(사용 중지·팀 제외 빼고)에게 보낸다. 제목 = 방 이름, 내용 = "이름: 글"(사진·파일은 📷/📎). 나를 부른 말은 "🔔 ○○님이 나를 불렀어요 · 방". 'mentions' 기기는 나를 부른 말만. 보낼 수 없는 토큰은 지운다. 읽기: 메시지 1개에 팀 문서·방·팀원 프로필·토큰 정도(10명 팀이면 약 25번).
+  - 웹은 데이터만 보내고 서비스 워커(`push-sw.js`, workbox `importScripts`)가 알림을 그린다. **앱을 보고 있으면 알림을 띄우지 않는다.** 알림을 누르면 열린 앱을 앞으로 가져와 그 방(`/?room=팀:방`, 프론트는 `/?front=방`)을 연다(`listenOpenRequests`).
+  - 🏌️ 프론트 채팅 알림 `ydrGuestPush`(onRequest, 누구나 호출 가능, POST, 머리글 `x-ydr-secret`): 비밀값은 **코드·저장소에 넣지 않고** 최고 관리자가 관리자 화면 → "🏌️ 프론트 채팅 알림 연동"에서 만들고(`setFrontLinkSecret`, 한 번만 보여 줌) 서버 전용 문서 `meta/frontLink.secret`에만 둔다. 함수 주소 `https://us-west1-ysdwcc-s.cloudfunctions.net/ydrGuestPush`. 'mentions' 기기는 프론트 알림도 안 받는다.
+  - 테스트: `tests/push.test.mjs`(보내는 부분을 바꿔 끼워 내용 확인), 규칙 테스트. 실제 FCM 전달은 배포 후 실제 기기로 확인한다.
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문).
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **용량 탭(최고 관리자):** 사진 용량(무료 5GB 대비), 월별 사진 용량, 메시지와 고객 수를 보여 주고, 기간을 정해 채팅과 사진을 한꺼번에 영구 삭제한다 (미리 보기 후 삭제).
@@ -151,6 +163,8 @@ users/{uid}                      name, email, teamIds[], superAdmin, platform, s
                                  active, disabledReason, disabledAt, disabledBy, mustChangePassword, passwordChangedAt
                                  (Functions가 생성, 본인은 name/platform/settings만 수정)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
+pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), updatedAt   (푸시 받을 기기, 본인만)
+meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
 meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)
 linkPreviews/{sha1(url)}         preview, at   (링크 미리보기 7일 저장, 앱에서 접근 불가)

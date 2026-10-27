@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { badgeText } from './reads.ts'
+import { Avatar } from './ui/Avatar.tsx'
 
-// 왼쪽 위 ☰ 버튼으로 여는 메뉴. 기능이 늘어나면 MENU_ITEMS에 추가한다.
+// 왼쪽 메뉴 (휴대폰 ☰ 서랍, PC 왼쪽 고정 메뉴). 프론트 앱과 같은 구조:
+// 내 프로필 → 팀원 → 단체 채팅(+) → 메뉴 → 관리자 전용. 기능이 늘어나면 MENU_ITEMS에 추가한다.
 export type Tab = 'customers' | 'chat' | 'front' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
 
 export type MenuItem = {
@@ -10,30 +12,29 @@ export type MenuItem = {
   label: string
   adminOnly?: boolean
   superAdminOnly?: boolean
-  section: 'main' | 'extra' | 'admin'
+  section: 'main' | 'admin'
 }
 
+// 팀원(팀원 묶음 제목·이름을 누르면)과 내 정보(맨 위 내 이름을 누르면)는 따로 연다.
 export const MENU_ITEMS: MenuItem[] = [
   { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
-  { tab: 'members', icon: '👥', label: '팀원', section: 'main' },
-  { tab: 'profile', icon: '⚙️', label: '내 정보', section: 'main' },
   // 프론트 앱 채팅방에 타부서 게스트로 들어가기 (src/front/)
-  { tab: 'front', icon: '🏌️', label: '프론트 채팅', section: 'extra' },
+  { tab: 'front', icon: '🏌️', label: '프론트 채팅', section: 'main' },
   { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },
   { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
 ]
 
 // 메뉴 묶음. 제목이 있는 묶음은 제목을 눌러 접고 펼 수 있고, 접은 상태는 기기마다 기억한다.
-// (예: 관리자 전용, 앞으로 생길 단체 채팅방 목록)
-const SECTIONS: { id: MenuItem['section'] | 'chat'; title?: string }[] = [
-  { id: 'main' },
+const SECTIONS: { id: MenuItem['section'] | 'members' | 'chat'; title?: string }[] = [
+  { id: 'members', title: '팀원' },
   { id: 'chat', title: '단체 채팅' },
-  { id: 'extra' },
+  { id: 'main' },
   { id: 'admin', title: '관리자 전용' },
 ]
 
 export type ChatRoomItem = { id: string; name: string }
+export type MemberItem = { uid: string; name: string; role: string }
 
 const COLLAPSED_KEY = 'menu-collapsed'
 
@@ -82,6 +83,9 @@ type MenuListProps = {
   superAdmin: boolean
   teamName: string
   userName: string
+  uid: string
+  roleLabel: string
+  members?: MemberItem[] // 나를 뺀 팀원
   onSelect: (tab: Tab) => void
   // 단체 채팅방 (메뉴의 "단체 채팅" 묶음)
   chatRooms?: ChatRoomItem[]
@@ -97,42 +101,42 @@ type MenuListProps = {
 
 // 메뉴 내용: 휴대폰의 ☰ 서랍과 PC의 왼쪽 고정 메뉴가 같이 쓴다.
 function MenuList(props: MenuListProps) {
-  const { current, isAdmin, superAdmin, teamName, userName, onSelect, focusable = true, children } = props
+  const { current, isAdmin, superAdmin, onSelect, focusable = true, children } = props
+  const tabIndex = focusable ? 0 : -1
   const items = MENU_ITEMS.filter((i) => (!i.superAdminOnly || superAdmin) && (!i.adminOnly || isAdmin))
   const { collapsed, toggle } = useCollapsed()
   return (
     <>
-      <div className="drawer-head">
-        <img src="/icons/icon-192.png" alt="" />
-        <div>
-          <strong>양산동원로얄CC 지원팀</strong>
-          <span className="muted small">
-            {teamName} · <span className="me-name">{userName}</span>
+      {/* 내 프로필: 누르면 내 정보 */}
+      <button
+        type="button"
+        className={current === 'profile' ? 'menu-profile active' : 'menu-profile'}
+        onClick={() => onSelect('profile')}
+        tabIndex={tabIndex}
+        aria-label="내 정보"
+      >
+        <Avatar uid={props.uid} name={props.userName || '나'} />
+        <span className="menu-profile-text">
+          <strong className="me-name">{props.userName || '이름 없음'}</strong>
+          <span className="small">
+            {props.roleLabel} · 내 정보 <span aria-hidden="true">✏️</span>
           </span>
-        </div>
-      </div>
+        </span>
+      </button>
       {children}
       {SECTIONS.map(({ id, title }) => {
-        if (id === 'chat') return <ChatRoomsSection key={id} {...props} title={title!} closed={collapsed.includes(id)} onToggle={() => toggle(id)} />
+        const closed = Boolean(title) && collapsed.includes(id)
+        if (id === 'members') return <MembersSection key={id} {...props} closed={closed} onToggle={() => toggle(id)} />
+        if (id === 'chat') return <ChatRoomsSection key={id} {...props} title={title!} closed={closed} onToggle={() => toggle(id)} />
         const list = items.filter((i) => i.section === id)
         if (list.length === 0) return null
         // 지금 보고 있는 화면이 든 묶음은 접혀 있어도 그 항목만은 보인다.
-        const closed = Boolean(title) && collapsed.includes(id)
         const shown = closed ? list.filter((i) => i.tab === current) : list
         return (
           <ul key={id} className="drawer-list">
             {title && (
               <li>
-                <button
-                  type="button"
-                  className="drawer-label"
-                  aria-expanded={!closed}
-                  onClick={() => toggle(id)}
-                  tabIndex={focusable ? 0 : -1}
-                >
-                  {title}
-                  <span aria-hidden="true">{closed ? '▸' : '▾'}</span>
-                </button>
+                <SectionLabel title={title} closed={closed} onToggle={() => toggle(id)} tabIndex={tabIndex} />
               </li>
             )}
             {shown.map((item) => (
@@ -142,7 +146,7 @@ function MenuList(props: MenuListProps) {
                   className={item.tab === current ? 'drawer-item active' : 'drawer-item'}
                   aria-current={item.tab === current ? 'page' : undefined}
                   onClick={() => onSelect(item.tab)}
-                  tabIndex={focusable ? 0 : -1}
+                  tabIndex={tabIndex}
                 >
                   <span aria-hidden="true">{item.icon}</span>
                   {item.label}
@@ -153,8 +157,62 @@ function MenuList(props: MenuListProps) {
           </ul>
         )
       })}
-      <p className="app-version">v{__APP_VERSION__}</p>
+      <p className="app-version">
+        <strong className="app-name">양산동원로얄CC 지원팀</strong>
+        {props.teamName} · v{__APP_VERSION__}
+      </p>
     </>
+  )
+}
+
+function SectionLabel(props: { title: string; closed: boolean; onToggle: () => void; tabIndex: number; extra?: ReactNode }) {
+  return (
+    <div className="drawer-label-row">
+      <button type="button" className="drawer-label" aria-expanded={!props.closed} onClick={props.onToggle} tabIndex={props.tabIndex}>
+        <span aria-hidden="true" className="caret">
+          {props.closed ? '▸' : '▾'}
+        </span>
+        {props.title}
+      </button>
+      {props.extra}
+    </div>
+  )
+}
+
+// 팀원: 이름과 권한. 누르면 팀원 화면.
+function MembersSection(props: MenuListProps & { closed: boolean; onToggle: () => void }) {
+  const { members = [], closed, onToggle, onSelect, focusable = true } = props
+  const tabIndex = focusable ? 0 : -1
+  return (
+    <ul className="drawer-list members-list">
+      <li>
+        <SectionLabel title="팀원" closed={closed} onToggle={onToggle} tabIndex={tabIndex} />
+      </li>
+      {!closed &&
+        members.map((m) => (
+          <li key={m.uid}>
+            <button
+              type="button"
+              className={props.current === 'members' ? 'drawer-member active' : 'drawer-member'}
+              onClick={() => onSelect('members')}
+              tabIndex={tabIndex}
+            >
+              <Avatar uid={m.uid} name={m.name} />
+              <span className="menu-profile-text">
+                <strong>{m.name}</strong>
+                <span className="small">{m.role}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      {!closed && members.length === 0 && (
+        <li>
+          <button type="button" className="drawer-member" onClick={() => onSelect('members')} tabIndex={tabIndex}>
+            <span className="small muted">아직 다른 팀원이 없어요</span>
+          </button>
+        </li>
+      )}
+    </ul>
   )
 }
 
@@ -168,11 +226,22 @@ function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolea
   return (
     <ul className="drawer-list">
       <li>
-        <button type="button" className="drawer-label" aria-expanded={!closed} onClick={onToggle} tabIndex={tabIndex}>
-          {title}
-          {hidden > 0 && <span className="badge">{badgeText(hidden)}</span>}
-          <span aria-hidden="true">{closed ? '▸' : '▾'}</span>
-        </button>
+        <SectionLabel
+          title={title}
+          closed={closed}
+          onToggle={onToggle}
+          tabIndex={tabIndex}
+          extra={
+            <>
+              {hidden > 0 && <span className="badge">{badgeText(hidden)}</span>}
+              {onCreateRoom && (
+                <button type="button" className="ghost section-add" onClick={onCreateRoom} tabIndex={tabIndex} aria-label="새 채팅방" title="새 채팅방">
+                  ＋
+                </button>
+              )}
+            </>
+          }
+        />
       </li>
       {shown.map((room) => (
         <li key={room.id}>
@@ -193,20 +262,13 @@ function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolea
           </button>
         </li>
       ))}
-      {!closed && onCreateRoom && (
-        <li>
-          <button type="button" className="drawer-item add" onClick={onCreateRoom} tabIndex={tabIndex}>
-            <span aria-hidden="true">＋</span>새 채팅방
-          </button>
-        </li>
-      )}
     </ul>
   )
 }
 
-type DrawerProps = Omit<MenuListProps, 'focusable' | 'children'> & { open: boolean; onClose: () => void }
+type DrawerProps = Omit<MenuListProps, 'focusable'> & { open: boolean; onClose: () => void }
 
-export function MenuDrawer({ open, onClose, onSelect, onSelectRoom, onCreateRoom, ...rest }: DrawerProps) {
+export function MenuDrawer({ open, onClose, onSelect, onSelectRoom, onCreateRoom, children, ...rest }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -239,7 +301,9 @@ export function MenuDrawer({ open, onClose, onSelect, onSelectRoom, onCreateRoom
               onCreateRoom()
             })
           }
-        />
+        >
+          {children}
+        </MenuList>
       </nav>
     </div>
   )

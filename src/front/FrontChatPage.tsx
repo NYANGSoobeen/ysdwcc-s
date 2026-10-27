@@ -4,7 +4,8 @@ import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
-import { Avatar, copyText, fileIcon, photoCols } from '../pages/ChatPage.tsx'
+import { copyText, EmojiButton, fileIcon, photoCols } from '../pages/ChatPage.tsx'
+import { Avatar } from '../ui/Avatar.tsx'
 import { badgeText } from '../reads.ts'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
@@ -637,6 +638,18 @@ function FrontComposer(props: {
         </div>
       )}
       <div className="composer-row">
+        <EmojiButton
+          onPick={(emoji) => {
+            const el = textarea.current
+            const a = el?.selectionStart ?? body.length
+            const b = el?.selectionEnd ?? body.length
+            setBody(body.slice(0, a) + emoji + body.slice(b))
+            requestAnimationFrame(() => {
+              el?.focus()
+              el?.setSelectionRange(a + emoji.length, a + emoji.length)
+            })
+          }}
+        />
         <textarea
           ref={textarea}
           value={body}
@@ -655,12 +668,18 @@ function FrontComposer(props: {
             }
             void send()
           }}
-          placeholder="프론트 채팅방에 메시지 입력"
+          placeholder={isTouchUi() ? '메시지 입력...' : '메시지 입력... (Enter 전송 · Ctrl+Enter 줄바꿈)'}
           rows={1}
           enterKeyHint={isTouchUi() ? 'enter' : 'send'}
         />
-        <button className="primary" disabled={!body.trim()} onPointerDown={(e) => e.preventDefault()}>
-          {editing ? '수정' : '보내기'}
+        <button
+          className="send-button"
+          aria-label={editing ? '수정' : '보내기'}
+          title={editing ? '수정' : '보내기'}
+          disabled={!body.trim()}
+          onPointerDown={(e) => e.preventDefault()}
+        >
+          {editing ? '✓' : '↑'}
         </button>
       </div>
     </form>
