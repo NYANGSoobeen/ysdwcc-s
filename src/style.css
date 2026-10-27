@@ -276,11 +276,16 @@ h3 {
 
 /* ── 로그인 ── */
 .login {
+  box-sizing: border-box;
   max-width: 420px;
+  /* 화면 가로·세로 가운데 (내용이 화면보다 길면 위에서부터 스크롤) */
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: calc(48px + var(--safe-area-inset-top, env(safe-area-inset-top))) 16px 32px;
+  padding: calc(24px + var(--safe-area-inset-top, env(safe-area-inset-top))) 16px
+    calc(24px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 20px;
 }
 
@@ -3141,4 +3146,121 @@ html.keyboard-open .chat-hint {
   margin: 0;
   padding: 4px 10px 6px;
   font-size: 10.5px;
+}
+
+/* ── 로그인 화면: 프론트 앱과 같은 모양 (가운데 카드), 색은 우리 앱 색 ── */
+.login-screen {
+  max-width: none;
+  background: linear-gradient(170deg, #fbf8f1 0%, var(--merino) 45%, #d6e4ec 100%);
+  align-items: center;
+}
+.login-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 360px;
+  padding: 32px 22px 24px;
+  border: 1px solid rgb(22 88 123 / 0.12);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgb(22 88 123 / 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.login-card .login-brand {
+  gap: 6px;
+}
+.login-logo {
+  font-size: 44px;
+  line-height: 1.1;
+}
+.login-card h1 {
+  margin: 4px 0 0;
+  color: var(--accent);
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 700;
+}
+.login-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.login-form input:not([type='checkbox']) {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+}
+.login-form input:not([type='checkbox']):focus {
+  outline: none;
+  border-color: var(--rock);
+  box-shadow: 0 0 0 3px rgb(132 179 206 / 0.3);
+}
+.login-checks {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 13.5px;
+}
+.login-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.5;
+}
+.login-submit {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.login-foot {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+.login-card .form {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .login-screen {
+    background: linear-gradient(170deg, #0b1e2a 0%, #0f2433 60%, #16384d 100%);
+  }
+}
+.login-checks .check {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text);
+  cursor: pointer;
+}
+.login-checks input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+/* 스티커 글자: line-height 1 상자, 위아래 위치는 StickerLayer가 글자 모양을 재서 맞춘다 */
+.sticker-text {
+  display: block;
+  line-height: 1;
 }

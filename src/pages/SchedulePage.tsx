@@ -143,6 +143,8 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
       return
     }
     const bitmap = await createImageBitmap(loaded.blob)
+    // 스티커 글꼴을 받은 뒤에 그려야 글자 위치가 맞는다.
+    await document.fonts?.load("800 40px 'Noto Sans KR'", 'B0휴').catch(() => {})
     const canvas = document.createElement('canvas')
     canvas.width = bitmap.width
     canvas.height = bitmap.height

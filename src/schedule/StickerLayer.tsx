@@ -1,6 +1,6 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import type { SchedulePage as Page } from './data.ts'
-import { STICKER_STYLE, stickerBox, stickerDef, type Mark } from './stickers.ts'
+import { inkOffsetEm, STICKER_FONT, STICKER_STYLE, stickerBox, stickerDef, type Mark } from './stickers.ts'
 
 export function stickerColors(kind: 'work' | 'off'): CSSProperties {
   const s = STICKER_STYLE[kind]
@@ -15,6 +15,15 @@ export function StickerLayer(props: {
   onMarkTap?: (mark: Mark) => void
 }) {
   const { page, marks, pending = [], onMarkTap } = props
+  // 글꼴을 다 받으면 한 번 다시 그려 글자 위치를 새 글꼴로 맞춘다.
+  const [, setFontsReady] = useState(false)
+  useEffect(() => {
+    let alive = true
+    document.fonts?.load("800 40px 'Noto Sans KR'", 'B0휴').then(() => alive && setFontsReady(true), () => {})
+    return () => {
+      alive = false
+    }
+  }, [])
   return (
     <>
       {marks.map((m, i) => {
@@ -40,7 +49,9 @@ export function StickerLayer(props: {
             }}
             aria-label={`스티커 ${m.t}`}
           >
-            {m.t}
+            <span className="sticker-text" style={{ fontFamily: STICKER_FONT, transform: `translateY(${inkOffsetEm(m.t)}em)` }}>
+              {m.t}
+            </span>
           </button>
         )
       })}

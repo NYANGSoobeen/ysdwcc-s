@@ -57,10 +57,12 @@ export function drawSticker(ctx: CanvasRenderingContext2D, mark: Mark, W: number
   ctx.strokeStyle = style.stroke
   ctx.stroke()
   ctx.fillStyle = style.text
-  ctx.font = `800 ${font}px Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif`
+  ctx.font = `800 ${font}px ${STICKER_FONT}`
   ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(mark.t, cx, cy + font * 0.04)
+  ctx.textBaseline = 'alphabetic'
+  // 글자 모양(잉크)의 위아래 가운데가 상자 가운데에 오게
+  const ink = ctx.measureText(mark.t)
+  ctx.fillText(mark.t, cx, cy + (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2)
   ctx.restore()
 }
 
@@ -71,4 +73,28 @@ export function sameCell(a: Mark, b: Mark) {
   if (!box) return Math.abs(a.x - b.x) < 0.004 && Math.abs(a.y - b.y) < 0.004
   const other = box === b ? a : b
   return Math.abs(other.x - box.x) <= box.w! / 2 && Math.abs(other.y - box.y) <= box.h! / 2
+}
+
+// 스티커 글꼴 (화면과 크게 보기 PNG가 같은 글꼴을 쓴다)
+export const STICKER_FONT = `'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif`
+
+// 화면 스티커 글자를 위아래 가운데로: 한글 글꼴은 글자 위·아래 여백이 달라 그냥 가운데 맞춤하면 아래로 쏠려 보인다.
+// 그 글자의 실제 모양(잉크)을 재서, line-height 1 상자 안에서 얼마나 옮기면 정가운데인지(글자 크기 대비 비율) 돌려준다.
+const offsets = new Map<string, number>()
+export function inkOffsetEm(text: string) {
+  const hit = offsets.get(text)
+  if (hit !== undefined) return hit
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (!ctx) return 0
+  const size = 100
+  ctx.font = `800 ${size}px ${STICKER_FONT}`
+  const m = ctx.measureText(text)
+  if (!m.fontBoundingBoxAscent) return 0
+  // line-height: 1 상자에서 기준선 위치(위에서부터) = (1em - (글꼴 위+아래)) / 2 + 글꼴 위
+  const baseline = (size - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent
+  const inkCenter = baseline - (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2
+  const dy = (size / 2 - inkCenter) / size
+  // 글꼴을 다 받은 뒤의 값만 기억한다 (받기 전 대체 글꼴 값은 다음에 다시 잰다)
+  if (document.fonts?.check(`800 ${size}px 'Noto Sans KR'`)) offsets.set(text, dy)
+  return dy
 }

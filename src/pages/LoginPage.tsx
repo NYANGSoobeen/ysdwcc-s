@@ -16,13 +16,19 @@ export function LoginPage() {
   }, [])
 
   return (
-    <main className="login">
-      <div className="login-brand">
-        <img src="/icons/icon-192.png" alt="" />
-        <h1>양산동원로얄CC 지원팀</h1>
+    // 프론트 앱과 같은 모양: 가운데 카드(⛳ · 이름 · 안내 · 입력칸 · 로그인), 색만 우리 앱 색
+    <main className="login login-screen">
+      <div className="login-card">
+        <div className="login-brand">
+          <span className="login-logo" aria-hidden="true">
+            ⛳
+          </span>
+          <h1>양산동원로얄CC 지원팀</h1>
+          <p className="login-sub">{needsSetup ? '처음 시작하기: 첫 관리자와 팀을 만들어요' : '관리자가 등록한 직원만 로그인할 수 있어요'}</p>
+        </div>
+        {notice && <p className="notice">{notice}</p>}
+        {needsSetup ? <SetupForm /> : <LoginForm />}
       </div>
-      {notice && <p className="notice">{notice}</p>}
-      {needsSetup ? <SetupForm /> : <LoginForm />}
     </main>
   )
 }
@@ -69,30 +75,28 @@ function LoginForm() {
   }
 
   return (
-    <form className="card form" onSubmit={submit}>
-      <label>
-        아이디
-        <input
-          value={loginId}
-          onChange={(e) => setLoginId(e.target.value)}
-          autoComplete="username"
-          autoCapitalize="none"
-          autoFocus={!loginId}
-          required
-        />
-      </label>
-      <label>
-        비밀번호
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          autoFocus={Boolean(loginId)}
-          required
-        />
-      </label>
-      <div className="checks">
+    <form className="login-form" onSubmit={submit}>
+      <input
+        aria-label="아이디"
+        placeholder="아이디"
+        value={loginId}
+        onChange={(e) => setLoginId(e.target.value)}
+        autoComplete="username"
+        autoCapitalize="none"
+        autoFocus={!loginId}
+        required
+      />
+      <input
+        aria-label="비밀번호"
+        placeholder="비밀번호"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        autoComplete="current-password"
+        autoFocus={Boolean(loginId)}
+        required
+      />
+      <div className="login-checks">
         {!isNativeApp && (
           <label className="check">
             <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
@@ -105,17 +109,18 @@ function LoginForm() {
         </label>
       </div>
       {!isNativeApp && (
-        <p className="rule-check muted">
+        <p className="login-hint">
+          <span aria-hidden="true">🔒</span>{' '}
           {keep
-            ? '로그아웃할 때까지 로그인이 유지됩니다. 여러 사람이 쓰는 컴퓨터에서는 끄세요.'
-            : '브라우저를 닫거나 15분 넘게 앱을 닫아 두면 자동으로 로그아웃됩니다.'}
+            ? '로그아웃할 때까지 로그인이 유지돼요. 여러 사람이 쓰는 컴퓨터에서는 꺼 주세요.'
+            : '브라우저를 닫거나 15분 넘게 앱을 닫아 두면 자동으로 로그아웃돼요.'}
         </p>
       )}
       {error && <p className="error">{error}</p>}
-      <button className="primary" disabled={busy}>
+      <button className="primary login-submit" disabled={busy}>
         {busy ? '로그인 중…' : '로그인'}
       </button>
-      <p className="muted small">계정은 팀 관리자가 만들어 줍니다. 비밀번호를 잊으면 관리자에게 초기화를 요청하세요.</p>
+      <p className="login-foot">아이디나 비밀번호를 잊었다면 관리자에게 초기화를 요청하세요.</p>
     </form>
   )
 }
