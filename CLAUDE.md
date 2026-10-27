@@ -226,6 +226,6 @@ teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], cu
 - Cloud Shell은 파일을 한 번에 많이 올리면 12개쯤에서 끊긴다 (실제로 겪음). 그래서 배포 파일 수를 적게 유지한다: pdf.js 한글 글꼴 정보(cMap, 약 170개)는 사이트에 넣지 않고 jsDelivr CDN에서 받는다 (`src/schedule/data.ts`의 `PDFJS_CDN`). 끊기면 같은 명령을 다시 실행하면 이어서 올라간다.
 - Firebase 웹 설정은 `.env.production`, 프로젝트 연결은 `.firebaserc`에 커밋되어 있다 (공개 값). 따로 복사할 필요 없음.
 - 연락처 구독은 배포 후 실제 폰으로 한 번 확인한다 (테스트는 tsdav 클라이언트로만 함). 함수 주소가 다르면 `VITE_CARDDAV_URL`에 적는다.
-- 앱에서 부르는 함수(onCall)는 처음 만들어질 때만 "누구나 호출 가능"으로 설정되고 이후 배포로는 고쳐지지 않는다. 첫 배포에서 이 설정이 실패해 403이 나면 그 함수를 `firebase functions:delete`로 지우고 다시 배포한다.
+- 앱에서 부르는 함수(onCall)는 처음 만들어질 때만 "누구나 호출 가능"으로 설정되고 이후 배포로는 고쳐지지 않는다(onCall에는 `invoker` 옵션도 안 먹음). 이 설정이 실패하면 앱 콘솔에 CORS 오류(실제로는 403)가 난다(2026-10 새 함수 6개에서 실제로 겪음). 그래서 `scripts/deploy.mjs`가 배포 뒤 onCall 함수를 모두 밖에서 두드려 보고 403이면 `gcloud run services add-iam-policy-binding <함수이름 소문자> --region=us-west1 --project=ysdwcc-s --member=allUsers --role=roles/run.invoker`로 고친다(gcloud가 없으면 명령을 출력).
 - 안드로이드 빌드 환경: JDK 21, Android SDK(platform 36, build-tools 36), `android/local.properties`에 `sdk.dir`. 이 클라우드 환경에는 KVM이 없어 에뮬레이터로 실행 확인을 못 하므로, 연락처 기능은 실제 갤럭시로 확인한다.
 - 배포 전 콘솔 설정: Authentication → 이메일/비밀번호 사용, 사용자 가입(create) 끄기. 예산 알림 설정.
