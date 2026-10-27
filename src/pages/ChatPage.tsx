@@ -19,6 +19,7 @@ import {
   REACTIONS,
   renameChannel,
   replyPreview,
+  sendLinkMessage,
   sendMessage,
   setReaction,
   type Channel,
@@ -32,6 +33,7 @@ import { useMemberProfiles, type Team } from '../hooks.ts'
 import { useMessages, type Message } from '../useMessages.ts'
 import { badgeText, markRead, unreadBy, useRoomReads } from '../reads.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
+import { WebSearchPanel, webQueryOf } from './WebSearchPanel.tsx'
 import { MenuButton } from '../menu.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
@@ -867,6 +869,11 @@ function Composer(props: {
   const fileInput = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const previews = usePreviews(photos)
+  // 🔎 #검색: "#검색어"를 치면 입력칸 위에 검색 결과 (닫으면 글을 바꿀 때까지 안 뜬다)
+  const [searchClosedFor, setSearchClosedFor] = useState<string | null>(null)
+  const [searchNow, setSearchNow] = useState(0)
+  const webQuery = !editing && photos.length === 0 && files.length === 0 ? webQueryOf(body) : null
+  const webOpen = webQuery !== null && searchClosedFor !== body
 
   // @멘션: "@"를 치면 직원 목록(맨 위 @모두)을 띄우고, 고르면 "@이름 "을 넣는다.
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
@@ -978,7 +985,9 @@ function Composer(props: {
   }
 
   // 보내기: 입력칸을 바로 비우고(키보드는 그대로 열어 둠) 뒤에서 보낸다. 실패하면 글을 되돌린다.
-  async function send() {
+  async function send(raw = false) {
+    // "#검색어"를 쓰는 중이면 보내지 않고 바로 검색한다 ("# 그대로 보내기"는 글자 그대로).
+    if (webOpen && !raw) return setSearchNow((n) => n + 1)
     const text = body.trim()
     const pics = photos
     const attach = files
@@ -1080,6 +1089,23 @@ function Composer(props: {
             ✕
           </button>
         </div>
+      )}
+      {webOpen && (
+        <WebSearchPanel
+          query={webQuery}
+          runNow={searchNow}
+          onClose={() => setSearchClosedFor(body)}
+          onRaw={() => void send(true)}
+          onPick={(r) => {
+            const reply = replyTo
+            setBody('')
+            onSent()
+            sendLinkMessage(teamId, channelId, { url: r.url, title: r.title, desc: r.desc, image: r.image, site: r.site }, reply).catch((err) => {
+              setBody((now) => now || body)
+              toast(errorMessage(err), { error: true })
+            })
+          }}
+        />
       )}
       {mention && candidates.length > 0 && (
         <ul className="mention-list" role="listbox" aria-label="부를 사람">

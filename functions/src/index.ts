@@ -9,6 +9,7 @@ import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
 import { notifyChatMessage, notifyFront } from './push.js'
+import { kakaoSearch, SearchError, type SearchKind } from './search.js'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 
 // Firestore와 같은 리전. 무료 사용량을 넘지 않도록 동시 실행 수를 제한한다.
@@ -722,4 +723,51 @@ export const setFrontLinkSecret = onCall(async (req) => {
   const secret = given || randomBytes(24).toString('base64url')
   await getFirestore().doc('meta/frontLink').set({ secret, updatedAt: FieldValue.serverTimestamp(), updatedBy: uid })
   return { secret }
+})
+
+// ── 🔎 채팅 #검색 (카카오 검색 API) ──────────────────────────
+// 팀원만 부를 수 있다. 키는 최고 관리자가 관리자 화면에서 넣고 서버 전용 문서(meta/kakaoSearch)에만 있다.
+export const webSearch = onCall({ timeoutSeconds: 20 }, async (req) => {
+  const uid = requireUid(req)
+  const db = getFirestore()
+  const user = await db.doc(`users/${uid}`).get()
+  if (!user.exists || user.get('active') === false || !((user.get('teamIds') ?? []) as string[]).length) {
+    throw new HttpsError('permission-denied', '팀원만 쓸 수 있습니다.')
+  }
+  const q = text(req.data?.q, '검색어', 100)
+  const kind: SearchKind = ['web', 'image', 'vclip'].includes(req.data?.kind) ? req.data.kind : 'web'
+  const key = String((await db.doc('meta/kakaoSearch').get()).get('key') ?? '')
+  if (!key) throw new HttpsError('failed-precondition', '검색 키가 아직 없어요. 최고 관리자가 관리자 화면 → 🔎 채팅 #검색에서 넣어 주세요.')
+  try {
+    return { results: await kakaoSearch(key, q, kind) }
+  } catch (err) {
+    if (err instanceof SearchError) throw new HttpsError(err.status === 429 ? 'resource-exhausted' : 'unavailable', err.message)
+    throw err
+  }
+})
+
+export const searchKeyInfo = onCall(async (req) => {
+  await requireSuperAdmin(req)
+  const snap = await getFirestore().doc('meta/kakaoSearch').get()
+  return { configured: Boolean(snap.get('key')), updatedAt: snap.get('updatedAt')?.toMillis?.() ?? null }
+})
+
+// 키를 넣을 때 한 번 검색해 보아 맞는 키인지 확인한다. 빈 값이면 키를 지운다.
+export const setSearchKey = onCall({ timeoutSeconds: 20 }, async (req) => {
+  const uid = await requireSuperAdmin(req)
+  const key = typeof req.data?.key === 'string' ? req.data.key.trim() : ''
+  const ref = getFirestore().doc('meta/kakaoSearch')
+  if (!key) {
+    await ref.delete()
+    return { ok: true }
+  }
+  if (key.length > 200 || /\s/.test(key)) throw new HttpsError('invalid-argument', '키 모양이 올바르지 않아요.')
+  try {
+    await kakaoSearch(key, '양산', 'web')
+  } catch (err) {
+    if (err instanceof SearchError) throw new HttpsError('invalid-argument', err.message)
+    throw err
+  }
+  await ref.set({ key, updatedAt: FieldValue.serverTimestamp(), updatedBy: uid })
+  return { ok: true }
 })

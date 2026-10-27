@@ -22,6 +22,9 @@ export type Usage = {
 
 export type LinkPreview = { url: string; title: string; desc: string; image: string; site: string }
 
+export type SearchKind = 'web' | 'image' | 'vclip'
+export type SearchResult = { title: string; url: string; desc: string; image: string; site: string }
+
 export type RangeResult = { messages: number; photos: number; bytes: number }
 
 function call<Req, Res>(name: string) {
@@ -53,6 +56,9 @@ export const api = {
     'setMemberActive',
   ),
   linkPreview: call<{ url: string }, LinkPreview | null>('linkPreview'),
+  webSearch: call<{ q: string; kind: SearchKind }, { results: SearchResult[] }>('webSearch'),
+  searchKeyInfo: call<void, { configured: boolean; updatedAt: number | null }>('searchKeyInfo'),
+  setSearchKey: call<{ key: string }, { ok: true }>('setSearchKey'),
   frontLinkInfo: call<void, { configured: boolean; updatedAt: number | null }>('frontLinkInfo'),
   setFrontLinkSecret: call<{ secret?: string }, { secret: string }>('setFrontLinkSecret'),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),

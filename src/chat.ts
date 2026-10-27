@@ -199,6 +199,25 @@ export async function sendMessage(
 }
 
 // 링크 미리보기: 보낸 뒤 서버가 읽어 온 제목·설명·사진을 메시지에 붙인다.
+// 🔎 #검색 결과 하나를 카드로 보낸다 (글 없이 link만, 답장 중이면 답장으로).
+export async function sendLinkMessage(teamId: string, channelId: string, link: LinkPreview, replyTo: ReplyTo | null = null) {
+  const messageRef = doc(messagesRef(teamId, channelId))
+  await setDoc(messageRef, {
+    authorUid: auth.currentUser!.uid,
+    body: '',
+    mentions: [],
+    customerTags: [],
+    replyTo,
+    attachments: [],
+    files: [],
+    link,
+    hasPhotos: false,
+    createdAt: serverTimestamp(),
+    editedAt: null,
+  })
+  return messageRef.id
+}
+
 export async function attachLinkPreview(teamId: string, channelId: string, messageId: string, url: string) {
   const preview = await api.linkPreview({ url }).catch(() => null)
   if (preview) await updateDoc(doc(messagesRef(teamId, channelId), messageId), { link: preview }).catch(() => {})

@@ -99,6 +99,8 @@ export function previewOf(m: Record<string, unknown>) {
   if (photos) return photos > 1 ? `📷 사진 ${photos}장` : '📷 사진'
   const files = Array.isArray(m.files) ? (m.files as { name?: string }[]) : []
   if (files.length) return `📎 ${files[0].name ?? '파일'}${files.length > 1 ? ` 외 ${files.length - 1}개` : ''}`
+  const link = m.link as { title?: string; url?: string } | undefined
+  if (link?.url) return short(`🔎 ${link.title || link.url}`, 100)
   return '새 메시지'
 }
 

@@ -95,6 +95,11 @@
   - 찾은 말(답장 원문 이동 포함)은 **4초(`PIN_MS`) 동안 가운데에 고정**한다. 키보드가 닫히거나 사진이 늦게 떠 높이가 바뀌어도, 이전 메시지가 앞에 붙어도 그 말을 다시 가운데로. 휠·손가락으로 밀기·마우스 누르기·키보드로 직접 움직이면 바로 푼다 (휴대폰에서 대화 영역을 눌러 키보드를 닫는 건 풀지 않음).
   - 찾은 말이 불러온 것 중 맨 앞이면 가운데에 오도록 위로 50개를 더 불러 둔다. 검색을 지우면 맨 아래(최신).
   - `useMessages`의 `loadOlder(n)`은 이미 불러오는 중이면 끝난 뒤 이어서 불러온다 (검색·답장 원문·스크롤이 겹쳐도 빠짐없이).
+- **🔎 채팅 #검색 (`src/pages/WebSearchPanel.tsx`, `functions/src/search.ts`, 프론트 앱과 같은 방식):**
+  - 입력칸에 "#검색어"를 치면 입력칸 위에 다음(Daum) 검색 결과(웹·이미지·동영상 탭). 0.9초 멈추거나 Enter·↑를 누르면 검색(검색어를 쓰는 중엔 보내지 않음). 결과를 누르면 글 없이 `link` 카드 메시지로 보낸다(`sendLinkMessage`, 답장 중이면 답장). "# 그대로 보내기"는 글자 그대로, ✕로 닫으면 그 글은 다시 검색 안 함. 사진·파일을 고른 중이나 수정 중엔 안 뜬다. 같은 검색은 화면에서 다시 묻지 않는다.
+  - 서버 함수 `webSearch`(팀원만, 사용 중지 제외)가 카카오 검색 API(`dapi.kakao.com/v2/search/{web|image|vclip}`)를 부른다. 결과는 http(s) 주소만, 태그 지움. 무료 사용량 안(하루 횟수는 카카오 앱 기준, 프론트와 같은 키를 쓰면 같이 씀).
+  - **카카오 REST API 키는 코드·저장소에 넣지 않는다:** 최고 관리자가 관리자 화면 → "🔎 채팅 #검색" 카드에서 넣으면 한 번 검색해 맞는 키인지 확인하고 서버 전용 문서 `meta/kakaoSearch.key`에만 둔다(`setSearchKey`, 빈 값이면 지움, `searchKeyInfo`는 설정 여부만). 키 받는 곳: developers.kakao.com → 앱 만들기 → 앱 키의 REST API 키.
+  - 푸시 알림 내용은 "🔎 제목". 테스트: `tests/search.test.mjs`(가짜 카카오 서버, `KAKAO_API_BASE`로 바꿈).
 - **🏌️ 프론트 채팅 (프론트 앱 채팅방에 타부서 게스트로, `src/front/`):** 요구사항은 프론트 저장소(`ysdwcc-f`)의 `GUEST_LINK.md`. 프론트 저장소는 읽기만 하고 고치지 않는다.
   - 프론트 Firebase(`ysdwcc-f`)에 이름 붙인 두 번째 앱 `'ydr'`로 접속(`src/front/ydr.ts`, 웹 설정은 공개 값). 프론트 데이터는 메모리 캐시만(기기에 안 남김), 로그인 유지를 끈 컴퓨터는 프론트 로그인도 세션 저장.
   - 입장: 우리 ID 토큰 + 초대 코드(6자리) → 프론트 함수 `guestAuth`(us-west1) → 커스텀 토큰으로 프론트에 로그인(아이디 `g_{우리 uid}`). **한 번 들어가면 내보내지거나 나가기 전까지 코드 없이 계속 쓴다:** 앱을 열 때마다 `{ idToken }`만으로 다시 로그인한다. 들어간 사실은 계정(`users/{uid}.settings.frontChat`, 다시 로그인·다른 기기용)과 기기(localStorage `front-chat`)에 기억하고, 둘 다 없어도 프론트 채팅 화면을 열면 로그인당 한 번 코드 없이 연결해 본다(`tryResume`). 로그아웃은 계정 기억을 남기고, 초대받은 방이 없어지면(permission-denied, 방 0개) 계정 기억도 지운다.
@@ -167,6 +172,7 @@ users/{uid}                      name, email, teamIds[], superAdmin, platform, s
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
 pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
+meta/kakaoSearch                 key, updatedAt, updatedBy   (채팅 #검색 카카오 키, 앱에서 접근 불가)
 meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)
 linkPreviews/{sha1(url)}         preview, at   (링크 미리보기 7일 저장, 앱에서 접근 불가)

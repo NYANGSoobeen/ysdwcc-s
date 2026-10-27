@@ -3039,3 +3039,106 @@ html.keyboard-open .chat-hint {
   font-size: 12.5px;
   opacity: 0.9;
 }
+
+/* 🔎 채팅 #검색 결과 (입력칸 위) */
+.web-search {
+  display: flex;
+  flex-direction: column;
+  max-height: min(46vh, 380px);
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.web-search-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.web-search-tabs > button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.web-search-tabs > button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.web-search-tabs .spacer {
+  flex: 1;
+}
+.web-search-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.web-search-body > p {
+  margin: 8px;
+}
+.web-search-body.images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-content: start;
+}
+.web-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  font-weight: 400;
+}
+.web-result:hover {
+  background: var(--bg);
+}
+.web-result img {
+  width: 72px;
+  height: 54px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.images .web-result {
+  padding: 2px;
+}
+.images .web-result img {
+  width: 100%;
+  height: 96px;
+}
+.web-result-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+}
+.web-result-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-result-text .link-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--muted);
+}
+.web-search-foot {
+  margin: 0;
+  padding: 4px 10px 6px;
+  font-size: 10.5px;
+}
