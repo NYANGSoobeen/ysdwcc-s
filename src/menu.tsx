@@ -261,7 +261,7 @@ function ChatRoomsSection(props: MenuListProps & { title: string; closed: boolea
             tabIndex={tabIndex}
             title={room.front ? '프론트 앱 채팅방 (타부서로 참여)' : undefined}
           >
-            <span aria-hidden="true">{room.front ? '🏌️' : '💬'}</span>
+            <span aria-hidden="true">💬</span>
             {room.name}
             {room.count > 0 && (
               <span className="badge" aria-label={`안 읽은 메시지 ${room.count}개`}>

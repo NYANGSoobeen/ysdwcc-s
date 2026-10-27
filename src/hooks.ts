@@ -12,7 +12,7 @@ export type Profile = {
   active?: boolean // false면 관리자가 사용 중지한 계정
   disabledReason?: string
   mustChangePassword?: boolean // 임시 비밀번호(새 계정, 초기화) → 처음 로그인하면 바꾼다
-  settings?: { frontChat?: boolean } // frontChat: 프론트 채팅에 들어가 있음 (다른 기기·다시 로그인해도 코드 없이 연결)
+  settings?: { frontChat?: boolean; team?: string } // team: 마지막으로 고른 팀(기기끼리 맞춤), frontChat: 프론트 채팅에 들어가 있음 (다른 기기·다시 로그인해도 코드 없이 연결)
 }
 export type Team = { id: string; name: string; members: Record<string, Role> }
 

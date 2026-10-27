@@ -1,8 +1,10 @@
 import type { User } from 'firebase/auth'
+import { doc, updateDoc } from 'firebase/firestore'
 import { useEffect, useRef, useState } from 'react'
 import { api, ROLE_LABELS } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
+import { db } from './firebase.ts'
 import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } from './hooks.ts'
 import { useMentionAlerts } from './useMentionAlerts.ts'
 import { useUnreadCounts } from './reads.ts'
@@ -83,9 +85,13 @@ function disabledNotice(reason: string | undefined) {
 
 function SignedIn({ user }: { user: User }) {
   const { profile, missing } = useProfile(user.uid)
-  const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(savedTeam)
+  // 고른 팀: 이 화면에서 고른 것 → 계정에 기억한 것(다른 기기에서 고른 것도) → 이 기기에 기억한 것 → 첫 팀
+  const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>()
   const teamIds = profile?.teamIds ?? []
-  const teamId = selectedTeamId && teamIds.includes(selectedTeamId) ? selectedTeamId : teamIds[0]
+  // 다른 기기에서 팀을 바꾸면 여기도 따라간다.
+  const accountTeam = profile?.settings?.team
+  useEffect(() => setSelectedTeamId(undefined), [accountTeam])
+  const teamId = [selectedTeamId, profile?.settings?.team, savedTeam()].find((id) => id && teamIds.includes(id)) ?? teamIds[0]
   const { team, denied } = useTeam(teamId)
   const channels = useChannels(team?.id)
   const memberProfiles = useMemberProfiles(Object.keys(team?.members ?? {}))
@@ -116,6 +122,8 @@ function SignedIn({ user }: { user: User }) {
     } catch {
       // 기억하지 못해도 동작에는 문제없다.
     }
+    // PC와 휴대폰이 같은 팀을 보이게 계정에도 기억한다.
+    if (profile?.settings?.team !== id) updateDoc(doc(db, 'users', user.uid), { 'settings.team': id }).catch(() => {})
   }
 
   // 최고 관리자 표시가 생기기 전에 만든 관리자 계정은 서버에 한 번 물어 표시를 받는다.

@@ -250,7 +250,15 @@ export function assetUrl(id: string) {
 }
 
 // ── 프론트 직원 이름 (accounts/{아이디}, authorId = acc_아이디) ────
-export type FrontAccount = { name: string; position: string; avatarAssetId: string | null }
+export type FrontAccount = {
+  loginId: string
+  name: string
+  position: string
+  avatarAssetId: string | null
+  active: boolean
+  admin: boolean
+  chatFrom: number // 이 시각(ms)부터의 채팅만 보이는 직원 (0 = 전부)
+}
 let accountsCache: Promise<Map<string, FrontAccount>> | null = null
 export function useFrontAccounts(enabled: boolean) {
   const [accounts, setAccounts] = useState<Map<string, FrontAccount>>(new Map())
@@ -261,7 +269,15 @@ export function useFrontAccounts(enabled: boolean) {
         new Map(
           snap.docs.map((d) => [
             `acc_${d.id}`,
-            { name: String(d.get('name') ?? ''), position: String(d.get('position') ?? ''), avatarAssetId: d.get('avatarAssetId') ?? null },
+            {
+              loginId: d.id,
+              name: String(d.get('name') ?? ''),
+              position: String(d.get('position') ?? ''),
+              avatarAssetId: d.get('avatarAssetId') ?? null,
+              active: d.get('active') !== false,
+              admin: d.get('role') === 'admin',
+              chatFrom: Number(d.get('chatFrom')) || 0,
+            },
           ]),
         ),
       (err) => {
@@ -374,4 +390,31 @@ export function useFrontUnread(viewing: string | null) {
 
 export function markFrontRead(ch: string, uid: string) {
   return setDoc(doc(ydrDb, 'channels', ch, 'reads', uid), { at: Date.now() })
+}
+
+// 이 방 사람들이 어디까지 읽었는지 (channels/{방}/reads/{아이디} = {at: ms}). 프론트 직원은 아이디, 게스트는 g_uid.
+export function useFrontRoomReads(ch: string) {
+  const [reads, setReads] = useState<Map<string, number>>(new Map())
+  useEffect(() => {
+    setReads(new Map())
+    return onSnapshot(
+      query(collection(ydrDb, 'channels', ch, 'reads'), limit(500)),
+      (snap) => setReads(new Map(snap.docs.map((d) => [d.id, Number(d.get('at')) || 0]))),
+      () => {},
+    )
+  }, [ch])
+  return reads
+}
+
+// 말풍선 옆 노란 숫자: 프론트 앱과 같은 기준으로, 보낸 사람을 뺀 프론트 직원 중 아직 안 읽은 사람 수
+// (사용 중지된 직원, 가입 전이라 이 말을 못 보는 직원은 뺀다)
+export function frontUnreadBy(accounts: Map<string, FrontAccount>, reads: Map<string, number>, authorId: string | null | undefined, at: number) {
+  const author = String(authorId ?? '').replace(/^acc_/, '')
+  let n = 0
+  for (const a of accounts.values()) {
+    if (!a.active || a.loginId === author) continue
+    if (!a.admin && a.chatFrom > at) continue
+    if ((reads.get(a.loginId) ?? 0) < at) n++
+  }
+  return n
 }

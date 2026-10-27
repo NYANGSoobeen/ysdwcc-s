@@ -19,10 +19,13 @@ import {
   toFrontMessage,
   useFront,
   useFrontAccounts,
+  useFrontRoomReads,
+  frontUnreadBy,
   type FrontAccount,
   type FrontMessage,
   type FrontRoom,
 } from './ydr.ts'
+import { badgeText } from '../reads.ts'
 
 // 🏌️ 프론트 채팅 화면: 초대 코드 넣기 → 초대받은 방 목록 → 채팅 (src/front/ydr.ts 참고)
 const PAGE = 100
@@ -117,6 +120,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   const [loaded, setLoaded] = useState(false)
   const [full, setFull] = useState(false) // 더 이전 메시지가 없음
   const accounts = useFrontAccounts(true)
+  const reads = useFrontRoomReads(room.id)
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
   const restore = useRef<{ height: number; top: number } | null>(null)
@@ -266,7 +270,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
       <header className="page-header chat-header">
         <MenuButton />
         <h2>
-          <span aria-hidden="true">🏌️</span> <span className="room-title">{room.name}</span>
+          <span aria-hidden="true">💬</span> <span className="room-title">{room.name}</span>
         </h2>
         <div className="header-actions">
           <MoreButton
@@ -325,6 +329,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 showAuthor={!mine && !groupedWithPrev}
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
+                unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, m.authorId, m.createdAt)}
                 replyName={m.replyTo ? nameOf(m.replyTo.authorId) : ''}
                 onReply={() => {
                   setEditing(null)
@@ -412,6 +417,7 @@ function FrontMessageItem(props: {
   showAuthor: boolean
   time: string
   highlight: boolean
+  unread: number
   replyName: string
   onReply: () => void
   onEdit: () => void
@@ -497,8 +503,13 @@ function FrontMessageItem(props: {
             )}
           </div>
         )}
-        {(props.time || m.edited) && (
+        {(props.time || m.edited || props.unread > 0) && (
           <div className="meta">
+            {props.unread > 0 && (
+              <span className="unread-count" title={`프론트 직원 ${props.unread}명이 아직 안 읽었어요`}>
+                {badgeText(props.unread)}
+              </span>
+            )}
             {m.edited && !m.deleted && <span>수정됨</span>}
             {props.time && <span>{props.time}</span>}
           </div>
