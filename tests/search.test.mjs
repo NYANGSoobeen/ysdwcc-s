@@ -6,7 +6,8 @@ import { createRequire } from 'node:module'
 
 const kakao = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x')
-  if (req.headers.authorization !== 'KakaoAK good-key') return res.writeHead(401).end('{}')
+  if (req.headers.authorization !== 'KakaoAK good-key')
+    return res.writeHead(401).end(JSON.stringify({ errorType: 'AccessDeniedError', message: `appKey(${req.headers.authorization}) does not exist` }))
   const kind = url.pathname.split('/').pop()
   const q = url.searchParams.get('query')
   const documents =
@@ -43,7 +44,12 @@ after(() => kakao.close())
 test('키가 없으면 안내, 키는 최고 관리자만 넣고 틀린 키는 거절', async () => {
   await fails(fn.webSearch.run(as('kim', { q: '양산 날씨' })), 'failed-precondition')
   await fails(fn.setSearchKey.run(as('kim', { key: 'good-key' })), 'permission-denied')
-  await fails(fn.setSearchKey.run(as('boss', { key: 'wrong-key' })), 'invalid-argument')
+  await assert.rejects(fn.setSearchKey.run(as('boss', { key: 'wrong-key' })), (e) => {
+    assert.match(e.message, /REST API 키/)
+    assert.match(e.message, /카카오: appKey\(…\) does not exist/)
+    assert.doesNotMatch(e.message, /wrong-key/, '키 값은 화면에 보이지 않게')
+    return true
+  })
   await fn.setSearchKey.run(as('boss', { key: ' good-key ' }))
   assert.equal((await db.doc('meta/kakaoSearch').get()).get('key'), 'good-key')
   assert.equal((await fn.searchKeyInfo.run(as('boss', {}))).configured, true)

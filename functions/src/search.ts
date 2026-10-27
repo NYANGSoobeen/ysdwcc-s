@@ -45,13 +45,11 @@ export async function kakaoSearch(key: string, q: string, kind: SearchKind): Pro
     throw new SearchError('검색 서버에 연결하지 못했어요. 잠시 뒤 다시 해 주세요.', 0)
   }
   if (!res.ok) {
-    const message =
-      res.status === 401 || res.status === 403
-        ? '검색 키가 맞지 않아요. 최고 관리자가 관리자 화면에서 다시 넣어 주세요.'
-        : res.status === 429
-          ? '오늘 검색 횟수를 다 썼어요. 내일 다시 해 주세요.'
-          : `검색이 안 돼요 (${res.status}). 잠시 뒤 다시 해 주세요.`
-    throw new SearchError(message, res.status)
+    // 카카오가 알려 준 이유를 같이 보여 준다 (키 값은 가림).
+    const body = (await res.json().catch(() => ({}))) as { errorType?: string; message?: string }
+    const reason = String(body.message ?? '').replace(/appKey\([^)]*\)/gi, 'appKey(…)').slice(0, 160)
+    console.warn('kakao search', res.status, body.errorType, reason)
+    throw new SearchError(`${kakaoHint(res.status, reason)}${reason ? `\n(카카오: ${reason})` : ''}`, res.status)
   }
   const json = (await res.json()) as { documents?: Record<string, unknown>[] }
   const docs = (json.documents ?? []).slice(0, 24)
@@ -83,3 +81,13 @@ export async function kakaoSearch(key: string, q: string, kind: SearchKind): Pro
 }
 
 const playTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+
+// 카카오 오류를 한국어 안내로
+function kakaoHint(status: number, reason: string) {
+  if (/does not exist|invalid/i.test(reason)) return '카카오에 없는 키예요. 앱 키 중 "REST API 키"를 그대로 복사했는지 확인해 주세요 (JavaScript·네이티브 앱·Admin 키는 안 돼요).'
+  if (/ip mismatch/i.test(reason)) return '키에 허용 IP가 정해져 있어요. 카카오 디벨로퍼스 → 앱 키 → REST API 키 설정에서 허용 IP를 비워 주세요.'
+  if (/disabled|not allowed|activate|service/i.test(reason)) return '이 앱에서 검색 기능이 꺼져 있어요. 카카오 디벨로퍼스 앱 설정에서 검색(다음 검색) 사용을 켜 주세요.'
+  if (status === 429) return '오늘 검색 횟수를 다 썼어요. 내일 다시 해 주세요.'
+  if (status === 401 || status === 403) return '검색 키가 맞지 않아요. 최고 관리자가 관리자 화면에서 다시 넣어 주세요.'
+  return `검색이 안 돼요 (${status}). 잠시 뒤 다시 해 주세요.`
+}
