@@ -279,3 +279,58 @@ test('스케줄: 새로 올리거나 지우면 이전 파일을 지우고, 용�
   await fn.onScheduleWritten.run({ params, data: { before: snap({ uploadId: 'new' }), after: snap(undefined) } })
   assert.equal((await bucket.getFiles({ prefix: `teams/${teamId}/schedule/` }))[0].length, 0)
 })
+
+test('💾 용량 관리: 파일을 쓰이는 곳별로 나누고, 사용하지 않는 파일만 정리한다', async () => {
+  process.env.USAGE_RECENT_MS = '0'
+  const put = (path, bytes, contentType = 'image/jpeg') => bucket.file(path).save(Buffer.alloc(bytes), { contentType })
+  const p = `teams/${teamId}/chat`
+  // 사진 메시지, 파일만 있는 메시지(방), 동영상 메시지, 지운 메시지의 남은 파일, 메시지가 없는 폴더
+  await put(`${p}/u_photo/0.jpg`, 100)
+  await put(`${p}/u_photo/0_thumb.jpg`, 10)
+  await put(`${p}/u_file/f_0.pdf`, 200, 'application/pdf')
+  await put(`${p}/u_video/v_0.mp4`, 5000, 'video/mp4')
+  await put(`${p}/u_video/v_0_poster.jpg`, 50)
+  await put(`${p}/u_deleted/0.jpg`, 300)
+  await put(`${p}/u_ghost/f_0.zip`, 400, 'application/zip')
+  await put(`teams/${teamId}/schedule/cur/p1.png`, 700, 'image/png')
+  await put(`teams/${teamId}/schedule/gone/p1.png`, 800, 'image/png')
+  const msg = (path, data) => db.doc(path).set({ authorUid: adminUid, body: '', createdAt: Timestamp.now(), attachments: [], files: [], hasPhotos: false, ...data })
+  await msg(`teams/${teamId}/messages/u_photo`, { attachments: [{ path: `${p}/u_photo/0.jpg`, thumbPath: `${p}/u_photo/0_thumb.jpg`, size: 100, thumbSize: 10 }], hasPhotos: true })
+  await db.doc(`teams/${teamId}/channels/roomU`).set({ name: '파일방', createdBy: adminUid })
+  await msg(`teams/${teamId}/channels/roomU/messages/u_file`, { files: [{ path: `${p}/u_file/f_0.pdf`, name: 'a.pdf', size: 200, type: 'application/pdf' }] })
+  await msg(`teams/${teamId}/messages/u_video`, { video: { path: `${p}/u_video/v_0.mp4`, posterPath: `${p}/u_video/v_0_poster.jpg`, name: 'v.mp4', size: 5000, type: 'video/mp4' } })
+  await msg(`teams/${teamId}/messages/u_deleted`, { deleted: true })
+  await db.doc(`teams/${teamId}/schedule/current`).set({ uploadId: 'cur', images: [] })
+
+  const usage = await fn.getUsage.run(as(adminUid, { teamId }))
+  const g = Object.fromEntries(usage.storage.groups.map((x) => [x.label, x]))
+  assert.equal(g['채팅 동영상'].bytes, 5050)
+  assert.equal(g['채팅 파일'].count, 1)
+  assert.equal(g['스케줄 사진'].bytes, 700)
+  const unused = usage.storage.unused.map((f) => f.name).sort()
+  for (const name of [`${p}/u_deleted/0.jpg`, `${p}/u_ghost/f_0.zip`, `teams/${teamId}/schedule/gone/p1.png`]) assert.ok(unused.includes(name), `${name} 빠짐`)
+  for (const name of [`${p}/u_photo/0.jpg`, `${p}/u_photo/0_thumb.jpg`, `${p}/u_file/f_0.pdf`, `${p}/u_video/v_0.mp4`, `teams/${teamId}/schedule/cur/p1.png`])
+    assert.ok(!unused.includes(name), `${name}은 쓰는 파일`)
+  assert.ok(usage.storage.projectBytes >= usage.storage.bytes)
+  assert.ok(usage.rooms.some((r) => r.id === 'roomU' && r.name === '파일방' && r.oldest))
+
+  // 정리 직전에 그새 쓰이게 된 파일은 건너뛴다
+  await msg(`teams/${teamId}/messages/u_ghost`, { files: [{ path: `${p}/u_ghost/f_0.zip`, name: 'z.zip', size: 400, type: 'application/zip' }] })
+  const r = await fn.cleanUnusedFiles.run(as(adminUid, { teamId, paths: [] }))
+  assert.ok(r.deleted >= 2)
+  assert.equal((await bucket.file(`${p}/u_ghost/f_0.zip`).exists())[0], true, '그새 쓰인 파일을 지움')
+  assert.equal((await bucket.file(`${p}/u_deleted/0.jpg`).exists())[0], false)
+  assert.equal((await bucket.file(`teams/${teamId}/schedule/gone/p1.png`).exists())[0], false)
+  assert.equal((await bucket.file(`${p}/u_video/v_0.mp4`).exists())[0], true)
+  await expectError(fn.cleanUnusedFiles.run(as('nobody', { teamId, paths: [] })), 'permission-denied')
+
+  const data = await fn.countData.run(as(adminUid, { teamId }))
+  assert.ok(data.counts.find((c) => c.label === '채팅 메시지').count >= 5)
+  assert.ok(data.bytes > 0 && data.reads > 0)
+
+  // 기간 삭제: 고른 방만
+  const only = await fn.deleteMessagesInRange.run(as(adminUid, { teamId, from: 0, to: Date.now() + 1000, dryRun: true, channels: ['roomU'] }))
+  assert.equal(only.messages, 1)
+  assert.equal(only.bytes, 200)
+  delete process.env.USAGE_RECENT_MS
+})

@@ -17,8 +17,16 @@ export type Usage = {
     videos?: number
     videoBytes?: number
     freeBytes: number
+    files: number
+    projectBytes: number
+    groups: { label: string; count: number; bytes: number }[]
+    unused: StoredFile[]
+    unusedCount: number
+    unusedBytes: number
+    reads: number
     byMonth: { month: string; bytes: number; photos: number }[]
   }
+  rooms: { id: string; name: string; oldest: number | null }[]
   counts: { members: number; messages: number; photoMessages: number; customers: number }
 }
 
@@ -26,6 +34,9 @@ export type LinkPreview = { url: string; title: string; desc: string; image: str
 
 export type SearchKind = 'web' | 'image' | 'vclip'
 export type SearchResult = { title: string; url: string; desc: string; image: string; site: string }
+
+export type StoredFile = { name: string; size: number; type: string; created: string }
+export type DataCount = { counts: { label: string; count: number }[]; bytes: number; reads: number; freeBytes: number }
 
 export type RangeResult = { messages: number; photos: number; bytes: number }
 
@@ -64,12 +75,14 @@ export const api = {
   frontLinkInfo: call<void, { configured: boolean; updatedAt: number | null }>('frontLinkInfo'),
   setFrontLinkSecret: call<{ secret?: string }, { secret: string }>('setFrontLinkSecret'),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
+  cleanUnusedFiles: call<{ teamId: string; paths: string[] }, { deleted: number; bytes: number; skipped: number }>('cleanUnusedFiles'),
+  countData: call<{ teamId: string }, DataCount>('countData'),
   getMyAccess: call<void, { superAdmin: boolean }>('getMyAccess'),
   createTeam: call<{ name: string }, { teamId: string }>('createTeam'),
   enableContactsSync: call<void, { username: string; password: string }>('enableContactsSync'),
   disableContactsSync: call<void, { ok: true }>('disableContactsSync'),
   deleteMessagesInRange: call<
-    { teamId: string; from: number; to: number; dryRun: boolean },
+    { teamId: string; from: number; to: number; dryRun: boolean; channels?: string[] },
     RangeResult
   >('deleteMessagesInRange'),
 }

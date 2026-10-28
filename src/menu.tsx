@@ -22,7 +22,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
   { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },
-  { tab: 'usage', icon: '📦', label: '용량 관리', section: 'admin', superAdminOnly: true },
+  { tab: 'usage', icon: '💾', label: '용량 관리', section: 'admin', superAdminOnly: true },
 ]
 
 // 접는 묶음 (▾ 단체 채팅 / ▾ 관리자 전용). 접은 상태는 기기마다 기억하고, 관리자 묶음은 처음엔 접혀 있다.

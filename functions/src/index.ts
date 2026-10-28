@@ -10,6 +10,7 @@ import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
 import { notifyChatMessage, notifyFront } from './push.js'
 import { kakaoSearch, SearchError, type SearchKind } from './search.js'
+import { classifyTeamFiles, messageCollectionsOf, UNUSED, type StoredFile } from './usage.js'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 
 // Firestore와 같은 리전. 무료 사용량을 넘지 않도록 동시 실행 수를 제한한다.
@@ -464,8 +465,9 @@ export const getUsage = onCall(async (req) => {
   const sum = async (counts: Promise<{ data: () => { count: number } }>[]) =>
     (await Promise.all(counts)).reduce((total, c) => total + c.data().count, 0)
 
-  const [[files], messageCount, photoMessageCount, customerCount] = await Promise.all([
+  const [[files], [allFiles], messageCount, photoMessageCount, customerCount] = await Promise.all([
     getStorage().bucket().getFiles({ prefix: `teams/${teamId}/` }),
+    getStorage().bucket().getFiles({ autoPaginate: true }),
     sum(collections.map((c) => c.count().get())),
     sum(collections.map((c) => c.where('hasPhotos', '==', true).count().get())),
     db.collection('customers').where('teamId', '==', teamId).count().get(),
@@ -500,6 +502,30 @@ export const getUsage = onCall(async (req) => {
     if (isPhoto) photos += 1
   }
 
+  // 💾 종류별(쓰이는 곳) 개수·용량과 사용하지 않는 파일 (src/pages/UsagePage.tsx)
+  const stored = files.map(toStoredFile)
+  const { labelOf, reads } = await classifyTeamFiles(teamId, stored)
+  const groups = new Map<string, { label: string; count: number; bytes: number }>()
+  const unused: StoredFile[] = []
+  for (const f of stored) {
+    const label = labelOf(f)
+    const g = groups.get(label) ?? { label, count: 0, bytes: 0 }
+    g.count += 1
+    g.bytes += f.size
+    groups.set(label, g)
+    if (label === UNUSED) unused.push(f)
+  }
+  // 채팅방마다 가장 오래된 메시지 (방마다 1개만 읽는다)
+  const { channels, collections: rooms } = await messageCollectionsOf(teamId)
+  const names = new Map(channels.map((c) => [c.id, String(c.get('name') ?? '')]))
+  const oldest = await Promise.all(
+    rooms.map(async (r) => {
+      const snap = await r.ref.orderBy('createdAt', 'asc').limit(1).select('createdAt').get()
+      const at = snap.docs[0]?.get('createdAt') as Timestamp | undefined
+      return { id: r.id, name: names.get(r.id) || (r.id === 'main' ? '전체 채팅' : '채팅방'), oldest: at ? at.toMillis() : null }
+    }),
+  )
+
   return {
     storage: {
       bytes,
@@ -508,10 +534,18 @@ export const getUsage = onCall(async (req) => {
       videos,
       videoBytes,
       freeBytes: FREE_STORAGE_BYTES,
+      files: files.length,
+      projectBytes: allFiles.reduce((sum, f) => sum + Number(f.metadata.size ?? 0), 0),
+      groups: [...groups.values()].sort((a, b) => b.bytes - a.bytes),
+      unused: unused.sort((a, b) => b.created.localeCompare(a.created)).slice(0, 300),
+      unusedCount: unused.length,
+      unusedBytes: unused.reduce((sum, f) => sum + f.size, 0),
+      reads,
       byMonth: [...months.entries()]
         .map(([month, v]) => ({ month, ...v }))
         .sort((a, b) => b.month.localeCompare(a.month)),
     },
+    rooms: oldest,
     counts: {
       members: Object.keys(members).length,
       messages: messageCount,
@@ -521,6 +555,72 @@ export const getUsage = onCall(async (req) => {
   }
 })
 
+const toStoredFile = (f: { name: string; metadata: { size?: string | number; contentType?: string; timeCreated?: string } }): StoredFile => ({
+  name: f.name,
+  size: Number(f.metadata.size ?? 0),
+  type: String(f.metadata.contentType ?? ''),
+  created: String(f.metadata.timeCreated ?? ''),
+})
+
+// 🧹 사용하지 않는 파일 정리: 지우기 직전에 다시 나눠 보고, 그새 쓰이게 된 파일은 건너뛴다.
+export const cleanUnusedFiles = onCall({ timeoutSeconds: 300 }, async (req) => {
+  const { teamId } = await requireSuperAdminOf(req, req.data?.teamId)
+  const wanted = new Set(Array.isArray(req.data?.paths) ? (req.data.paths as unknown[]).filter((p): p is string => typeof p === 'string') : [])
+  const bucket = getStorage().bucket()
+  const [files] = await bucket.getFiles({ prefix: `teams/${teamId}/` })
+  const stored = files.map(toStoredFile)
+  const { labelOf } = await classifyTeamFiles(teamId, stored)
+  const targets = stored.filter((f) => labelOf(f) === UNUSED && (wanted.size === 0 || wanted.has(f.name)))
+  let deleted = 0
+  let freed = 0
+  for (let i = 0; i < targets.length; i += 20) {
+    await Promise.all(
+      targets.slice(i, i + 20).map(async (f) => {
+        await bucket.file(f.name).delete({ ignoreNotFound: true })
+        deleted += 1
+        freed += f.size
+      }),
+    )
+  }
+  return { deleted, bytes: freed, skipped: wanted.size ? wanted.size - deleted : 0 }
+})
+
+// 📊 데이터(Firestore) 개수·용량: 버튼을 누를 때만 센다. 개수는 count(1,000개마다 읽기 1회),
+// 용량은 종류마다 최대 50개를 읽어 평균 크기 × 개수 × 2(색인)로 어림한다. 무료 한도는 프로젝트 전체 기준이라 모든 팀을 센다.
+export const countData = onCall(async (req) => {
+  await requireSuperAdminOf(req, req.data?.teamId)
+  const db = getFirestore()
+  const kinds: [string, FirebaseFirestore.Query][] = [
+    ['채팅 메시지', db.collectionGroup('messages')],
+    ['채팅 읽음 기록', db.collectionGroup('reads')],
+    ['채팅방', db.collectionGroup('channels')],
+    ['고객', db.collection('customers')],
+    ['상담 메모', db.collectionGroup('notes')],
+    ['메모 수정 기록', db.collectionGroup('revisions')],
+    ['직원 계정', db.collection('users')],
+    ['팀', db.collection('teams')],
+    ['스케줄', db.collectionGroup('schedule')],
+    ['푸시 알림 기기', db.collection('pushTokens')],
+    ['링크 미리보기 저장', db.collection('linkPreviews')],
+    ['연락처 구독 접속 정보', db.collection('carddavTokens')],
+  ]
+  let reads = 0
+  let bytes = 0
+  const counts = await Promise.all(
+    kinds.map(async ([label, q]) => {
+      const [count, sample] = await Promise.all([q.count().get(), q.limit(50).get()])
+      const n = count.data().count
+      reads += Math.max(1, Math.ceil(n / 1000)) + Math.max(1, sample.size)
+      const avg = sample.size
+        ? sample.docs.reduce((sum, d) => sum + Buffer.byteLength(JSON.stringify(d.data())) + d.ref.path.length + 32, 0) / sample.size
+        : 0
+      bytes += avg * n * 2
+      return { label, count: n }
+    }),
+  )
+  return { counts: counts.filter((c) => c.count > 0).sort((a, b) => b.count - a.count), bytes: Math.round(bytes), reads, freeBytes: 1024 ** 3 }
+})
+
 // 기간을 정해 채팅을 한꺼번에 영구 삭제한다. dryRun이면 지울 양만 알려 준다.
 export const deleteMessagesInRange = onCall(async (req) => {
   const { teamId } = await requireSuperAdminOf(req, req.data?.teamId)
@@ -528,15 +628,17 @@ export const deleteMessagesInRange = onCall(async (req) => {
   const to = millis(req.data?.to, '끝 날짜')
   if (from >= to) throw new HttpsError('invalid-argument', '시작 날짜가 끝 날짜보다 앞서야 합니다.')
   const dryRun = req.data?.dryRun === true
+  // 고른 채팅방만 (없으면 모든 방). main = 기본 방
+  const only = Array.isArray(req.data?.channels) ? new Set((req.data.channels as unknown[]).map(String)) : null
 
   const db = getFirestore()
-  // 모든 채팅방에서 그 기간의 메시지를 찾는다.
+  const { collections } = await messageCollectionsOf(teamId)
   const snaps = await Promise.all(
-    (await messageCollections(teamId)).map((c) =>
+    collections.filter((c) => !only || only.has(c.id)).map(({ ref: c }) =>
       c
         .where('createdAt', '>=', Timestamp.fromMillis(from))
         .where('createdAt', '<', Timestamp.fromMillis(to))
-        .select('attachments', 'files')
+        .select('attachments', 'files', 'video')
         .get(),
     ),
   )
@@ -548,7 +650,9 @@ export const deleteMessagesInRange = onCall(async (req) => {
   for (const doc of docs) {
     const attachments = (doc.get('attachments') ?? []) as { size?: number; thumbSize?: number }[]
     const files = (doc.get('files') ?? []) as { size?: number }[]
-    if (attachments.length > 0 || files.length > 0) withPhotos.push(doc.id)
+    const video = doc.get('video') as { size?: number } | null | undefined
+    if (attachments.length > 0 || files.length > 0 || video) withPhotos.push(doc.id)
+    if (video) bytes += video.size ?? 0
     photos += attachments.length
     for (const a of attachments) bytes += (a.size ?? 0) + (a.thumbSize ?? 0)
     for (const f of files) bytes += f.size ?? 0

@@ -3592,3 +3592,198 @@ button.menu-logout {
 .bubble .chat-video + p {
   margin-top: 6px;
 }
+
+/* ══════════════════════════════════════════════════════════
+   💾 용량 관리: 프론트 앱 "용량 관리" 탭(storage-kit.html)과 같은 모양, 색은 우리 앱 (2026-10-28)
+   카드 둥근 16px · 카드 사이 14px · 제목 16px 명조 주색 · 알약 버튼 · 막대 70%↑ 노랑 / 90%↑ 빨강
+   ══════════════════════════════════════════════════════════ */
+.page-body.storage-view {
+  display: block;
+  padding: 16px 20px;
+}
+.st-empty {
+  padding: 40px 10px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.st-card {
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgb(var(--shadow) / 0.08);
+}
+.st-card h3 {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-family: var(--font-serif);
+  font-size: 16px;
+}
+button.st-btn {
+  min-height: 0;
+  margin: 10px 6px 0 0;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 18px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.st-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.st-btn.st-ghost {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+button.st-btn.st-close {
+  margin-top: 0;
+  background: var(--notice-bg);
+  color: var(--text);
+}
+a.st-link-btn {
+  display: inline-block;
+  margin: 10px 6px 0 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.st-meter {
+  margin-bottom: 12px;
+}
+.st-meter-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.st-meter-top span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.st-meter.small .st-meter-top {
+  font-size: 12px;
+}
+.st-bar {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--notice-bg);
+}
+.st-meter.small .st-bar {
+  height: 8px;
+}
+.st-bar div {
+  height: 100%;
+  border-radius: 8px;
+  background: #1e7145;
+  transition: width 0.3s;
+}
+.st-bar div.warn {
+  background: #e0a100;
+}
+.st-bar div.danger {
+  background: #d9534f;
+}
+.st-table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.st-table th {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+.st-table td {
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.st-table tr.st-orphan td {
+  color: #c0392b;
+}
+.st-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.st-result {
+  margin-top: 12px;
+}
+.st-orphan-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.st-orphan-item {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 11px;
+}
+.st-orphan-item img {
+  display: block;
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  background: #fff;
+  cursor: zoom-in;
+}
+.st-orphan-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  font-size: 30px;
+}
+.st-orphan-cap {
+  padding: 4px 6px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.check-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.check-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+}
+.shell.desktop .page-body.storage-view {
+  padding: 16px 20px 40px;
+}
+@media (max-width: 680px) {
+  .page-body.storage-view {
+    padding: 12px;
+  }
+}
+.form label.check-row,
+.modal .form label.check-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+}
