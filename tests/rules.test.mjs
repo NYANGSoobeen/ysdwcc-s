@@ -267,3 +267,24 @@ test('😊 이모티콘: 팀 직원은 보기만, 최고 관리자만 테마·�
   await assertFails(deleteDoc(doc(fs('ed'), 'stickers/s1')))
   await assertSucceeds(deleteDoc(doc(fs('boss'), 'stickers/s1')))
 })
+
+test('🏷️ 붙이는 스티커: 팀원은 한 번에 하나씩 자기 스티커만 붙이고 떼며, 기본 방 배경은 문서가 없어도 붙는다', async () => {
+  const st = (by, extra = {}) => ({ e: '😀', x: 0.5, y: 0.2, by, at: serverTimestamp(), ...extra })
+  // 보기 권한도 말풍선에 붙일 수 있다
+  await assertSucceeds(updateDoc(doc(fs('viewer'), 'teams/t1/messages/m1'), { 'stk.s1': st('viewer'), stkLast: 's1' }))
+  // 남의 이름으로 붙이기, 범위 밖 위치, 다른 칸 같이 바꾸기, stkLast 없이
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'stk.s2': st('viewer'), stkLast: 's2' }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'stk.s2': st('ed2', { x: 1.5 }), stkLast: 's2' }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'stk.s2': st('ed2'), stkLast: 's2', body: '몰래 수정' }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'stk.s2': st('ed2') }))
+  await assertSucceeds(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'stk.s2': { a: 'stickers/x.png', x: 0.1, y: 0.1, by: 'ed2', at: serverTimestamp() }, stkLast: 's2' }))
+  // 남의 것은 못 떼고 내 것은 뗀다
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/m1'), { 'stk.s1': deleteField(), stkLast: 's1' }))
+  await assertSucceeds(updateDoc(doc(fs('viewer'), 'teams/t1/messages/m1'), { 'stk.s1': deleteField(), stkLast: 's1' }))
+  await assertFails(updateDoc(doc(fs('outsider'), 'teams/t1/messages/m1'), { 'stk.s3': st('outsider'), stkLast: 's3' }))
+  // 배경: 기본 방 문서가 없어도 merge로 만들어진다, 이름은 못 바꾼다
+  await assertSucceeds(setDoc(doc(fs('viewer'), 'teams/t1/channels/main'), { bgStk: { b1: st('viewer') }, stkLast: 'b1' }, { merge: true }))
+  await assertFails(setDoc(doc(fs('viewer'), 'teams/t1/channels/main'), { bgStk: { b2: st('viewer') }, stkLast: 'b2', name: '바꿈' }, { merge: true }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { 'bgStk.b3': st('ed'), stkLast: 'b3' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { 'bgStk.b1': deleteField(), stkLast: 'b1' }))
+})

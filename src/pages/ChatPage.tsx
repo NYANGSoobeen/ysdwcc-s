@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { doc } from 'firebase/firestore'
+import { db } from '../firebase.ts'
 import { errorMessage } from '../auth.ts'
 import {
   createChannel,
@@ -34,6 +36,8 @@ import {
 } from '../chat.ts'
 import { fileName, saveFile } from '../download.ts'
 import { recentEmoticons, rememberEmoticon, useEmoticons } from '../emoticons.ts'
+import { MAX_STUCK, stick, stuckList, unstick, type StickerChoice, type StuckSticker } from '../stuck.ts'
+import { showStickerInfo, StickerPicker, StuckLayer, StuckList } from '../ui/Stuck.tsx'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { useMemberProfiles, type Team } from '../hooks.ts'
@@ -195,8 +199,47 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
     }
   }
 
+  // 🏷️ 붙이는 스티커: 고르는 창 → 붙일 자리 누르기. 말풍선은 그 말풍선 안, 배경은 대화 영역 안 비율(0~1)로 저장.
+  const [stickTarget, setStickTarget] = useState<{ kind: 'msg'; id: string } | { kind: 'bg' } | null>(null)
+  const [placing, setPlacing] = useState<{ target: { kind: 'msg'; id: string } | { kind: 'bg' }; choice: StickerChoice } | null>(null)
+  const [showBgList, setShowBgList] = useState(false)
+  const areaRef = useRef<HTMLDivElement>(null)
+  const roomDoc = doc(db, 'teams', team.id, 'channels', room.id)
+  const bgStickers = stuckList(room.bgStk)
+  const names = useMemo(() => Object.fromEntries(Object.entries(profiles).map(([id, p]) => [id, p.name])), [profiles])
+
+  function place(e: React.MouseEvent) {
+    if (!placing) return
+    e.preventDefault()
+    e.stopPropagation()
+    const { target, choice } = placing
+    let box: DOMRect | undefined
+    if (target.kind === 'bg') box = areaRef.current?.getBoundingClientRect()
+    else box = areaRef.current?.querySelector(`[data-msg="${target.id}"] .stk-anchor`)?.getBoundingClientRect()
+    if (!box) return setPlacing(null)
+    const pad = 8
+    if (target.kind === 'msg' && (e.clientX < box.left - pad || e.clientX > box.right + pad || e.clientY < box.top - pad || e.clientY > box.bottom + pad))
+      return toast('말풍선 위를 눌러 주세요. (그만두려면 취소)')
+    const x = (e.clientX - box.left) / box.width
+    const y = (e.clientY - box.top) / box.height
+    setPlacing(null)
+    const job =
+      target.kind === 'bg' ? stick(roomDoc, 'bgStk', choice, x, y, true) : stick(doc(ref, target.id), 'stk', choice, x, y)
+    job.catch((err) => toast(`붙이지 못했어요. ${errorMessage(err)}`, { error: true }))
+  }
+
+  function full(map: unknown) {
+    if (stuckList(map).length >= MAX_STUCK) {
+      toast(`스티커는 한 곳에 ${MAX_STUCK}개까지 붙일 수 있어요.`, { error: true })
+      return true
+    }
+    return false
+  }
+
   const roomActions = (): MenuAction[] => [
     { icon: '🖼️', label: '사진 모아보기', onSelect: () => setShowGallery(true) },
+    { icon: '🏷️', label: '배경에 스티커 붙이기', onSelect: () => !full(room.bgStk) && setStickTarget({ kind: 'bg' }) },
+    { icon: '🧹', label: `배경 스티커 보기·떼기 (${bgStickers.length})`, onSelect: () => setShowBgList(true) },
     ...(canManage ? [{ icon: '✏️', label: '방 이름 바꾸기', onSelect: () => void rename() }] : []),
     ...(canManage && room.id !== MAIN_CHANNEL
       ? [{ icon: '🗑️', label: '방 삭제', danger: true, onSelect: () => void removeRoom() }]
@@ -495,6 +538,19 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
       <p className="chat-hint">
         💡 메시지를 길게 누르거나(PC는 오른쪽 클릭) 답장·복사·수정·삭제할 수 있어요
       </p>
+      {placing && (
+        <div className="placing-bar" role="status">
+          <span>
+            {'e' in placing.choice ? placing.choice.e : '😊'} {placing.target.kind === 'bg' ? '배경에서 붙일 자리를 누르세요' : '말풍선에서 붙일 자리를 누르세요'}
+          </span>
+          <button type="button" className="ghost" onClick={() => setPlacing(null)}>
+            취소
+          </button>
+        </div>
+      )}
+      <div className={placing ? 'messages-area placing' : 'messages-area'} ref={areaRef} onClickCapture={place}>
+      {/* 🏷️ 채팅방 배경 스티커: 대화 뒤에 깔린다 (누르는 건 ⋯ → 배경 스티커 보기·떼기) */}
+      <StuckLayer stickers={bgStickers} className="bg" />
       <div
         className="messages"
         ref={listRef}
@@ -570,10 +626,17 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
                 }}
                 onReact={(emoji) => void react(m, emoji)}
                 onJump={(id) => void jumpTo(id)}
+                onStick={() => !full(m.stk) && setStickTarget({ kind: 'msg', id: m.id })}
+                onStickerTap={(s) =>
+                  void showStickerInfo(s, names, uid, () =>
+                    unstick(doc(ref, m.id), 'stk', s.id).catch((err) => toast(errorMessage(err), { error: true })),
+                  )
+                }
               />
             </div>
           )
         })}
+      </div>
       </div>
       {newBelow && (
         <button type="button" className="new-below" onClick={toBottom}>
@@ -602,6 +665,25 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
         />
       ) : (
         <p className="composer muted small">보기 권한은 메시지를 보낼 수 없습니다.</p>
+      )}
+      {stickTarget && (
+        <StickerPicker
+          onClose={() => setStickTarget(null)}
+          onPick={(choice) => {
+            setPlacing({ target: stickTarget, choice })
+            setStickTarget(null)
+          }}
+        />
+      )}
+      {showBgList && (
+        <StuckList
+          title="🧹 배경 스티커"
+          stickers={bgStickers}
+          names={names}
+          me={uid}
+          onClose={() => setShowBgList(false)}
+          onRemove={(id) => unstick(roomDoc, 'bgStk', id).catch((err) => toast(errorMessage(err), { error: true }))}
+        />
       )}
       {showGallery && <PhotoGallery messages={ref} profiles={profiles} onClose={() => setShowGallery(false)} />}
       {viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
@@ -636,6 +718,8 @@ function MessageItem(props: {
   onEdit: () => void
   onReact: (emoji: string | null) => void
   onJump: (id: string) => void
+  onStick: () => void
+  onStickerTap: (s: StuckSticker) => void
 }) {
   const { message: m, mine, uid, profiles } = props
   const links = m.body.match(URL_RE) ?? []
@@ -650,11 +734,11 @@ function MessageItem(props: {
           label: emoji === myReaction ? '떼기' : '붙이기',
           onSelect: () => props.onReact(emoji === myReaction ? null : emoji),
         })),
-        ...(myReaction ? [{ icon: '✖️', label: `내 스티커 떼기 (${myReaction})`, onSelect: () => props.onReact(null) }] : []),
+        ...(myReaction ? [{ icon: '✖️', label: `내 공감 떼기 (${myReaction})`, onSelect: () => props.onReact(null) }] : []),
       ],
       x,
       y,
-      '스티커 붙이기',
+      '공감 표시',
     )
   }
 
@@ -685,7 +769,8 @@ function MessageItem(props: {
           ...(links.length
             ? [{ icon: '🔗', label: links.length > 1 ? `링크 ${links.length}개 복사` : '링크 복사', onSelect: () => void copyText(links.join('\n')) }]
             : []),
-          { icon: '🏷️', label: myReaction ? `스티커 바꾸기 (${myReaction})` : '스티커 붙이기', onSelect: () => setTimeout(() => pickSticker(point.current.x, point.current.y), 0) },
+          { icon: '👍', label: myReaction ? `공감 바꾸기 (${myReaction})` : '공감 표시', onSelect: () => setTimeout(() => pickSticker(point.current.x, point.current.y), 0) },
+          { icon: '🏷️', label: '스티커 붙이기', onSelect: props.onStick },
           ...(mine ? [{ icon: '🗑️', label: '삭제', danger: true, onSelect: props.onDelete }] : []),
         ]
   const menu = useItemMenu(actions)
@@ -709,6 +794,8 @@ function MessageItem(props: {
             <p>삭제된 메시지입니다</p>
           </div>
         ) : (
+          // 🏷️ 붙인 스티커는 말풍선 위에 겹쳐 그린다 (stk-anchor = 붙일 자리 기준)
+          <div className="stk-anchor">
           <div
             className={m.stickerAssetId && !m.body && !reply ? 'bubble has-menu emoticon-bubble' : 'bubble has-menu'}
             {...menu}
@@ -759,6 +846,8 @@ function MessageItem(props: {
                 </span>
               </a>
             )}
+          </div>
+          <StuckLayer stickers={stuckList(m.stk)} onTap={props.onStickerTap} />
           </div>
         )}
         {(props.time || m.editedAt || props.unread > 0) && (

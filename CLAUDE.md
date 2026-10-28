@@ -77,7 +77,7 @@
   - 답장: `replyTo {id, authorUid, text(원문 앞 80자)}`를 메시지에 같이 저장해 원문을 안 불러와도 미리보기. 누르면 원문으로 이동해 반짝이고, 아직 안 불러온 옛 원문이면 100개씩 더 불러와 찾는다(최대 3000개).
   - 수정: 입력칸에 원래 글을 채워 고친다 → `editedAt`, 말풍선 옆 "수정됨".
   - 삭제: 글·사진은 바로 영구 삭제(사진 파일은 올린 사람이 지움)하고 `deleted: true`인 빈 메시지가 "삭제된 메시지입니다"로 남는다 (대화 흐름 유지). 용량 관리의 기간 삭제는 문서째 지운다.
-  - 스티커(공감): `reactions {uid: 이모지}`, 한 사람에 하나(👍 ❤️ 😂 😮 😢 🙏 ✅, `REACTIONS`). 팀원 누구나(보기 권한 포함) 자기 것만 바꿀 수 있다(규칙 `canUpdateMessage`). 말풍선 아래 개수 표시, 누르면 내 것 붙이기/떼기.
+  - 공감(예전 이름 스티커): `reactions {uid: 이모지}`, 한 사람에 하나(👍 ❤️ 😂 😮 😢 🙏 ✅, `REACTIONS`). 팀원 누구나(보기 권한 포함) 자기 것만 바꿀 수 있다(규칙 `canUpdateMessage`). 말풍선 아래 개수 표시, 누르면 내 것 붙이기/떼기.
   - 글 속 주소는 눌러서 새 탭으로 열린다.
 - **사진 여러 장과 파일 (공통 기능 4-3):**
   - 입력칸 ＋ 메뉴: 🖼️ 사진 보관함 / 📷 사진 찍기(휴대폰만) / 📁 파일 선택. PC는 Ctrl+V로 캡처 붙여넣기, 채팅 화면 아무 데나 끌어다 놓기.
@@ -97,6 +97,13 @@
   - 보내기: 입력칸 😊 창 위쪽 탭 🕘 최근 · 😊 이모지 · 테마들. 이모티콘을 누르면 바로 메시지 `{stickerAssetId}`로 보낸다(`sendStickerMessage`, 답장 중이면 답장). 최근 보낸 이모티콘은 이 기기 localStorage `recent-emoticons`(24개). 목록은 실시간 구독 없이 😊 창을 처음 열 때 한 번 읽는다(`loadEmoticons`). 휴대폰은 😊 창이 입력칸 줄 전체 너비.
   - 말풍선: 바탕 없이 그림만 120px(`emoticon-bubble`, 답장·글이 있으면 보통 말풍선). 푸시·답장 미리보기 "😊 이모티콘". 수정 중엔 이모티콘 탭 없음. 🏌️ 프론트 방 입력칸은 이모지만(프론트 규칙상 게스트는 글만).
   - 용량 관리: `stickers/` 파일은 팀 폴더 밖이라 막대(프로젝트 전체)에만 들어간다.
+- **🏷️ 붙이는 스티커 (6번, 2026-10-28, `src/stuck.ts`, 화면 `src/ui/Stuck.tsx`):**
+  - 채팅 말풍선·채팅방 배경(공지는 7번에서)에 이모지(유니코드 전체 1,898개, Win + . 과 같은 9묶음, `src/emojiData.ts`는 고르는 창을 열 때만 불러옴)나 😊 이모티콘(모든 테마)을 붙였다 뗀다. 끌어 옮기기 없음.
+  - 순서: 메시지 메뉴 🏷️ 스티커 붙이기 / 채팅방 ⋯ → 🏷️ 배경에 스티커 붙이기 → 고르는 창(`StickerPicker`: 🕘 최근 · 이모지 묶음 · 이모티콘 테마) → 위쪽 띠 "붙일 자리를 누르세요 · 취소" → 누른 자리에 붙음. 말풍선은 그 말풍선(`.stk-anchor`) 안(밖을 누르면 안내), 배경은 대화 영역(`.messages-area`) 안 비율 0~1. 배경 스티커는 대화 뒤에 깔리고 누를 수 없다 → ⋯ → 🧹 배경 스티커 보기·떼기(`StuckList`).
+  - 말풍선 스티커를 누르면 누가 언제 붙였는지, 내 것이면 떼기. 최근 쓴 스티커는 기기 localStorage `recent-stickers`(32개). 한 곳에 60개까지(`MAX_STUCK`).
+  - 데이터: 메시지 `stk`, 채팅방 `channels/{id}.bgStk` = **맵** `{스티커id: {e | a, x, y, by, at}}` + `stkLast`(이번에 바꾼 id). 요청서는 배열이었지만 "남의 스티커는 못 떼게"를 보안 규칙(`stkOk`)으로 막으려고 맵으로 했다: 한 번에 하나, 붙이기는 by = 나·위치 0~1, 떼기는 내 것만, 팀원 누구나(보기 권한 포함). 기본 방은 `channels/main` 문서가 없을 수 있어 배경 스티커는 merge로 만든다(규칙이 bgStk·stkLast만 있는 생성 허용).
+  - 기존 4-2의 "스티커(공감)"는 메뉴 이름을 "👍 공감 표시"로 바꿨다(👍 ❤️ … 개수 표시는 그대로).
+  - 휴대폰 채팅 머리줄: 예전에는 머리줄 안 아무 버튼에 포커스가 가도(`:focus-within`) 검색칸이 넓어져, ⋯을 누르면 검색칸이 그 자리로 밀려와 메뉴가 안 열렸다(갤럭시 크롬) → 검색칸에 포커스가 있을 때만 넓힌다(`:has(.header-search:focus-within)`).
 - **링크 미리보기와 @멘션 (공통 기능 4-4):**
   - 링크: 보낸 뒤 앱이 서버 함수 `linkPreview`(`functions/src/linkPreview.ts`)를 불러 그 페이지의 og:title·description·image(없으면 <title>)를 읽어 메시지 `link {url, title, desc, image, site}`에 붙인다. 팀원만 부를 수 있고, 같은 주소는 7일 동안 `linkPreviews/{sha1}`(앱 접근 불가)에 저장해 다시 쓴다. 내부망·서버 주소(localhost, 10.x, 192.168.x, 169.254.x 등)와 80/443 외 포트는 읽지 않고(넘겨 주는 주소도 매번 검사), 6초·512KB까지만 읽는다. euc-kr 페이지도 읽는다.
   - @멘션: 입력칸에서 "@"를 치면 직원 목록(맨 위 @모두)이 뜨고 글자로 걸러진다. ↑↓·Enter·Tab·Esc, 휴대폰은 눌러서 고른다. 보낼 때 글 속 "@이름"/"@모두"로 `mentions[uid]`를 만든다(@모두 = 나를 뺀 팀원 전부). 말풍선의 @이름은 색칠, 나를 부른 말은 노란 테두리와 내 이름 노란 칠.
@@ -212,14 +219,14 @@ customers/{id}/notes/{id}/revisions/{revId}   body, editedBy, editedAt
 teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null), size, pdfDropped,
                                  images[{assetId(경로), name:'1쪽', w, h, scale}],
                                  marks[{p(쪽 0부터), x, y, w?, h?, t}], marksAt, marksBy, authorId, createdAt
-teams/{teamId}/channels/{channelId}  name, createdBy, createdAt   (단체 채팅방, main은 기본 방 이름만)
+teams/{teamId}/channels/{channelId}  name, createdBy, createdAt, bgStk, stkLast   (단체 채팅방, main은 기본 방 이름·배경 스티커만)
 teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모양
 teams/{teamId}/channels/{c}/reads/{uid}       at (마지막으로 읽은 시각, 기본 방은 c = main)
 teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], customerTags[customerId],
                                  replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}], files[{path, name, size, type}],
                                  video{path, posterPath, name, size, type, w, h, dur},
                                  reactions{uid: 이모지}, deleted, editedAt, link{url, title, desc, image, site},
-                                 hasPhotos (사진 모아보기 조회용), stickerAssetId(😊 이모티콘), createdAt, editedAt
+                                 hasPhotos (사진 모아보기 조회용), stickerAssetId(😊 이모티콘), stk{id: {e|a, x, y, by, at}}, stkLast(🏷️), createdAt, editedAt
 ```
 
 - 보안 규칙: 팀 멤버만 해당 팀의 `customers`, `messages`에 접근. `viewer`는 읽기만. 메시지 수정/삭제는 작성자만. 고객 삭제는 관리자 또는 담당자(`ownerUid`)만, 메모 삭제는 관리자 또는 작성자만. Storage 규칙도 `teams/{teamId}.members`를 조회해 같은 기준을 적용한다.

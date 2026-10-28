@@ -69,7 +69,7 @@ const JPEG_QUALITY = 0.8
 export const MAIN_CHANNEL = 'main'
 export const MAIN_CHANNEL_NAME = '전체 채팅'
 
-export type Channel = { id: string; name: string; createdBy: string | null; createdAt: Timestamp | null }
+export type Channel = { id: string; name: string; createdBy: string | null; createdAt: Timestamp | null; bgStk?: unknown }
 
 export function messagesRef(teamId: string, channelId: string): CollectionReference {
   return channelId === MAIN_CHANNEL
@@ -91,13 +91,14 @@ export function useChannels(teamId: string | undefined) {
           name: String(d.get('name') ?? ''),
           createdBy: (d.get('createdBy') as string) ?? null,
           createdAt: (d.get('createdAt') as Timestamp) ?? null,
+          bgStk: d.get('bgStk') ?? null, // 🏷️ 채팅방 배경 스티커
         }))
         const main = list.find((c) => c.id === MAIN_CHANNEL)
         const others = list
           .filter((c) => c.id !== MAIN_CHANNEL)
           .sort((a, b) => (a.createdAt?.toMillis() ?? Infinity) - (b.createdAt?.toMillis() ?? Infinity))
         setChannels([
-          { id: MAIN_CHANNEL, name: main?.name || MAIN_CHANNEL_NAME, createdBy: null, createdAt: null },
+          { id: MAIN_CHANNEL, name: main?.name || MAIN_CHANNEL_NAME, createdBy: null, createdAt: null, bgStk: main?.bgStk ?? null },
           ...others,
         ])
       },

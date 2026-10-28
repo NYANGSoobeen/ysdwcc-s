@@ -38,6 +38,23 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
 
+    // 🏷️ 붙이는 스티커: 문서의 field = { 스티커id: {e(이모지) | a(이모티콘 경로), x, y(0~1), by, at} }.
+    // 팀원은 누구나 한 번에 하나씩 자기 스티커를 붙이거나(by = 나) 자기 것만 뗀다. stkLast = 이번에 바꾼 스티커 id.
+    function stkOk(field) {
+      let before = resource == null ? {} : resource.data.get(field, {});
+      let after = request.resource.data.get(field, {});
+      let k = request.resource.data.get('stkLast', '');
+      return k is string && k.size() > 0
+        && after.diff(before).affectedKeys().hasOnly([k])
+        && after.size() <= 60
+        && ((!(k in before) && k in after
+            && after[k].by == request.auth.uid
+            && after[k].keys().hasOnly(['e', 'a', 'x', 'y', 'by', 'at'])
+            && after[k].x is number && after[k].x >= 0 && after[k].x <= 1
+            && after[k].y is number && after[k].y >= 0 && after[k].y <= 1)
+          || (k in before && !(k in after) && before[k].by == request.auth.uid));
+    }
+
     // 채팅 메시지 수정: 작성자는 글(수정, 삭제 표시)을, 팀원은 누구나 자기 스티커(공감)만 바꾼다.
     // reactions = { uid: "👍" } — 남의 스티커는 건드릴 수 없다.
     function canUpdateMessage(teamId) {
@@ -51,7 +68,8 @@ service cloud.firestore {
           && request.resource.data.reactions
             .diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])
           && (!(request.auth.uid in request.resource.data.reactions)
-            || request.resource.data.reactions[request.auth.uid] in ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅']));
+            || request.resource.data.reactions[request.auth.uid] in ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅']))
+        || (isMember(teamId) && onlyChanges(['stk', 'stkLast']) && stkOk('stk'));
     }
 
     // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다.
@@ -153,11 +171,16 @@ service cloud.firestore {
         }
 
         allow read: if isMember(teamId);
-        allow create: if canEdit(teamId) && validName()
-          && request.resource.data.createdBy == request.auth.uid
-          && (channelId != 'main' || isAdmin(teamId));
-        allow update: if validName() && onlyChanges(['name'])
-          && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid));
+        allow create: if (canEdit(teamId) && validName()
+            && request.resource.data.createdBy == request.auth.uid
+            && (channelId != 'main' || isAdmin(teamId)))
+          // 기본 방은 문서가 없을 수 있다: 배경 스티커를 처음 붙일 때 생긴다.
+          || (channelId == 'main' && isMember(teamId)
+            && request.resource.data.keys().hasOnly(['bgStk', 'stkLast']) && stkOk('bgStk'));
+        allow update: if (validName() && onlyChanges(['name'])
+            && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid)))
+          // 🏷️ 채팅방 배경 스티커: 팀원 누구나 (자기 것만 떼기)
+          || (isMember(teamId) && onlyChanges(['bgStk', 'stkLast']) && stkOk('bgStk'));
         allow delete: if channelId != 'main'
           && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid));
 

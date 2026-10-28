@@ -2901,16 +2901,16 @@ dd.break {
   padding: 0;
 }
 /* 휴대폰: 검색칸을 누르면 방 이름을 숨기고 검색칸을 넓힌다 */
-.shell:not(.desktop) .chat-header:focus-within h2 {
+.shell:not(.desktop) .chat-header:has(.header-search:focus-within) h2 {
   display: none;
 }
-.shell:not(.desktop) .chat-header:focus-within .header-actions {
+.shell:not(.desktop) .chat-header:has(.header-search:focus-within) .header-actions {
   flex: 1;
 }
-.shell:not(.desktop) .chat-header:focus-within .header-search {
+.shell:not(.desktop) .chat-header:has(.header-search:focus-within) .header-search {
   flex: 1;
 }
-.shell:not(.desktop) .chat-header:focus-within .header-search input {
+.shell:not(.desktop) .chat-header:has(.header-search:focus-within) .header-search input {
   width: 100%;
 }
 .search-results {
@@ -3963,4 +3963,176 @@ a.st-link-btn {
   bottom: calc(100% + 6px);
   width: auto;
   max-width: none;
+}
+
+/* ══ 🏷️ 붙이는 스티커 (말풍선·채팅방 배경·공지) ══ */
+.messages-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.messages-area > .messages {
+  position: relative;
+  z-index: 1;
+}
+.messages-area.placing,
+.messages-area.placing * {
+  cursor: crosshair;
+}
+.stk-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.stk-layer.bg {
+  z-index: 0;
+}
+.stk {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  line-height: 1;
+}
+.stk-layer.bg .stk {
+  pointer-events: none;
+  opacity: 0.92;
+}
+.stk-emoji {
+  font-size: 26px;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+}
+.stk-img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+.stk-layer.bg .stk-emoji {
+  font-size: 40px;
+}
+.stk-layer.bg .stk-img {
+  width: 72px;
+  height: 72px;
+}
+.stk-anchor {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+.placing-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--venice);
+  color: var(--merino);
+  font-size: 14px;
+  font-weight: 600;
+}
+.placing-bar button {
+  min-height: 32px;
+  color: var(--merino);
+}
+/* 고르는 창 */
+.modal.sticker-picker {
+  width: min(560px, calc(100vw - 24px));
+}
+.sticker-tabs {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+.sticker-tabs button {
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sticker-tabs button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.sticker-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 2px;
+  height: min(50vh, 340px);
+  margin-top: 8px;
+  overflow-y: auto;
+  align-content: start;
+}
+.sticker-choices .pick {
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 28px;
+}
+.sticker-choices .pick.emoticon {
+  grid-column: span 2;
+  height: 72px;
+}
+.sticker-choices .pick img,
+.sticker-choices .pick .photo-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.sticker-choices p {
+  grid-column: 1 / -1;
+}
+/* 누가 붙였는지 · 배경 스티커 목록 */
+.stk-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.stk-info .stk-emoji {
+  font-size: 40px;
+}
+.stk-info .stk-img {
+  width: 64px;
+  height: 64px;
+}
+.stuck-list {
+  max-height: 50vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.stuck-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.stuck-list .stk-emoji {
+  width: 44px;
+  font-size: 30px;
+  text-align: center;
+}
+.stuck-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.danger-text {
+  color: var(--danger);
 }

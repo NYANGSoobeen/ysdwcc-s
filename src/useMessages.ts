@@ -27,6 +27,7 @@ export type Message = {
   files: ChatFile[]
   video: ChatVideo | null
   stickerAssetId: string | null
+  stk: unknown // 🏷️ 붙인 스티커 (src/stuck.ts)
   createdAt: Timestamp | null
   pending: boolean
   replyTo: ReplyTo | null
@@ -46,6 +47,7 @@ function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
     attachments: data.attachments ?? [],
     files: data.files ?? [],
     video: data.video ?? null,
+    stk: data.stk ?? null,
     stickerAssetId: typeof data.stickerAssetId === 'string' && data.stickerAssetId ? data.stickerAssetId : null,
     createdAt: data.createdAt ?? null,
     pending: d.metadata.hasPendingWrites,
