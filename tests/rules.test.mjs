@@ -247,3 +247,23 @@ test('푸시 토큰: 본인 것만 등록·삭제, 남의 토큰은 못 읽고, 
   // 서버 전용: 프론트 알림 비밀값
   await assertFails(getDoc(doc(fs('admin'), 'meta/frontLink')))
 })
+
+test('😊 이모티콘: 팀 직원은 보기만, 최고 관리자만 테마·이모티콘을 만들고 지운다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore()
+    await setDoc(doc(db, 'users/boss'), { name: '최고', teamIds: ['t1'], superAdmin: true })
+    await setDoc(doc(db, 'users/ed'), { name: '편집', teamIds: ['t1'] })
+    await setDoc(doc(db, 'users/gone'), { name: '중지', teamIds: ['t1'], active: false })
+    await setDoc(doc(db, 'stickerPacks/p1'), { name: '강아지', order: 1 })
+  })
+  await assertSucceeds(getDoc(doc(fs('ed'), 'stickerPacks/p1')))
+  await assertFails(getDoc(doc(fs('gone'), 'stickerPacks/p1')))
+  await assertFails(getDoc(doc(fs('outsider'), 'stickerPacks/p1')))
+  await assertFails(setDoc(doc(fs('ed'), 'stickerPacks/p2'), { name: '고양이', order: 2 }))
+  await assertSucceeds(setDoc(doc(fs('boss'), 'stickerPacks/p2'), { name: '고양이', order: 2 }))
+  await assertFails(setDoc(doc(fs('boss'), 'stickerPacks/p3'), { name: '', order: 3 }))
+  await assertSucceeds(setDoc(doc(fs('boss'), 'stickers/s1'), { packId: 'p1', assetId: 'stickers/s1.png', name: '웃음', order: 1 }))
+  await assertFails(setDoc(doc(fs('boss'), 'stickers/s2'), { packId: 'p1', assetId: 'teams/t1/chat/x/0.jpg', name: '남의 파일', order: 2 }))
+  await assertFails(deleteDoc(doc(fs('ed'), 'stickers/s1')))
+  await assertSucceeds(deleteDoc(doc(fs('boss'), 'stickers/s1')))
+})

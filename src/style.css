@@ -3810,3 +3810,157 @@ a.st-link-btn {
     display: none;
   }
 }
+
+/* 😊 이모지·이모티콘 창: 위에 탭(🕘 최근 · 😊 이모지 · 테마들), 아래 고르는 칸 */
+.emoji-panel {
+  display: block;
+  width: min(340px, calc(100vw - 24px));
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 38px);
+  justify-content: center;
+  gap: 2px;
+}
+.emoji-panel .emoji-tabs {
+  display: flex;
+  gap: 4px;
+  margin: -2px -2px 8px;
+  padding-bottom: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+.emoji-panel .emoji-tabs button {
+  width: auto;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 15px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.emoji-panel .emoji-tabs button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.emoticon-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.emoji-panel .emoticon-grid button {
+  width: 100%;
+  height: 72px;
+  min-height: 72px;
+  padding: 4px;
+  border-radius: 10px;
+}
+.emoticon-grid img,
+.emoticon-grid .photo-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.emoticon-grid p {
+  grid-column: 1 / -1;
+  margin: 12px 0;
+  text-align: center;
+}
+/* 말풍선 속 이모티콘: 바탕 없이 그림만 */
+.chat-emoticon {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+.bubble.emoticon-bubble,
+.message.mine .bubble.emoticon-bubble {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 최고 관리자: 😊 이모티콘 관리 */
+.emoticon-pack {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.emoticon-pack-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.emoticon-pack-head .spacer {
+  flex: 1;
+}
+.emoticon-pack-head button {
+  min-height: 32px;
+  padding: 4px 8px;
+}
+.emoticon-pack-head .danger-text {
+  color: var(--danger);
+}
+.emoticon-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+.emoticon-admin-item {
+  position: relative;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.emoticon-admin-item img,
+.emoticon-admin-item .photo-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.emoticon-admin-item .remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+}
+.emoticon-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  min-height: 64px;
+  padding: 0;
+  border-style: dashed;
+  font-size: 20px;
+}
+.emoticon-add span {
+  font-size: 11px;
+}
+/* 휴대폰: 😊 창을 입력칸 줄 전체 너비로 (화면 밖으로 나가지 않게) */
+.shell:not(.desktop) .composer {
+  position: relative;
+}
+.shell:not(.desktop) .emoji-root {
+  position: static;
+}
+.shell:not(.desktop) .emoji-panel {
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  width: auto;
+  max-width: none;
+}

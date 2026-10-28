@@ -98,6 +98,7 @@ export function previewOf(m: Record<string, unknown>) {
   const photos = Array.isArray(m.attachments) ? m.attachments.length : 0
   if (photos) return photos > 1 ? `📷 사진 ${photos}장` : '📷 사진'
   if (m.video) return '🎬 동영상'
+  if (typeof m.stickerAssetId === 'string' && m.stickerAssetId) return '😊 이모티콘'
   const files = Array.isArray(m.files) ? (m.files as { name?: string }[]) : []
   if (files.length) return `📎 ${files[0].name ?? '파일'}${files.length > 1 ? ` 외 ${files.length - 1}개` : ''}`
   const link = m.link as { title?: string; url?: string } | undefined

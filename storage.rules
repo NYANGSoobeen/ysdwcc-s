@@ -13,6 +13,18 @@ service firebase.storage {
       return active() ? firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid] : null;
     }
 
+    // 😊 이모티콘 그림 (모든 팀 공용): 로그인한 직원은 보고, 최고 관리자만 올리고 지운다.
+    // PNG·JPG·WebP는 앱이 256px로 줄여 올리고, 움직이는 GIF는 원본 그대로 1MB까지. 문서를 지우면 Functions가 그림도 지운다.
+    match /stickers/{fileName} {
+      allow read: if request.auth != null && active();
+      allow create: if request.auth != null && active()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true
+        && request.resource.contentType.matches('image/(png|gif|jpeg|webp)')
+        && request.resource.size <= 1024 * 1024;
+      allow delete: if request.auth != null && active()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true;
+    }
+
     // 근무표(스케줄): 쪽 그림(PNG/JPEG)과 원본 PDF(1MB 이하만). 교체·삭제 시 Functions가 폴더째 지운다.
     match /teams/{teamId}/schedule/{uploadId}/{fileName} {
       allow read: if request.auth != null

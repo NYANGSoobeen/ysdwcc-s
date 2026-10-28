@@ -90,6 +90,13 @@
   - Storage `teams/{teamId}/chat/{msgId}/v_0.{mp4|mov|m4v|webm|3gp}` + 첫 장면 사진 `v_0_poster.jpg`(긴 쪽 640px, 사진 규칙). 메시지 `video {path, posterPath, name, size, type, w, h, dur}`. 첫 장면을 못 뽑는 형식(PC의 아이폰 HEVC 등)은 미리보기 없이 보낸다.
   - 말풍선(`VideoBox`): 첫 장면 + ▶ + "0:32 · 12MB". 상자 크기는 영상 비율로 정한다(너비 = min(280px, 62vw, 360px×비율), 높이 = 너비÷비율 → 세로 영상도 360px 안에 꼭 맞음, 아이폰·갤럭시 같음). 재생하면 실제 영상 크기(videoWidth/Height)로 비율을 다시 맞춘다(회전 정보 차이 대비). 예전처럼 너비 고정 + max-height로 하면 세로 영상에서 비율이 깨진다(프론트 앱 갤럭시 오류의 원인으로 보임). 누르면 그 자리에서 재생하는데, 다운로드 주소로 바로 재생해 **본 만큼만 받는다**(미리 받지 않음, 무료 사용량 절약). 재생 못 하면 저장 안내. 메시지 메뉴 💾 동영상 저장, 삭제하면 동영상·첫 장면 파일도 지움(기간 삭제·방 삭제는 폴더째). 푸시·답장 미리보기 "🎬 동영상", 용량 관리에 "동영상 N개 용량".
   - 🏌️ 프론트 채팅방의 동영상(`video {assetId, poster, …}`)도 같은 모양으로 보고(`assetLink` = 다운로드 주소로 재생) 저장한다. 프론트 방에 동영상 보내기는 프론트 규칙상 게스트가 못 한다.
+- **😊 이모티콘 (5번, 2026-10-28, 카톡 이모티콘처럼, `src/emoticons.ts`):**
+  - **모든 팀 공용, 최고 관리자만 관리**(사용자가 정함). `stickerPacks/{id} {name, order, createdAt}`(테마), `stickers/{id} {packId, assetId, name, order, createdAt}`(assetId = Storage `stickers/{id}.{png|gif}`). 규칙: 팀에 속한(`users.teamIds` 있음) 사용 중인 직원은 읽기, 쓰기·삭제는 `users.superAdmin`만(Storage도 같음). 이모티콘 문서를 지우면 `onStickerDeleted`가 그림을 지운다(테마 삭제는 앱이 그 테마 이모티콘 문서를 지움).
+  - 그림: PNG·JPG·WebP는 긴 쪽 256px PNG로 줄여(투명 유지), **움직이는 GIF는 원본 그대로 1MB까지**(`EMOTICON_MAX_BYTES` = storage.rules).
+  - 관리: 관리자 화면 최고 관리자 묶음 "😊 이모티콘" 카드(`EmoticonAdminCard`): 새 테마, 이름 바꾸기, ▲▼ 순서, 테마 삭제, ＋ 추가(여러 장), ✕ 지우기.
+  - 보내기: 입력칸 😊 창 위쪽 탭 🕘 최근 · 😊 이모지 · 테마들. 이모티콘을 누르면 바로 메시지 `{stickerAssetId}`로 보낸다(`sendStickerMessage`, 답장 중이면 답장). 최근 보낸 이모티콘은 이 기기 localStorage `recent-emoticons`(24개). 목록은 실시간 구독 없이 😊 창을 처음 열 때 한 번 읽는다(`loadEmoticons`). 휴대폰은 😊 창이 입력칸 줄 전체 너비.
+  - 말풍선: 바탕 없이 그림만 120px(`emoticon-bubble`, 답장·글이 있으면 보통 말풍선). 푸시·답장 미리보기 "😊 이모티콘". 수정 중엔 이모티콘 탭 없음. 🏌️ 프론트 방 입력칸은 이모지만(프론트 규칙상 게스트는 글만).
+  - 용량 관리: `stickers/` 파일은 팀 폴더 밖이라 막대(프로젝트 전체)에만 들어간다.
 - **링크 미리보기와 @멘션 (공통 기능 4-4):**
   - 링크: 보낸 뒤 앱이 서버 함수 `linkPreview`(`functions/src/linkPreview.ts`)를 불러 그 페이지의 og:title·description·image(없으면 <title>)를 읽어 메시지 `link {url, title, desc, image, site}`에 붙인다. 팀원만 부를 수 있고, 같은 주소는 7일 동안 `linkPreviews/{sha1}`(앱 접근 불가)에 저장해 다시 쓴다. 내부망·서버 주소(localhost, 10.x, 192.168.x, 169.254.x 등)와 80/443 외 포트는 읽지 않고(넘겨 주는 주소도 매번 검사), 6초·512KB까지만 읽는다. euc-kr 페이지도 읽는다.
   - @멘션: 입력칸에서 "@"를 치면 직원 목록(맨 위 @모두)이 뜨고 글자로 걸러진다. ↑↓·Enter·Tab·Esc, 휴대폰은 눌러서 고른다. 보낼 때 글 속 "@이름"/"@모두"로 `mentions[uid]`를 만든다(@모두 = 나를 뺀 팀원 전부). 말풍선의 @이름은 색칠, 나를 부른 말은 노란 테두리와 내 이름 노란 칠.
@@ -190,6 +197,8 @@ users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽�
 pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
 meta/kakaoSearch                 key, updatedAt, updatedBy   (채팅 #검색 카카오 키, 앱에서 접근 불가)
+stickerPacks/{id}                name, order, createdAt   (😊 이모티콘 테마, 모든 팀 공용, 최고 관리자만 씀)
+stickers/{id}                    packId, assetId(stickers/{id}.png|gif), name, order, createdAt
 meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)
 carddavTokens/{username}         uid, secretHash, disabled, createdAt, lastUsedAt   (앱에서 접근 불가)
 linkPreviews/{sha1(url)}         preview, at   (링크 미리보기 7일 저장, 앱에서 접근 불가)
@@ -210,7 +219,7 @@ teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], cu
                                  replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}], files[{path, name, size, type}],
                                  video{path, posterPath, name, size, type, w, h, dur},
                                  reactions{uid: 이모지}, deleted, editedAt, link{url, title, desc, image, site},
-                                 hasPhotos (사진 모아보기 조회용), createdAt, editedAt
+                                 hasPhotos (사진 모아보기 조회용), stickerAssetId(😊 이모티콘), createdAt, editedAt
 ```
 
 - 보안 규칙: 팀 멤버만 해당 팀의 `customers`, `messages`에 접근. `viewer`는 읽기만. 메시지 수정/삭제는 작성자만. 고객 삭제는 관리자 또는 담당자(`ownerUid`)만, 메모 삭제는 관리자 또는 작성자만. Storage 규칙도 `teams/{teamId}.members`를 조회해 같은 기준을 적용한다.

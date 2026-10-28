@@ -138,10 +138,11 @@ export type { LinkPreview }
 
 export type ReplyTo = { id: string; authorUid: string; text: string }
 
-export function replyPreview(message: { body: string; attachments: Attachment[]; files?: ChatFile[]; video?: ChatVideo | null }) {
+export function replyPreview(message: { body: string; attachments: Attachment[]; files?: ChatFile[]; video?: ChatVideo | null; stickerAssetId?: string | null }) {
   if (message.body) return message.body.replace(/\s+/g, ' ').slice(0, 80)
   if (message.attachments.length) return `사진 ${message.attachments.length}장`
   if (message.video) return '동영상'
+  if (message.stickerAssetId) return '이모티콘'
   return message.files?.length ? `파일 ${message.files[0].name}` : ''
 }
 
@@ -328,6 +329,25 @@ export async function sendLinkMessage(teamId: string, channelId: string, link: L
   return messageRef.id
 }
 
+// 😊 이모티콘 하나를 보낸다 (글 없이 그림만, 답장 중이면 답장으로).
+export async function sendStickerMessage(teamId: string, channelId: string, stickerAssetId: string, replyTo: ReplyTo | null = null) {
+  const messageRef = doc(messagesRef(teamId, channelId))
+  await setDoc(messageRef, {
+    authorUid: auth.currentUser!.uid,
+    body: '',
+    mentions: [],
+    customerTags: [],
+    replyTo,
+    attachments: [],
+    files: [],
+    stickerAssetId,
+    hasPhotos: false,
+    createdAt: serverTimestamp(),
+    editedAt: null,
+  })
+  return messageRef.id
+}
+
 export async function attachLinkPreview(teamId: string, channelId: string, messageId: string, url: string) {
   const preview = await api.linkPreview({ url }).catch(() => null)
   if (preview) await updateDoc(doc(messagesRef(teamId, channelId), messageId), { link: preview }).catch(() => {})
@@ -362,6 +382,7 @@ export async function deleteMessage(
     attachments: [],
     files: [],
     video: null,
+    stickerAssetId: null,
     hasPhotos: false,
     replyTo: null,
     mentions: [],

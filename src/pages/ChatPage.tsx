@@ -25,6 +25,7 @@ import {
   replyPreview,
   sendLinkMessage,
   sendMessage,
+  sendStickerMessage,
   setReaction,
   type Channel,
   type ChatFile,
@@ -32,6 +33,7 @@ import {
   type ReplyTo,
 } from '../chat.ts'
 import { fileName, saveFile } from '../download.ts'
+import { recentEmoticons, rememberEmoticon, useEmoticons } from '../emoticons.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { useMemberProfiles, type Team } from '../hooks.ts'
@@ -708,7 +710,7 @@ function MessageItem(props: {
           </div>
         ) : (
           <div
-            className="bubble has-menu"
+            className={m.stickerAssetId && !m.body && !reply ? 'bubble has-menu emoticon-bubble' : 'bubble has-menu'}
             {...menu}
             onPointerDownCapture={(e) => (point.current = { x: e.clientX, y: e.clientY })}
           >
@@ -726,6 +728,7 @@ function MessageItem(props: {
                 ))}
               </div>
             )}
+            {m.stickerAssetId && <StorageImage path={m.stickerAssetId} alt="이모티콘" className="chat-emoticon" />}
             {m.video && (
               <VideoBox
                 video={m.video}
@@ -1149,6 +1152,17 @@ function Composer(props: {
     }
   }
 
+  // 😊 이모티콘은 고르면 바로 보낸다 (답장 중이면 답장으로).
+  async function sendSticker(assetId: string) {
+    const reply = replyTo
+    if (reply) onSent()
+    try {
+      await sendStickerMessage(teamId, channelId, assetId, reply)
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+
   // 😊 고른 이모지를 커서 자리에 넣는다.
   function insertText(text: string) {
     const el = textarea.current
@@ -1255,7 +1269,7 @@ function Composer(props: {
         <button type="button" className="round-button attach-button" onClick={openAttachMenu} aria-label="사진·파일 보내기" disabled={Boolean(editing)}>
           ＋
         </button>
-        <EmojiButton onPick={insertText} />
+        <EmojiButton onPick={insertText} onSticker={editing ? undefined : (assetId) => void sendSticker(assetId)} />
         <input ref={galleryInput} type="file" accept="image/*" multiple hidden onChange={pickInput} />
         <input ref={videoInput} type="file" accept={['video/*', ...VIDEO_EXTS.map((e) => `.${e}`)].join(',')} multiple hidden onChange={pickInput} />
         <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={pickInput} />
@@ -1359,9 +1373,13 @@ function usePreviews(files: File[]) {
 // 😊 이모지 고르기 (입력칸 옆). 자주 쓰는 것만 모아 둔다.
 const EMOJIS = '😀 😂 🥹 😊 😍 🥰 😘 😎 🤔 😮 😢 😭 😡 🙏 👍 👏 🙌 💪 👌 ✌️ 🤝 🙇 ❤️ 💙 🔥 ✨ 🎉 🎈 ☕ 🍚 ⛳ 🏌️ 📞 📅 ✅ ❌ ⚠️ ❗ ❓ 💯'.split(' ')
 
-export function EmojiButton({ onPick }: { onPick: (emoji: string) => void }) {
+// 😊 버튼: 자주 쓰는 이모지(입력칸에 넣기) + 이모티콘 테마(누르면 바로 보내기, onSticker가 있을 때만).
+// 이모티콘 목록은 이 창을 처음 열 때 한 번 읽는다. 최근 보낸 이모티콘은 이 기기에 기억한다.
+export function EmojiButton({ onPick, onSticker }: { onPick: (emoji: string) => void; onSticker?: (assetId: string) => void }) {
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<string>(() => (onSticker && recentEmoticons().length ? 'recent' : 'emoji'))
   const root = useRef<HTMLDivElement>(null)
+  const { packs, items, loaded } = useEmoticons(open && Boolean(onSticker))
   useEffect(() => {
     if (!open) return
     const close = (e: PointerEvent) => {
@@ -1375,12 +1393,19 @@ export function EmojiButton({ onPick }: { onPick: (emoji: string) => void }) {
       window.removeEventListener('keydown', onKey)
     }
   }, [open])
+  const recent = onSticker ? recentEmoticons().filter((a) => !loaded || items.some((i) => i.assetId === a)) : []
+  const pick = (assetId: string) => {
+    rememberEmoticon(assetId)
+    setOpen(false)
+    onSticker?.(assetId)
+  }
+  const shown = tab === 'recent' ? recent : items.filter((i) => i.packId === tab).map((i) => i.assetId)
   return (
     <div className="emoji-root" ref={root}>
       <button
         type="button"
         className="round-button"
-        aria-label="이모지"
+        aria-label={onSticker ? '이모지·이모티콘' : '이모지'}
         aria-expanded={open}
         // 입력칸 포커스를 뺏지 않아 휴대폰 키보드가 그대로 남는다.
         onPointerDown={(e) => e.preventDefault()}
@@ -1389,12 +1414,43 @@ export function EmojiButton({ onPick }: { onPick: (emoji: string) => void }) {
         😊
       </button>
       {open && (
-        <div className="emoji-panel" role="listbox" aria-label="이모지 고르기">
-          {EMOJIS.map((e) => (
-            <button key={e} type="button" role="option" aria-selected={false} onPointerDown={(ev) => ev.preventDefault()} onClick={() => onPick(e)}>
-              {e}
-            </button>
-          ))}
+        <div className={onSticker ? 'emoji-panel with-tabs' : 'emoji-panel'}>
+          {onSticker && (
+            <div className="emoji-tabs" role="tablist">
+              {recent.length > 0 && (
+                <button type="button" role="tab" aria-selected={tab === 'recent'} className={tab === 'recent' ? 'active' : ''} onPointerDown={(e) => e.preventDefault()} onClick={() => setTab('recent')}>
+                  🕘 최근
+                </button>
+              )}
+              <button type="button" role="tab" aria-selected={tab === 'emoji'} className={tab === 'emoji' ? 'active' : ''} onPointerDown={(e) => e.preventDefault()} onClick={() => setTab('emoji')}>
+                😊 이모지
+              </button>
+              {packs.map((p) => (
+                <button key={p.id} type="button" role="tab" aria-selected={tab === p.id} className={tab === p.id ? 'active' : ''} onPointerDown={(e) => e.preventDefault()} onClick={() => setTab(p.id)}>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {tab === 'emoji' || !onSticker ? (
+            <div className="emoji-grid" role="listbox" aria-label="이모지 고르기">
+              {EMOJIS.map((e) => (
+                <button key={e} type="button" role="option" aria-selected={false} onPointerDown={(ev) => ev.preventDefault()} onClick={() => onPick(e)}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="emoticon-grid" role="listbox" aria-label="이모티콘 고르기">
+              {!loaded && <p className="muted small">불러오는 중…</p>}
+              {loaded && shown.length === 0 && <p className="muted small">아직 이모티콘이 없어요.</p>}
+              {shown.map((assetId) => (
+                <button key={assetId} type="button" role="option" aria-selected={false} onPointerDown={(ev) => ev.preventDefault()} onClick={() => pick(assetId)} aria-label="이모티콘 보내기">
+                  <StorageImage path={assetId} alt="이모티콘" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

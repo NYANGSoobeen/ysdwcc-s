@@ -9,6 +9,7 @@ import { MenuButton } from '../menu.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, tell, toast } from '../ui/dialogs.tsx'
 import { FrontLinkCard } from './FrontLinkCard.tsx'
+import { EmoticonAdminCard } from './EmoticonAdminCard.tsx'
 import { SearchKeyCard } from './SearchKeyCard.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
@@ -97,6 +98,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
             <CreateTeamForm onCreated={onSelectTeam} />
             <SearchKeyCard />
             <FrontLinkCard />
+            <EmoticonAdminCard />
             <button type="button" onClick={onOpenUsage}>
               💾 용량 관리 (저장 공간·데이터·기간별 채팅 삭제)
             </button>

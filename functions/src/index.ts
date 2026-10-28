@@ -44,6 +44,12 @@ export const onChannelMessageDeleted = onDocumentDeleted(
 )
 
 // 채팅방을 지우면 방의 메시지를 모두 지운다 (메시지마다 위 트리거가 사진을 지운다).
+// 😊 이모티콘을 지우면 그림 파일도 지운다 (테마를 지우면 앱이 그 테마의 이모티콘 문서를 지우고, 여기서 그림을 지운다).
+export const onStickerDeleted = onDocumentDeleted('stickers/{stickerId}', async (event) => {
+  const path = event.data?.get('assetId') as string | undefined
+  if (path && /^stickers\/[^/]+$/.test(path)) await getStorage().bucket().file(path).delete({ ignoreNotFound: true })
+})
+
 export const onChannelDeleted = onDocumentDeleted('teams/{teamId}/channels/{channelId}', async (event) => {
   const { teamId, channelId } = event.params
   if (channelId === 'main') return

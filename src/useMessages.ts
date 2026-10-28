@@ -26,6 +26,7 @@ export type Message = {
   attachments: Attachment[]
   files: ChatFile[]
   video: ChatVideo | null
+  stickerAssetId: string | null
   createdAt: Timestamp | null
   pending: boolean
   replyTo: ReplyTo | null
@@ -45,6 +46,7 @@ function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
     attachments: data.attachments ?? [],
     files: data.files ?? [],
     video: data.video ?? null,
+    stickerAssetId: typeof data.stickerAssetId === 'string' && data.stickerAssetId ? data.stickerAssetId : null,
     createdAt: data.createdAt ?? null,
     pending: d.metadata.hasPendingWrites,
     replyTo: data.replyTo ?? null,
