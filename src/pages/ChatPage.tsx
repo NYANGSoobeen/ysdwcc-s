@@ -848,7 +848,9 @@ export function VideoBox(props: { video: VideoInfo; loadSrc: () => Promise<strin
   const { video } = props
   const [src, setSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const ratio = video.w && video.h ? Math.max(0.5, Math.min(2, video.w / video.h)) : 16 / 9
+  // 가로·세로 비율: 보낼 때 잰 값, 재생하면 실제 영상 크기로 다시 맞춘다 (회전 정보가 다른 기기·잘못 잰 값 대비).
+  const [actual, setActual] = useState<number | null>(null)
+  const ratio = Math.max(0.5, Math.min(2, actual ?? (video.w && video.h ? video.w / video.h : 16 / 9)))
   async function play(e: React.MouseEvent) {
     e.stopPropagation()
     if (loading || src) return
@@ -867,9 +869,22 @@ export function VideoBox(props: { video: VideoInfo; loadSrc: () => Promise<strin
       props.onSave()
   }
   return (
-    <div className="chat-video" style={{ aspectRatio: String(ratio) }}>
+    // 상자 크기를 비율로 정한다: 너비 = min(280px, 화면 62%, 높이 360px일 때의 너비) → 세로 영상도 잘리거나 늘어나지 않는다.
+    <div className="chat-video" style={{ aspectRatio: String(ratio), width: `min(280px, 62vw, ${Math.round(360 * ratio)}px)` }}>
       {src ? (
-        <video src={src} controls autoPlay playsInline preload="metadata" onClick={(e) => e.stopPropagation()} onError={() => void cannotPlay()} />
+        <video
+          src={src}
+          controls
+          autoPlay
+          playsInline
+          preload="metadata"
+          onClick={(e) => e.stopPropagation()}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget
+            if (v.videoWidth && v.videoHeight) setActual(v.videoWidth / v.videoHeight)
+          }}
+          onError={() => void cannotPlay()}
+        />
       ) : (
         <button type="button" className="chat-video-cover" onClick={(e) => void play(e)} aria-label={`동영상 재생 ${video.name}`}>
           {props.poster}
