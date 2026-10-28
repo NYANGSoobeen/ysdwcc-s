@@ -24,6 +24,7 @@ import {
 import { StickerLayer, stickerColors } from '../schedule/StickerLayer.tsx'
 import { drawSticker, sameCell, STICKERS, type Mark } from '../schedule/stickers.ts'
 import { ZoomViewer } from '../schedule/ZoomViewer.tsx'
+import { useIsDesktop } from '../useMedia.ts'
 
 const stickerRows = [...new Set(STICKERS.map((s) => s.row))].sort()
 const ZOOM_STEP = 1.25
@@ -36,7 +37,8 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
   const [sticker, setSticker] = useState<string | null>(null)
   const [pending, setPending] = useState<Mark[]>([])
   const [zoom, setZoom] = useState(1)
-  const [viewport, setViewport] = useState(0)
+  const [viewport, setViewport] = useState({ w: 0, h: 0 })
+  const desktop = useIsDesktop()
   const [progress, setProgress] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [full, setFull] = useState<{ src: string; marks: Mark[]; page: Page; revoke: boolean } | null>(null)
@@ -54,11 +56,18 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
     [team.id],
   )
 
-  // 화면 너비에 맞춘 크기를 기준(확대 1)으로 삼는다.
+  // 화면에 맞춘 크기를 기준(확대 1)으로 삼는다: 휴대폰은 너비에, PC는 쪽 전체가 스크롤 없이 보이게.
   useLayoutEffect(() => {
     const el = scroller.current
     if (!el) return
-    const update = () => setViewport(el.clientWidth - 24)
+    const update = () => {
+      const cs = getComputedStyle(el)
+      setViewport({
+        w: el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+        // 쪽 아래 여백(12px)까지 빼야 세로 스크롤이 안 생긴다.
+        h: el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 12,
+      })
+    }
     update()
     const observer = new ResizeObserver(update)
     observer.observe(el)
@@ -162,7 +171,8 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
   }
 
   const marks = schedule ? [...schedule.marks, ...pending] : []
-  const pageWidth = Math.max(160, viewport * zoom)
+  const fitWidth = (page: Page) =>
+    Math.max(160, (desktop && viewport.h > 0 ? Math.min(viewport.w, (viewport.h * page.w) / page.h) : viewport.w) * zoom)
 
   return (
     <div className="page schedule">
@@ -282,12 +292,12 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
           </div>
         )}
         {schedule &&
-          viewport > 0 &&
+          viewport.w > 0 &&
           schedule.images.map((page, i) => (
             <PageView
               key={page.assetId}
               page={page}
-              width={pageWidth}
+              width={fitWidth(page)}
               marks={marks.filter((m) => m.p === i)}
               pending={pending}
               onTap={(fx, fy) => (sticker ? void place(i, fx, fy) : void openFull(i))}
