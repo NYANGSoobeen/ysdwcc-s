@@ -8,7 +8,7 @@ import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-fu
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
-import { notifyChatMessage, notifyFront } from './push.js'
+import { notifyChatMessage, notifyFront, notifyNotice } from './push.js'
 import { kakaoSearch, SearchError, type SearchKind } from './search.js'
 import { classifyTeamFiles, messageCollectionsOf, UNUSED, type StoredFile } from './usage.js'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
@@ -48,6 +48,12 @@ export const onChannelMessageDeleted = onDocumentDeleted(
 export const onStickerDeleted = onDocumentDeleted('stickers/{stickerId}', async (event) => {
   const path = event.data?.get('assetId') as string | undefined
   if (path && /^stickers\/[^/]+$/.test(path)) await getStorage().bucket().file(path).delete({ ignoreNotFound: true })
+})
+
+// 📢 새 공지 알림 (9번)
+export const onNoticeCreatedPush = onDocumentCreated('teams/{teamId}/notices/{noticeId}', async (event) => {
+  const data = event.data?.data()
+  if (data) await notifyNotice(event.params.teamId, data)
 })
 
 // 📢 공지를 지우면 사진 폴더를 지우고, 고치면 빠진 사진만 지운다 (방금 올린 파일은 저장 중일 수 있어 10분 동안 둔다).

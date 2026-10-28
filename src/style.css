@@ -4356,3 +4356,19 @@ a.st-link-btn {
 .member-row-avatar .avatar {
   border-radius: 50%;
 }
+
+/* 🔔 알림 종류별 켜기/끄기 (9번, 내 정보 PushCard) */
+.push-kinds {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.push-kinds .check-row {
+  align-items: flex-start;
+  line-height: 1.45;
+}
+.push-kinds small {
+  font-size: 12px;
+}

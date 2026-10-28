@@ -43,7 +43,7 @@ test('팀 채팅: 보낸 사람·사용 중지된 사람 빼고, "나를 부른 
   await push.notifyChatMessage('t1', 'r1', { authorUid: 'a', body: '오늘   회의 10시', mentions: [] })
   assert.deepEqual(sent.map((m) => m.token).sort(), ['tok-b1', 'tok-b2'])
   const web = sent.find((m) => m.token === 'tok-b1')
-  assert.deepEqual(web.data, { title: '오전 근무', body: '박관리: 오늘 회의 10시', url: '/?room=t1%3Ar1', tag: 'room-t1-r1' })
+  assert.deepEqual(web.data, { title: '오전 근무', body: '박관리: 오늘 회의 10시', url: '/?room=t1%3Ar1', tag: 'room-t1-r1', kind: 'chat' })
   assert.ok(web.webpush && !web.notification, '웹은 데이터만 보낸다 (서비스 워커가 그림)')
   const android = sent.find((m) => m.token === 'tok-b2')
   assert.equal(android.notification.title, '오전 근무')
@@ -73,6 +73,39 @@ test('보낼 수 없는 토큰(앱 삭제·알림 해제)은 지운다', async (
   assert.equal((await db.doc('pushTokens/b1').get()).exists, false)
   assert.equal((await db.doc('pushTokens/b2').get()).exists, true, '잠깐 실패한 토큰은 남긴다')
   await db.doc('pushTokens/b1').set({ uid: 'b', token: 'tok-b1', mode: 'all', platform: 'web' })
+})
+
+test('9번: 종류별 켜기/끄기, 20분 넘게 소식 없는 PC는 빼기, 새 공지 알림', async () => {
+  const { Timestamp } = require('firebase-admin/firestore')
+  const kinds = (chat, mention, notice, front) => ({ chat, mention, notice, front })
+  const set = (id, uid, k, extra = {}) => db.doc(`pushTokens/${id}`).set({ uid, token: `tok-${id}`, platform: 'web', mode: 'all', kinds: k, ...extra })
+  await set('k1', 'c', kinds(false, true, true, false)) // 이보기: 나를 부른 말 + 공지
+  await set('k2', 'b', kinds(true, true, false, true), { pc: true, seenAt: Timestamp.fromMillis(Date.now() - 25 * 60_000) }) // 오래된 PC
+  await set('k3', 'b', kinds(true, true, false, true), { pc: true, seenAt: Timestamp.now() }) // 열려 있는 PC
+  try {
+    await push.notifyChatMessage('t1', 'r1', { authorUid: 'a', body: '안녕' })
+    let got = sent.map((m) => m.token)
+    assert.ok(got.includes('tok-k3') && !got.includes('tok-k2'), '20분 넘은 PC는 안 보낸다')
+    assert.ok(!got.includes('tok-k1'), '채팅을 끈 기기는 일반 채팅을 안 받는다')
+
+    sent = []
+    await push.notifyChatMessage('t1', 'r1', { authorUid: 'a', body: '@이보기 확인', mentions: ['c'] })
+    assert.ok(sent.map((m) => m.token).includes('tok-k1'), '나를 부른 말은 받는다')
+
+    sent = []
+    await db.doc('teams/t1').update({ name: '지원팀' })
+    await push.notifyNotice('t1', { authorUid: 'a', title: '내일 근무 변경' })
+    got = sent.map((m) => m.token)
+    assert.ok(got.includes('tok-k1') && !got.includes('tok-k3'), '공지를 켠 기기만')
+    assert.ok(!got.includes('tok-a1'), '쓴 사람은 빼고')
+    const n = sent.find((m) => m.token === 'tok-k1').data
+    assert.equal(n.kind, 'notice')
+    assert.equal(n.url, '/?notice=t1')
+    assert.equal(n.title, '📢 새 공지 · 지원팀')
+    assert.equal(n.body, '내일 근무 변경 (박관리)')
+  } finally {
+    for (const id of ['k1', 'k2', 'k3']) await db.doc(`pushTokens/${id}`).delete()
+  }
 })
 
 function call(handler, { method = 'POST', headers = {}, body = {} }) {
@@ -117,5 +150,6 @@ test('프론트 알림(ydrGuestPush): 비밀값이 맞을 때만, 나를 부른 
     body: '김프론트: 손님 도착',
     url: '/?front=c1',
     tag: 'front-c1',
+    kind: 'front',
   })
 })

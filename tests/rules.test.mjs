@@ -235,7 +235,14 @@ test('푸시 토큰: 본인 것만 등록·삭제, 남의 토큰은 못 읽고, 
   await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { mode: 'loud' })))
   await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { extra: 1 })))
   await assertFails(setDoc(doc(fs(null), 'pushTokens/h1'), t('ed')))
+  await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { kinds: { chat: true, loud: true } })))
+  await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { pc: 'yes' })))
+  await assertFails(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { seenAt: Timestamp.fromMillis(Date.now() + 3_600_000) })))
   await assertSucceeds(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed')))
+  const k = { chat: false, mention: true, notice: true, front: false }
+  await assertSucceeds(setDoc(doc(fs('ed'), 'pushTokens/h1'), t('ed', { kinds: k, pc: true, seenAt: serverTimestamp() })))
+  // PC가 5분마다 "열려 있어요"
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'pushTokens/h1'), { seenAt: serverTimestamp(), updatedAt: serverTimestamp() }))
   await assertSucceeds(getDoc(doc(fs('ed'), 'pushTokens/h1')))
   await assertFails(getDoc(doc(fs('viewer'), 'pushTokens/h1')))
   await assertFails(getDocs(collection(fs('viewer'), 'pushTokens')))

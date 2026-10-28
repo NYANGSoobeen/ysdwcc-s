@@ -109,7 +109,11 @@ service cloud.firestore {
       allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
       allow create, update: if signedIn() && isActive()
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['uid', 'token', 'platform', 'mode', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'token', 'platform', 'mode', 'kinds', 'pc', 'seenAt', 'updatedAt'])
+        && (!('kinds' in request.resource.data) || (request.resource.data.kinds is map
+          && request.resource.data.kinds.keys().hasOnly(['chat', 'mention', 'notice', 'front'])))
+        && request.resource.data.get('pc', false) is bool
+        && (!('seenAt' in request.resource.data) || request.resource.data.seenAt == request.time)
         && request.resource.data.token is string && request.resource.data.token.size() < 4096
         && request.resource.data.platform in ['web', 'android']
         && request.resource.data.mode in ['all', 'mentions']

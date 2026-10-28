@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
-import { disablePush, enablePush, pushState, setPushMode, type PushMode, type PushState } from '../push.ts'
+import { DEFAULT_KINDS, disablePush, enablePush, isPc, pushState, setPushKinds, type PushKinds, type PushState } from '../push.ts'
 import { toast } from '../ui/dialogs.tsx'
 
-// 내 정보: 이 기기 알림 켜기/끄기 (앱이 꺼져 있어도 새 채팅·나를 부른 말·프론트 채팅 알림)
+// 내 정보: 이 기기 알림 (9번). 켜기/끄기 + 종류별(💬 채팅 · 🔔 나를 부른 말 · 📢 공지 · 🏌️ 프론트 채팅) 켜고 끄기.
+const KINDS: { key: keyof PushKinds; label: string; hint: string }[] = [
+  { key: 'chat', label: '💬 모든 새 채팅', hint: '우리 팀 채팅방의 새 말' },
+  { key: 'mention', label: '🔔 나를 부른 말', hint: '@내 이름, @모두 (채팅을 꺼도 받음)' },
+  { key: 'notice', label: '📢 새 공지', hint: '공지 게시판에 새 글' },
+  { key: 'front', label: '🏌️ 프론트 채팅', hint: '들어가 있는 프론트 채팅방의 새 말' },
+]
+
 export function PushCard() {
   const [state, setState] = useState<PushState | null>(null)
   const [busy, setBusy] = useState(false)
@@ -24,6 +31,7 @@ export function PushCard() {
 
   if (!state) return null
   const on = state.kind === 'on'
+  const kinds = on ? state.kinds : DEFAULT_KINDS
   return (
     <section className="card">
       <h3>🔔 알림 (이 기기)</h3>
@@ -45,37 +53,42 @@ export function PushCard() {
           주세요.
         </p>
       )}
-      {(state.kind === 'off' || on) && (
+      {state.kind === 'off' && (
         <>
-          <p className="muted small">앱이 꺼져 있어도 새 채팅을 알려 줘요. 앱을 보고 있을 때는 알림 대신 화면의 빨간 숫자로 보여요.</p>
-          <div className="segmented" role="radiogroup" aria-label="알림 받을 것">
-            {(
-              [
-                ['all', '모든 새 메시지'],
-                ['mentions', '나를 부른 말만'],
-              ] as [PushMode, string][]
-            ).map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={on && state.mode === mode}
-                className={on && state.mode === mode ? 'active' : ''}
-                disabled={busy}
-                onClick={() => void run(() => (on ? setPushMode(mode) : enablePush(mode)), on ? '알림 설정을 바꿨어요.' : '알림을 켰어요.')}
-              >
-                {label}
-              </button>
+          <p className="muted small">앱이 꺼져 있어도 새 채팅·공지를 알려 주고, 앱 아이콘에 안 읽은 수를 보여 줘요.</p>
+          <button type="button" className="primary" disabled={busy} onClick={() => void run(() => enablePush(DEFAULT_KINDS), '알림을 켰어요.')}>
+            🔔 알림 켜기
+          </button>
+          <p className="muted small">허용 창이 뜨면 "허용"을 눌러 주세요.</p>
+        </>
+      )}
+      {on && (
+        <>
+          <ul className="push-kinds">
+            {KINDS.map((k) => (
+              <li key={k.key}>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={kinds[k.key]}
+                    disabled={busy}
+                    onChange={(e) => void run(() => setPushKinds({ ...kinds, [k.key]: e.target.checked }), '알림 설정을 바꿨어요.')}
+                  />
+                  <span>
+                    {k.label}
+                    <small className="muted"> · {k.hint}</small>
+                  </span>
+                </label>
+              </li>
             ))}
-          </div>
-          {on ? (
-            <button type="button" disabled={busy} onClick={() => void run(disablePush, '이 기기 알림을 껐어요.')}>
-              알림 끄기
-            </button>
-          ) : (
-            <p className="muted small">위에서 받을 알림을 고르면 알림이 켜져요. (허용 창이 뜨면 "허용")</p>
-          )}
-          <p className="muted small">"나를 부른 말만"이면 프론트 채팅 알림도 받지 않아요.</p>
+          </ul>
+          <p className="muted small">
+            지금 보고 있는 채팅방의 알림은 띄우지 않아요. 알림을 누르면 그 채팅방이 바로 열려요.
+            {isPc() && ' 이 컴퓨터는 여러 사람이 쓸 수 있어서, 앱을 열어 둔 동안(마지막으로 연 뒤 20분까지)만 알림을 받아요.'}
+          </p>
+          <button type="button" disabled={busy} onClick={() => void run(() => disablePush(true), '이 기기 알림을 껐어요.')}>
+            알림 끄기
+          </button>
         </>
       )}
     </section>

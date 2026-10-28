@@ -10,11 +10,24 @@ import { getMessaging, type Message } from 'firebase-admin/messaging'
 export type PushNote = {
   title: string
   body: string
-  url: string // 알림을 누르면 열 주소 (/?room=팀:방, /?front=방)
+  url: string // 알림을 누르면 열 주소 (/?room=팀:방, /?front=방, /?notice=팀)
   tag: string // 같은 방 알림은 하나로 묶는다
+  kind?: 'chat' | 'notice' | 'front' // 서비스 워커가 앱 아이콘 숫자를 올릴지 정한다 (공지는 안 올림)
 }
 
-type Token = { id: string; uid: string; token: string; platform: string; mode: string }
+export type PushKinds = { chat: boolean; mention: boolean; notice: boolean; front: boolean }
+type Token = { id: string; uid: string; token: string; platform: string; mode: string; kinds: PushKinds; pc: boolean; seenAt: number }
+
+// 9번: 종류별 켜기/끄기. kinds가 없는 예전 기기는 mode로 정한다.
+const kindsOf = (v: Record<string, unknown>): PushKinds => {
+  const k = v.kinds as Partial<PushKinds> | undefined
+  if (k && typeof k === 'object') return { chat: !!k.chat, mention: !!k.mention, notice: !!k.notice, front: !!k.front }
+  return v.mode === 'mentions' ? { chat: false, mention: true, notice: false, front: false } : { chat: true, mention: true, notice: true, front: true }
+}
+
+// PC(여러 사람이 쓰는 컴퓨터)는 앱이 열려 있다고 5분마다 알린다. 20분 넘게 소식 없으면 보내지 않는다.
+export const PC_FRESH_MS = 20 * 60 * 1000
+export const reachable = (t: Token, now = Date.now()) => !t.pc || now - t.seenAt <= PC_FRESH_MS
 
 const chunk = <T>(list: T[], size: number) =>
   Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, i * size + size))
@@ -26,14 +39,24 @@ export async function tokensOf(uids: string[]): Promise<Token[]> {
     const snap = await db.collection('pushTokens').where('uid', 'in', part).get()
     for (const d of snap.docs) {
       const v = d.data()
-      if (typeof v.token === 'string') out.push({ id: d.id, uid: v.uid, token: v.token, platform: v.platform ?? 'web', mode: v.mode ?? 'all' })
+      if (typeof v.token === 'string')
+        out.push({
+          id: d.id,
+          uid: v.uid,
+          token: v.token,
+          platform: v.platform ?? 'web',
+          mode: v.mode ?? 'all',
+          kinds: kindsOf(v),
+          pc: v.pc === true,
+          seenAt: v.seenAt?.toMillis?.() ?? 0,
+        })
     }
   }
   return out
 }
 
 export function buildMessage(t: Pick<Token, 'token' | 'platform'>, note: PushNote): Message {
-  const data = { title: note.title, body: note.body, url: note.url, tag: note.tag }
+  const data = { title: note.title, body: note.body, url: note.url, tag: note.tag, kind: note.kind ?? 'chat' }
   if (t.platform === 'android') {
     return {
       token: t.token,
@@ -129,8 +152,8 @@ export async function notifyChatMessage(teamId: string, channelId: string, m: Re
   const url = `/?room=${encodeURIComponent(`${teamId}:${channelId}`)}`
   const tag = `room-${teamId}-${channelId}`
   const targets = tokens
-    .filter((t) => people.has(t.uid))
-    .filter((t) => t.mode !== 'mentions' || mentions.has(t.uid))
+    .filter((t) => people.has(t.uid) && reachable(t))
+    .filter((t) => (mentions.has(t.uid) ? t.kinds.mention || t.kinds.chat : t.kinds.chat))
     .map((t) => ({
       token: t,
       note: mentions.has(t.uid)
@@ -143,12 +166,34 @@ export async function notifyChatMessage(teamId: string, channelId: string, m: Re
 // 🏌️ 프론트 채팅방 새 말 (프론트 서버가 ydrGuestPush로 알려 줌) → 그 방에 있는 우리 직원에게.
 export async function notifyFront(uids: string[], title: string, body: string, ch: string) {
   const people = await activeUsers(uids)
-  const tokens = (await tokensOf([...people.keys()])).filter((t) => t.mode !== 'mentions')
-  const note = {
+  const tokens = (await tokensOf([...people.keys()])).filter((t) => t.kinds.front && reachable(t))
+  const note: PushNote = {
     title: short(`🏌️ ${title || '프론트 채팅'}`, 80),
     body: short(body || '새 메시지', 120),
     url: `/?front=${encodeURIComponent(ch)}`,
     tag: `front-${ch}`,
+    kind: 'front',
   }
   return sendNotes(tokens.map((token) => ({ token, note })))
+}
+
+// 📢 새 공지 → 쓴 사람을 뺀 팀원 중 공지 알림을 켠 기기에.
+export async function notifyNotice(teamId: string, n: Record<string, unknown>) {
+  if (typeof n.authorUid !== 'string') return 0
+  const db = getFirestore()
+  const team = await db.doc(`teams/${teamId}`).get()
+  const others = Object.keys((team.get('members') as Record<string, string>) ?? {}).filter((u) => u !== n.authorUid)
+  if (others.length === 0) return 0
+  const tokens = (await tokensOf(others)).filter((t) => t.kinds.notice && reachable(t))
+  if (tokens.length === 0) return 0
+  const people = await activeUsers([n.authorUid, ...new Set(tokens.map((t) => t.uid))], teamId)
+  const who = people.get(n.authorUid)?.name || '팀원'
+  const note: PushNote = {
+    title: short(`📢 새 공지 · ${String(team.get('name') ?? '')}`, 80),
+    body: short(`${String(n.title ?? '')} (${who})`, 120),
+    url: `/?notice=${encodeURIComponent(teamId)}`,
+    tag: `notice-${teamId}`,
+    kind: 'notice',
+  }
+  return sendNotes(tokens.filter((t) => people.has(t.uid)).map((token) => ({ token, note })))
 }

@@ -10,7 +10,7 @@ import { useMentionAlerts } from './useMentionAlerts.ts'
 import { useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
 import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
-import { listenOpenRequests, refreshPush, type OpenRequest } from './push.ts'
+import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellViewing, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
@@ -207,12 +207,27 @@ function SignedIn({ user }: { user: User }) {
     if (req.kind === 'front') return openFrontRoom(req.ch)
     if (!teamIds.includes(req.teamId)) return
     if (req.teamId !== team?.id) selectTeam(req.teamId)
+    if (req.kind === 'notice') return setTab('notices')
     setChannelState({ teamId: req.teamId, id: req.channelId })
     setQueries((prev) => ({ ...prev, chat: '' }))
     setTab('chat')
   }
   useEffect(() => listenOpenRequests((req) => openRequest.current(req)), [])
   const frontUnreadTotal = Object.values(frontUnread).reduce((a, b) => a + b, 0)
+  // PC: 앱이 열려 있다고 5분마다 서버에 알린다 (20분 넘게 소식 없는 PC에는 알림을 안 보냄).
+  useEffect(() => startPushHeartbeat(), [user.uid])
+  // 📛 앱 아이콘 빨간 숫자 = 안 읽은 채팅 수
+  const badgeTotal = unreadTotal + frontUnreadTotal
+  useEffect(() => setBadge(badgeTotal), [badgeTotal])
+  // 지금 보고 있는 방: 그 방 알림은 띄우지 않고, 이미 뜬 알림은 지운다 (앱을 내리면 없음).
+  const viewingTag =
+    tab === 'chat' && team && roomId ? roomTag(team.id, roomId) : tab === 'front' && frontRoomId ? frontTag(frontRoomId) : tab === 'notices' && team ? `notice-${team.id}` : null
+  useEffect(() => {
+    const send = () => tellViewing(document.visibilityState === 'visible' ? viewingTag : null)
+    send()
+    document.addEventListener('visibilitychange', send)
+    return () => document.removeEventListener('visibilitychange', send)
+  }, [viewingTag])
 
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
   const removed = missing || (profile !== null && teamIds.length === 0)
