@@ -12,6 +12,7 @@ import { FrontLinkCard } from './FrontLinkCard.tsx'
 import { EmoticonAdminCard } from './EmoticonAdminCard.tsx'
 import { SearchKeyCard } from './SearchKeyCard.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
+import { makeTempPassword } from '../tempPassword.ts'
 
 export const ROLE_HELP: Record<Role, string> = {
   admin: '팀원 관리(추가, 권한, 비밀번호, 삭제), 팀 이름, 모든 기능',
@@ -207,8 +208,9 @@ function MemberRow(props: {
   async function resetPassword() {
     const password = await askText({
       title: '비밀번호 초기화',
-      message: `${name}님의 임시 비밀번호를 정하세요 (6자 이상).\n다음에 로그인하면 새 비밀번호를 정하게 됩니다.`,
+      message: `${name}님의 임시 비밀번호예요 (헷갈리는 0·o·1·l·i는 뺐어요). 바꿔 써도 돼요 (6자 이상).\n다음에 로그인하면 새 비밀번호를 정하게 됩니다.`,
       label: '임시 비밀번호',
+      value: makeTempPassword(),
       ok: '초기화',
       required: '임시 비밀번호를 입력하세요.',
     })
@@ -220,7 +222,9 @@ function MemberRow(props: {
       await tell({
         title: '임시 비밀번호로 바꿨습니다',
         message: `${name}님에게 알려 주세요.\n아이디: ${loginId}\n임시 비밀번호: ${password}\n로그인하면 새 비밀번호를 정하게 됩니다.`,
+        ok: '복사하고 닫기',
       })
+      void copyText(`아이디: ${loginId}\n임시 비밀번호: ${password}`)
     } catch (err) {
       toast(errorMessage(err), { error: true })
     } finally {
@@ -324,7 +328,7 @@ function MemberRow(props: {
 }
 
 function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void }) {
-  const [form, setForm] = useState({ name: '', loginId: '', password: '', role: 'editor' as Role })
+  const [form, setForm] = useState({ name: '', loginId: '', password: makeTempPassword(), role: 'editor' as Role })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
@@ -343,11 +347,15 @@ function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void 
         role: form.role,
       })
       if (existed) toast(`${form.name}님을 추가했습니다. 이미 있던 계정이라 비밀번호는 그대로입니다.`)
-      else
+      else {
         await tell({
           title: `${form.name}님을 추가했습니다`,
           message: `아래 내용을 ${form.name}님에게 알려 주세요.\n아이디: ${form.loginId.trim()}\n임시 비밀번호: ${form.password}\n처음 로그인하면 새 비밀번호를 정하게 됩니다.`,
+          ok: '복사하고 닫기',
         })
+        // 확인을 누른 순간이라 복사가 허용된다
+        void copyText(`아이디: ${form.loginId.trim()}\n임시 비밀번호: ${form.password}`)
+      }
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -368,8 +376,13 @@ function AddMemberForm({ teamId, onDone }: { teamId: string; onDone: () => void 
         <input value={form.loginId} onChange={set('loginId')} autoCapitalize="none" required />
       </label>
       <label>
-        임시 비밀번호 (6자 이상, 처음 로그인 때 바꿈)
-        <input value={form.password} onChange={set('password')} minLength={6} required />
+        임시 비밀번호 (저절로 만들어짐, 처음 로그인 때 바꿈)
+        <span className="temp-pw-row">
+          <input value={form.password} onChange={set('password')} minLength={6} autoCapitalize="none" spellCheck={false} required />
+          <button type="button" onClick={() => setForm({ ...form, password: makeTempPassword() })} aria-label="임시 비밀번호 새로 만들기">
+            🎲 새로
+          </button>
+        </span>
       </label>
       <label>
         권한
@@ -453,4 +466,14 @@ function CreateTeamForm({ onCreated }: { onCreated: (teamId: string) => void }) 
       </button>
     </form>
   )
+}
+
+// 알려 줄 내용을 클립보드에 (안 되면 조용히 넘어감, 창에 그대로 보이므로)
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast('아이디와 임시 비밀번호를 복사했어요.')
+  } catch {
+    // 복사가 막힌 브라우저
+  }
 }

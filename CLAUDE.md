@@ -24,12 +24,12 @@
 - **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 맨 아래(버전 위), 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
 - **앱 색상:** Merino `#F5EEDD`(바탕) · Rock Blue `#84B3CE`(보조) · Venice Blue `#16587B`(주색, 버튼·내 말풍선·메뉴 바탕). `src/style.css` 맨 위 `:root` 토큰에서 바꾼다 (어두운 모드는 Venice 계열 바탕 + Rock Blue 강조). 메뉴(☰, PC 왼쪽 메뉴)는 Venice Blue 바탕에 Merino 글씨. 채팅방 바탕은 Rock Blue를 Merino 쪽으로 누그러뜨린 `#BED3DC`(`--chat-bg`), 남의 말풍선은 미색, 내 말풍선은 Venice Blue, 날짜 줄은 짙은 남색 반투명.
 - **글꼴:** 본문 Noto Sans KR(400·500·700, 기본 16px), 제목·화면 이름·내 이름 Noto Serif KR(500·700, 내 이름 14px), 채팅 말풍선 14.5px·줄 간격 1.55, 메뉴 14px, 작은 안내 10.5~12.5px. 구글 폰트를 `index.html`에서 불러오고 서비스 워커가 기기에 저장(`google-fonts` 캐시). 입력칸은 아이폰 확대 방지로 16px 유지. 토큰은 `style.css`의 `--font-sans`, `--font-serif`.
-- **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전은 저절로 적용한다 (`src/update.ts`): 새로고침·앱을 다시 열 때 새 버전을 찾으면 바로 바꾸고(한 번 더 새로고침), 쓰는 중이면 쓰던 글·열린 창·고른 사진·올리는 중인 것이 없을 때(`busy()`, 15초마다 확인) 바꾼다. 그동안은 하단 알림("지금 업데이트")을 띄운다. 서비스 워커는 prompt 방식 그대로(skipWaiting 안 함, 옛 화면 조각이 지워지지 않게).
+- **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전은 저절로 적용한다 (`src/update.ts`): 새로고침·앱을 다시 열 때 새 버전을 찾으면 바로 바꾸고(한 번 더 새로고침), 쓰는 중이면 쓰던 글·열린 창·고른 사진·올리는 중인 것이 없을 때(`busy()`, 15초마다 확인) 바꾼다. 그동안은 하단 알림("새 버전이 있어요 · 지금 업데이트")을 띄운다. 새 버전 확인: 30분마다, 앱을 다시 볼 때(visibilitychange), PC 창으로 돌아올 때(focus, 5분에 한 번), 인터넷이 다시 될 때. 다시 불러와도 보던 화면은 sessionStorage로 그대로. `sw.js`·`push-sw.js`·`index.html`은 `firebase.json`에서 no-cache. 서비스 워커는 prompt 방식 그대로(skipWaiting 안 함, 옛 화면 조각이 지워지지 않게).
 - **로그인 화면 (`src/pages/LoginPage.tsx`):** 프론트 앱과 같은 모양(화면 가로·세로 가운데 카드: ⛳ · 앱 이름 · "관리자가 등록한 직원만 로그인할 수 있어요" · 아이디/비밀번호 칸 · 로그인 유지/아이디 저장 체크칸(16px, 한 줄) · 🔒 안내 · 로그인 버튼 · 초기화 안내), 색만 우리 앱 색(바탕 Merino→Rock Blue 그라데이션).
 - **로그인과 계정:** 이메일/비밀번호 로그인. 계정은 관리자만 만든다 (콘솔에서 가입 기능을 끈다). "@" 없는 아이디는 `아이디@workphone.local`로 저장하며 실제 메일이 아니므로 비밀번호 분실 시 관리자가 초기화한다. 프로젝트에 팀이 없을 때만 로그인 화면에 "처음 시작하기"(첫 관리자 만들기)가 나온다.
 - **로그인 보안 (공통 기능 1번):**
   - 비밀번호 규칙: 8자 이상, 영문+숫자, 1234·abcd·qwer·aaaa처럼 4글자 이상 이어지거나 반복 금지, 아이디 포함 금지. 규칙 파일은 `src/password.ts`와 `functions/src/password.ts` 두 곳에 똑같이 두며(테스트가 같은지 확인), 서버(`changeMyPassword`, `createFirstAdmin`)도 검사한다.
-  - 관리자가 정한 비밀번호(새 계정, 초기화)는 임시 비밀번호(6자 이상)이고 `users.mustChangePassword`가 붙어, 처음 로그인하면 "비밀번호 정하기" 화면이 먼저 나온다. 비밀번호 바꾸기는 재인증 후 `changeMyPassword`(5분 안 재인증만 허용) → 새 비밀번호로 다시 로그인.
+  - 관리자가 정한 비밀번호(새 계정, 초기화)는 임시 비밀번호(6자 이상)이고, 화면이 **저절로 만들어 채운다**(11번, `src/tempPassword.ts` `makeTempPassword`: 헷갈리는 0·o·1·l·i를 뺀 소문자 6 + 숫자 2, 🎲 새로 / 직접 고쳐도 됨). 만든 뒤 창의 "복사하고 닫기"를 누르면 아이디·임시 비밀번호를 클립보드에 복사한다. `users.mustChangePassword`가 붙어, 처음 로그인하면 "비밀번호 정하기" 화면이 먼저 나온다. 비밀번호 바꾸기는 재인증 후 `changeMyPassword`(5분 안 재인증만 허용) → 새 비밀번호로 다시 로그인.
   - 로그인 화면 **"로그인 유지" 체크칸**(사용자가 고름, localStorage `keep-signed-in`에 기억). 기본값은 휴대폰 켬, PC(마우스 기기) 끔. 갤럭시 앱은 칸 없이 항상 유지. (지원팀은 각자 자기 컴퓨터를 써서 선택으로 바꿈.)
     - 켬: 로그인 유지(IndexedDB), 오프라인 캐시.
     - 끔(여러 사람이 쓰는 컴퓨터): 세션 저장(브라우저 닫으면 로그아웃), Firestore 메모리 캐시(디스크에 고객 정보 안 남김, 앱을 다시 열 때부터 적용), 1분마다 localStorage `alive-at` 기록 → 15분 넘게 끊겼으면 로그아웃(`src/session.ts`).
@@ -58,7 +58,7 @@
   - 메뉴 묶음: "단체 채팅", "관리자 전용"은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`).
   - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면은 📢 공지(7번에서 고객 → 공지로 바꿈).
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
-  - 앱 버전: 메뉴 맨 아래(`팀 · v0.5.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
+  - 앱 버전: 메뉴 맨 아래(`팀 · v0.6.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
   - 입력칸 글자는 16px 이상 (아이폰이 입력칸을 누를 때 화면을 확대하지 않게, `style.css` 끝 `@media (hover: none)` 규칙).
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.
@@ -212,7 +212,7 @@ users/{uid}                      name, position, avatar, email, teamIds[], super
                                  active, disabledReason, disabledAt, disabledBy, mustChangePassword, passwordChangedAt
                                  (Functions가 생성, 본인은 name/position/avatar/platform/settings만 수정)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
-pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), updatedAt   (푸시 받을 기기, 본인만)
+pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), kinds{chat,mention,notice,front}, pc, seenAt, updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
 meta/kakaoSearch                 key, updatedAt, updatedBy   (채팅 #검색 카카오 키, 앱에서 접근 불가)
 stickerPacks/{id}                name, order, createdAt   (😊 이모티콘 테마, 모든 팀 공용, 최고 관리자만 씀)

@@ -4372,3 +4372,15 @@ a.st-link-btn {
 .push-kinds small {
   font-size: 12px;
 }
+
+/* 11번: 임시 비밀번호 칸 + 🎲 새로 */
+.temp-pw-row {
+  display: flex;
+  gap: 6px;
+}
+.temp-pw-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: 1px;
+}

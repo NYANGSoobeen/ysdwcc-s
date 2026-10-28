@@ -66,6 +66,13 @@ export function setupUpdateNotice() {
     else tryApply()
   })
   window.addEventListener('online', checkForUpdate)
+  // PC: 다른 창을 보다가 이 창으로 돌아올 때도 (5분에 한 번까지)
+  let lastFocusCheck = 0
+  window.addEventListener('focus', () => {
+    if (Date.now() - lastFocusCheck < 5 * 60 * 1000) return
+    lastFocusCheck = Date.now()
+    checkForUpdate()
+  })
 }
 
 function showUpdateBanner(onUpdate: () => void) {
