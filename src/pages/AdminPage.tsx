@@ -98,7 +98,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
             <SearchKeyCard />
             <FrontLinkCard />
             <button type="button" onClick={onOpenUsage}>
-              📦 용량 관리 (사진·스케줄 저장 공간, 기간별 채팅 삭제)
+              💾 용량 관리 (저장 공간·데이터·기간별 채팅 삭제)
             </button>
           </section>
         )}

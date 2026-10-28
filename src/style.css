@@ -3785,3 +3785,28 @@ a.st-link-btn {
   justify-content: flex-start;
   text-align: left;
 }
+
+/* 휴대폰: 가로 스크롤 없애기 + 스크롤 막대 숨기기 (밀어서 움직이는 건 그대로)
+   - 버튼은 기본이 한 줄(nowrap)이라 카드 안 긴 버튼 글자가 화면 밖으로 나가 가로 스크롤이 생겼다 → 카드 안 버튼은 줄바꿈
+   - 그래도 넘치는 것이 있으면 화면 안에서 잘라 가로로 밀리지 않게 */
+.page-body .card > button,
+.page-body section > button {
+  max-width: 100%;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.page-body dt {
+  white-space: nowrap;
+}
+.shell:not(.desktop) .page-body {
+  overflow-x: hidden;
+}
+@media (hover: none) {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
