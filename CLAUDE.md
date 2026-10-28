@@ -64,6 +64,7 @@
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.
   - 채팅 입력: 보내기 버튼은 `onPointerDown preventDefault`로 포커스를 뺏지 않아 키보드가 열린 채로 남고, 입력칸은 바로 비운 뒤 뒤에서 보낸다(실패하면 글을 되돌림). 대화 영역을 누르면 키보드를 닫는다. Enter: PC는 보내기(Shift/Ctrl+Enter 줄바꿈, 한글 조합 중 Enter 무시), 휴대폰은 줄바꿈. 입력칸은 5줄까지 늘어난다. 키보드로 화면이 줄거나 사진이 늦게 떠도 맨 아래를 보고 있었으면 맨 아래 유지(ResizeObserver).
   - 저장(`src/download.ts`의 `saveFile`): 갤럭시 앱은 Kotlin `FileSaver` 플러그인(`android/.../files/FileSaverPlugin.kt`, 갤럭시 앱 1.2.0부터)으로 Download 폴더에 바로 저장(사진은 갤러리 Download 앨범), 아이폰은 공유 창(이미지 저장/파일에 저장, 보이는 사진을 미리 받아 둠), PC·갤럭시 브라우저는 일반 다운로드. 예전 갤럭시 앱이면 업데이트 안내. 붙은 곳: 사진 크게 보기 💾, 근무표 크게 보기 💾, 근무표 파일 메뉴.
+  - 가로 스크롤 없음·스크롤 막대 숨김(휴대폰): 버튼은 기본이 한 줄(nowrap)이라 카드 안 긴 버튼 글자가 화면 밖으로 나가 가로 스크롤이 생겼다(관리자 화면 용량 관리 버튼, 2026-10-28) → 카드 안 버튼은 줄바꿈(`keep-all`), 휴대폰 `.page-body`는 `overflow-x: hidden`, `@media (hover: none)`에서 모든 스크롤 막대를 숨긴다(밀어서 움직이는 건 그대로).
   - 노치·홈 바: `env(safe-area-inset-*)`는 모두 `var(--safe-area-inset-*, env(...))`로 쓴다 (갤럭시 앱은 Capacitor가 변수를 넣어 줌).
   - 홈 화면 추가: 내 정보 맨 위 `InstallCard`(이미 홈 화면 앱이거나 갤럭시 앱이면 안 보임). 크롬은 "앱 설치" 버튼(beforeinstallprompt), 아이폰은 Safari 공유 → 홈 화면에 추가 안내.
 - **단체 채팅방 (공통 기능 4-1):**
