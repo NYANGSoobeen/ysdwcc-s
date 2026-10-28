@@ -40,6 +40,20 @@ service firebase.storage {
         && resource.metadata.uploaderUid == request.auth.uid;
     }
 
+    // 📢 공지 사진: 압축본과 썸네일 (2MB 미만 JPEG). 공지를 고치거나 지우면 Functions가 안 쓰는 사진을 지운다.
+    match /teams/{teamId}/notices/{noticeId}/{fileName} {
+      allow read: if request.auth != null
+        && active()
+        && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
+      allow create: if request.auth != null
+        && role(teamId) in ['admin', 'editor']
+        && request.resource.metadata.uploaderUid == request.auth.uid
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size < 2 * 1024 * 1024;
+      allow delete: if request.auth != null
+        && resource.metadata.uploaderUid == request.auth.uid;
+    }
+
     // 채팅 사진: 압축본과 썸네일. 메시지가 삭제되면 Functions가 폴더째 지운다.
     match /teams/{teamId}/chat/{msgId}/{fileName} {
       allow read: if request.auth != null

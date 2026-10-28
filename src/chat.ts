@@ -408,7 +408,7 @@ export async function setReaction(teamId: string, channelId: string, messageId: 
   })
 }
 
-async function resizeToJpeg(file: File, maxSide: number) {
+export async function resizeToJpeg(file: File | Blob, maxSide: number, quality = JPEG_QUALITY) {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
   const width = Math.round(bitmap.width * scale)
@@ -421,7 +421,7 @@ async function resizeToJpeg(file: File, maxSide: number) {
   bitmap.close()
 
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진 변환 실패'))), 'image/jpeg', JPEG_QUALITY),
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진 변환 실패'))), 'image/jpeg', quality),
   )
   return { blob, width, height }
 }

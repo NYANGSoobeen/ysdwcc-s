@@ -17,6 +17,7 @@ import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
+import { NoticesPage } from './pages/NoticesPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
 import { PasswordForm } from './pages/PasswordForm.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
@@ -38,7 +39,7 @@ function savedTeam() {
 
 // F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
 const TAB_KEY = 'current-tab'
-const TABS: Tab[] = ['customers', 'chat', 'front', 'schedule', 'members', 'admin', 'usage', 'profile']
+const TABS: Tab[] = ['notices', 'customers', 'chat', 'front', 'schedule', 'members', 'admin', 'usage', 'profile']
 
 function savedTab(): Tab {
   try {
@@ -47,7 +48,7 @@ function savedTab(): Tab {
   } catch {
     // 기억하지 못하면 첫 화면
   }
-  return 'customers'
+  return 'notices'
 }
 
 const CHANNEL_KEY = 'chat-channel'
@@ -234,7 +235,7 @@ function SignedIn({ user }: { user: User }) {
   const superAdmin = profile.superAdmin === true
   // 관리자 화면은 이 팀의 관리자만 (팀을 바꿨는데 그 팀 관리자가 아니면 고객 화면으로)
   const isAdmin = team.members[user.uid] === 'admin'
-  const current = (tab === 'usage' && !superAdmin) || (tab === 'admin' && !isAdmin) ? 'customers' : tab
+  const current = (tab === 'usage' && !superAdmin) || (tab === 'admin' && !isAdmin) ? 'notices' : tab
 
   const teamSelect =
     teamIds.length > 1 ? (
@@ -295,6 +296,7 @@ function SignedIn({ user }: { user: User }) {
         {desktop && <Sidebar {...menuProps}>{teamSelect}</Sidebar>}
         <div className="shell-main">
           <div className="shell-body">
+            {current === 'notices' && <NoticesPage team={team} uid={user.uid} />}
             {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} />}
             {current === 'chat' && (
               <ChatPage

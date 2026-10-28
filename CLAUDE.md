@@ -43,9 +43,9 @@
 - **여러 팀과 최고 관리자:** 처음 만든 관리자는 최고 관리자(`users.superAdmin`, `meta/setup.ownerUid`, Functions만 씀)다. 최고 관리자만 새 팀을 만들 수 있고(`createTeam`), 만든 팀에 관리자로 자동으로 들어가 모든 팀을 본다. 다른 관리자는 최고 관리자를 빼거나 강등할 수 없다. 팀이 2개 이상이면 팀 바꾸기 칸이 나온다 (메뉴 맨 위 내 프로필 아래, 휴대폰·PC 같음). 고른 팀은 계정(`users.settings.team`)에 기억해 PC와 휴대폰이 같은 팀을 보고, 열려 있는 다른 기기도 따라간다(계정 기억이 없으면 기기 localStorage `selected-team`). 채팅방은 팀마다 따로다. 관리자는 관리자 화면에서 팀 이름을 바꾼다.
 - **PC와 휴대폰 화면:** 가로 1024px 이상(`src/useMedia.ts`의 `useIsDesktop`)은 PC 화면: 왼쪽 고정 메뉴(`Sidebar`, 팀 바꾸기 포함), 하단 탭과 ☰ 없음, 고객은 왼쪽 목록 | 오른쪽 상세 2단, 내 정보·관리자는 2열(`.page-body.two-col` + `.col`), 용량은 카드 여러 열(`.masonry`), 채팅·스케줄은 넓게. 스타일은 `src/style.css` 끝의 `.shell.desktop` 규칙에 모아 둔다. 그보다 좁으면 휴대폰 화면.
 - **화면 구성 (프론트 앱과 같은 구조, 2026-10):** 아래 탭은 없다. 휴대폰은 머리줄 왼쪽 ☰(테두리 있는 둥근 네모, 안 읽은 합계 빨간 숫자)로 서랍 메뉴를 열고, PC는 같은 메뉴가 왼쪽에 고정.
-  - **왼쪽 메뉴는 프론트 앱 화면 틀(프론트가 준 `layout.html`)과 같은 모양, 색만 우리 앱**(2026-10-28, `src/menu.tsx` `MenuList`, CSS는 `style.css` 끝 "왼쪽 메뉴: 프론트 앱 화면 틀" 묶음): 폭 240px(PC·휴대폰 서랍 같음). 순서: **내 프로필**(높이 64px = PC 제목줄 높이, 38px 동그라미·명조 이름·"권한 · 내 정보 ✏️", 누르면 내 정보) → 팀 바꾸기(팀 2개 이상) → **팀원**(접지 않는 목록, 26px 동그라미·이름·권한, 누르면 팀원 화면) → **▾ 단체 채팅 ＋**(우리 방과 프론트 채팅방 모두 💬, 프론트 방이 없으면 "🏌️ 프론트 채팅 들어가기") → 메뉴(`MENU_ITEMS` main: 고객, 스케줄) → **▾ 🔐 관리자 전용**(관리자 화면, 용량 관리, 들여쓰기) → 맨 아래 "이름 님 로그인 중 · 로그아웃" · 앱 이름 · 팀 · 버전.
+  - **왼쪽 메뉴는 프론트 앱 화면 틀(프론트가 준 `layout.html`)과 같은 모양, 색만 우리 앱**(2026-10-28, `src/menu.tsx` `MenuList`, CSS는 `style.css` 끝 "왼쪽 메뉴: 프론트 앱 화면 틀" 묶음): 폭 240px(PC·휴대폰 서랍 같음). 순서: **내 프로필**(높이 64px = PC 제목줄 높이, 38px 동그라미·명조 이름·"권한 · 내 정보 ✏️", 누르면 내 정보) → 팀 바꾸기(팀 2개 이상) → **팀원**(접지 않는 목록, 26px 동그라미·이름·권한, 누르면 팀원 화면) → **▾ 단체 채팅 ＋**(우리 방과 프론트 채팅방 모두 💬, 프론트 방이 없으면 "🏌️ 프론트 채팅 들어가기") → 메뉴(`MENU_ITEMS` main: 공지, 고객, 스케줄) → **▾ 🔐 관리자 전용**(관리자 화면, 용량 관리, 들여쓰기) → 맨 아래 "이름 님 로그인 중 · 로그아웃" · 앱 이름 · 팀 · 버전.
   - 지금 화면은 알약 모양(Merino 바탕 · Venice Blue 굵은 글씨, 둥근 20px). 묶음 제목은 10.5px 자간 1px + 삼각형(접으면 ▶). 접은 상태는 localStorage `menu-collapsed`(처음엔 관리자 묶음만 접힘), 묶음 안 화면으로 가면 저절로 펴짐. 단체 채팅을 접으면 제목 옆에 안 읽은 합계. 빨간 숫자 `#ff3b30`.
-  - 제목줄: 화면 이름은 왼쪽·명조·주색, 이모지 붙임(📇 고객, 📅 스케줄, 👥 팀원, 🛡️ 관리자, 💾 용량 관리, 👤 내 정보). PC 64px·19px, 휴대폰 ☰ 오른쪽 16px.
+  - 제목줄: 화면 이름은 왼쪽·명조·주색, 이모지 붙임(📢 공지, 📇 고객, 📅 스케줄, 👥 팀원, 🛡️ 관리자, 💾 용량 관리, 👤 내 정보). PC 64px·19px, 휴대폰 ☰ 오른쪽 16px.
   - PC/휴대폰 나누는 폭은 그대로 1024px(프론트는 680px). 새 기능은 `MENU_ITEMS`에 추가한다.
   - 채팅 화면은 늘 방 하나를 보여 준다(고른 방이 없으면 기본 방, 휴대폰 "방 목록" 화면은 없앰). 머리줄: ☰ · 💬 방 이름 · ⋯(방 메뉴) · 🔍 검색칸(머리줄 안, 휴대폰은 누르면 넓어짐, 찾은 결과 "1 / 3건 ▲ ▼"는 머리줄 아래 줄). 그 아래 안내줄 "💡 메시지를 길게 누르거나(PC는 오른쪽 클릭) …"(키보드 열리면 숨김), 빈 방은 "아직 메시지가 없어요 🎈".
   - 입력칸: 둥근 ＋(사진·파일) · 😊(자주 쓰는 이모지 고르기, `EmojiButton`) · 둥근 입력칸(PC 안내 "Enter 전송 · Ctrl+Enter 줄바꿈") · 둥근 ↑ 보내기(수정 중엔 ✓). 프론트 채팅방도 같은 입력칸(＋ 없음).
@@ -56,7 +56,7 @@
   - 바깥을 눌러 닫기는 휴대폰(터치)만. PC는 바깥 클릭·창 안에서 끌다 바깥에서 놓기로 닫히지 않고 Esc나 버튼으로 닫는다.
   - 항목 메뉴(`src/ui/ContextMenu.tsx`): PC 오른쪽 클릭, 휴대폰 길게 누르기(0.5초), ⋯ 버튼(`MoreButton`). `useItemMenu(() => actions)`를 항목에 펼쳐 붙이고 `has-menu` 클래스를 단다. 길게 누른 뒤 손을 뗀 자리의 클릭은 막는다. PC는 누른 자리에 작은 메뉴, 휴대폰은 아래에서 올라오는 메뉴. 지금 붙은 곳: 채팅 메시지(복사, 내 것 삭제), 관리자 화면 팀원(권한, 비밀번호 초기화, 사용 중지, 삭제).
   - 메뉴 묶음: "단체 채팅", "관리자 전용"은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`).
-  - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면(고객). 요청서의 "공지" 탭이 생기면 그것을 첫 화면으로 바꾼다.
+  - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면은 📢 공지(7번에서 고객 → 공지로 바꿈).
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
   - 앱 버전: 메뉴 맨 아래(`팀 · v0.5.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
@@ -145,6 +145,10 @@
   - 웹은 데이터만 보내고 서비스 워커(`push-sw.js`, workbox `importScripts`)가 알림을 그린다. **앱을 보고 있으면 알림을 띄우지 않는다.** 알림을 누르면 열린 앱을 앞으로 가져와 그 방(`/?room=팀:방`, 프론트는 `/?front=방`)을 연다(`listenOpenRequests`).
   - 🏌️ 프론트 채팅 알림 `ydrGuestPush`(onRequest, 누구나 호출 가능, POST, 머리글 `x-ydr-secret`): 비밀값은 **코드·저장소에 넣지 않고** 최고 관리자가 관리자 화면 → "🏌️ 프론트 채팅 알림 연동"에서 만들고(`setFrontLinkSecret`, 한 번만 보여 줌) 서버 전용 문서 `meta/frontLink.secret`에만 둔다. 함수 주소 `https://us-west1-ysdwcc-s.cloudfunctions.net/ydrGuestPush`. 'mentions' 기기는 프론트 알림도 안 받는다.
   - 테스트: `tests/push.test.mjs`(보내는 부분을 바꿔 끼워 내용 확인), 규칙 테스트. 실제 FCM 전달은 배포 후 실제 기기로 확인한다.
+- **📢 공지 게시판 (7번, 2026-10-28, `src/pages/NoticesPage.tsx`, `src/notices.ts`):** 팀마다 `teams/{teamId}/notices/{id}` {title(100자), body(5000자), photos[채팅 사진과 같은 모양, 10장], authorUid, createdAt, editedAt, editedBy, stk, stkLast}. 메뉴 맨 위 📢 공지, 앱 첫 화면.
+  - 쓰기는 편집 이상(＋ 쓰기 → 창: 제목·내용·사진 붙이기/빼기), 고치기·지우기는 쓴 사람이나 관리자(⋯ 메뉴), 보기와 🏷️ 스티커 붙이기는 팀원 모두(보기 권한 포함, 6번과 같은 방식으로 공지 카드 안 비율). 글 속 주소는 링크, 사진은 누르면 크게.
+  - 사진은 채팅처럼 긴 쪽 1600px + 썸네일 400px JPEG, Storage `teams/{teamId}/notices/{id}/{시각}_{n}.jpg`(규칙: 편집 이상, 2MB 미만 JPEG). 고치면 빠진 사진, 지우면 폴더째 `onNoticeWritten`이 지운다(10분 안에 올린 건 저장 중일 수 있어 남김). 용량 관리 종류 "공지 사진".
+  - 실시간 구독은 공지 화면을 볼 때만, 최근 50개. 위쪽 검색칸은 제목·내용. PC 두 칸, 휴대폰 한 칸.
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문). 스티커 글자는 칸 가로·세로 정가운데: 한글 글꼴은 위아래 여백이 달라 그냥 가운데 맞춤하면 아래로 쏠리므로, 글자 모양을 재서(`inkOffsetEm`, 크게 보기 PNG는 `drawSticker`의 `measureText`) 맞춘다. 글꼴 `STICKER_FONT`(Noto Sans KR)를 받은 뒤 다시 그린다. 기본 크기(확대 1, "화면맞춤"): 휴대폰은 너비에 맞춤, PC는 쪽 전체가 스크롤 없이 보이게(너비·높이 중 작은 쪽, 여백은 `.sched-scroll` padding을 재서 뺌). ＋로 확대하면 스크롤이 생긴다.
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **💾 용량 관리 (최고 관리자, 2026-10-28, 프론트 앱 "용량 관리" 탭과 같은 화면, 색은 우리 앱):** `src/pages/UsagePage.tsx`, 서버 `functions/src/usage.ts` + `getUsage`·`cleanUnusedFiles`·`countData`·`deleteMessagesInRange`. 메뉴 💾 용량 관리. 위에서부터:
@@ -216,6 +220,7 @@ customers/{customerId}           teamId, name, company, phones[] (E.164), ownerU
 customers/{id}/notes/{noteId}    kind ("수신 통화"|"발신 통화"|"방문 미팅"|...), body, authorUid,
                                  createdAt, editedBy, editedAt, editCount
 customers/{id}/notes/{id}/revisions/{revId}   body, editedBy, editedAt
+teams/{teamId}/notices/{id}      title, body, photos[], authorUid, createdAt, editedAt, editedBy, stk, stkLast   (📢 공지)
 teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null), size, pdfDropped,
                                  images[{assetId(경로), name:'1쪽', w, h, scale}],
                                  marks[{p(쪽 0부터), x, y, w?, h?, t}], marksAt, marksBy, authorId, createdAt

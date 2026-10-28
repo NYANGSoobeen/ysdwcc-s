@@ -50,6 +50,26 @@ export const onStickerDeleted = onDocumentDeleted('stickers/{stickerId}', async 
   if (path && /^stickers\/[^/]+$/.test(path)) await getStorage().bucket().file(path).delete({ ignoreNotFound: true })
 })
 
+// 📢 공지를 지우면 사진 폴더를 지우고, 고치면 빠진 사진만 지운다 (방금 올린 파일은 저장 중일 수 있어 10분 동안 둔다).
+export const onNoticeWritten = onDocumentWritten('teams/{teamId}/notices/{noticeId}', async (event) => {
+  const { teamId, noticeId } = event.params
+  const prefix = `teams/${teamId}/notices/${noticeId}/`
+  const bucket = getStorage().bucket()
+  const after = event.data?.after
+  if (!after?.exists) {
+    await bucket.deleteFiles({ prefix })
+    return
+  }
+  const used = new Set<string>()
+  for (const p of (after.get('photos') ?? []) as { path?: string; thumbPath?: string }[]) {
+    if (p.path) used.add(p.path)
+    if (p.thumbPath) used.add(p.thumbPath)
+  }
+  const [files] = await bucket.getFiles({ prefix })
+  const old = (f: (typeof files)[number]) => Date.now() - Date.parse(String(f.metadata.timeCreated ?? '')) > 10 * 60_000
+  await Promise.all(files.filter((f) => !used.has(f.name) && old(f)).map((f) => f.delete({ ignoreNotFound: true })))
+})
+
 export const onChannelDeleted = onDocumentDeleted('teams/{teamId}/channels/{channelId}', async (event) => {
   const { teamId, channelId } = event.params
   if (channelId === 'main') return

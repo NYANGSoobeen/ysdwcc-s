@@ -6,7 +6,7 @@ import { Avatar } from './ui/Avatar.tsx'
 
 // 왼쪽 메뉴 (휴대폰 ☰ 서랍, PC 왼쪽 고정 메뉴). 프론트 앱과 같은 구조:
 // 내 프로필 → (팀 바꾸기) → 팀원 → ▾ 단체 채팅(+) → 메뉴 → ▾ 관리자 전용 → 로그인 상태·버전. 기능이 늘어나면 MENU_ITEMS에 추가한다.
-export type Tab = 'customers' | 'chat' | 'front' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
+export type Tab = 'notices' | 'customers' | 'chat' | 'front' | 'schedule' | 'members' | 'admin' | 'usage' | 'profile'
 
 export type MenuItem = {
   tab: Tab
@@ -19,6 +19,7 @@ export type MenuItem = {
 
 // 팀원(팀원 묶음 제목·이름을 누르면)과 내 정보(맨 위 내 이름을 누르면)는 따로 연다.
 export const MENU_ITEMS: MenuItem[] = [
+  { tab: 'notices', icon: '📢', label: '공지', section: 'main' },
   { tab: 'customers', icon: '📇', label: '고객', section: 'main' },
   { tab: 'schedule', icon: '📅', label: '스케줄', section: 'main' },
   { tab: 'admin', icon: '🛡️', label: '관리자 (팀원 관리)', section: 'admin', adminOnly: true },

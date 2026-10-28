@@ -163,6 +163,27 @@ service cloud.firestore {
       // 단체 채팅방. 기본 방(main)의 메시지는 위의 teams/{teamId}/messages에 있고,
       // channels/main 문서는 기본 방 이름을 바꿀 때만 생긴다. 기본 방은 지울 수 없다.
       // 방을 지우면 Functions(onChannelDeleted)가 방의 메시지와 사진을 지운다.
+      // 📢 공지 게시판: 팀원은 보고 스티커를 붙이고, 편집 이상은 쓰고, 고치기·지우기는 쓴 사람이나 관리자.
+      match /notices/{noticeId} {
+        function validNotice() {
+          let d = request.resource.data;
+          return d.title is string && d.title.size() > 0 && d.title.size() <= 100
+            && d.body is string && d.body.size() <= 5000
+            && d.photos is list && d.photos.size() <= 10;
+        }
+        allow read: if isMember(teamId);
+        allow create: if canEdit(teamId) && validNotice()
+          && request.resource.data.authorUid == request.auth.uid
+          && !('stk' in request.resource.data);
+        allow update: if (canEdit(teamId) && validNotice()
+            && (resource.data.authorUid == request.auth.uid || isAdmin(teamId))
+            && unchanged('authorUid') && unchanged('createdAt')
+            && request.resource.data.editedBy == request.auth.uid
+            && request.resource.data.get('stk', {}) == resource.data.get('stk', {}))
+          || (isMember(teamId) && onlyChanges(['stk', 'stkLast']) && stkOk('stk'));
+        allow delete: if isAdmin(teamId) || (canEdit(teamId) && resource.data.authorUid == request.auth.uid);
+      }
+
       match /channels/{channelId} {
         function validName() {
           return request.resource.data.name is string

@@ -4,6 +4,7 @@ import { FieldPath, getFirestore, type DocumentReference } from 'firebase-admin/
 // 파일을 저장하는 곳이 늘면 여기(classifyTeamFiles)에 꼭 넣는다. 빠지면 쓰는 파일이 "사용하지 않는 파일"로 잡혀 지워질 수 있다.
 //   - teams/{teamId}/chat/{msgId}/  : 채팅 사진(숫자.jpg, 숫자_thumb.jpg) · 파일(f_…) · 동영상(v_…, v_0_poster.jpg)
 //   - teams/{teamId}/schedule/{uploadId}/ : 지금 스케줄(schedule/current.uploadId)의 쪽 그림·원본 PDF
+//   - teams/{teamId}/notices/{noticeId}/  : 📢 공지 사진(notices.photos)
 // 그 밖의 경로는 "기타"로 두고 정리 대상에서 뺀다 (모르는 파일은 지우지 않는다).
 
 export const UNUSED = '사용하지 않는 파일'
@@ -79,12 +80,22 @@ export async function classifyTeamFiles(teamId: string, files: StoredFile[]) {
     for (const d of docs) if (d.exists) for (const [path, label] of labelsOf(d.data() as MessageRefs)) labels.set(path, label)
   }
 
+  // 📢 공지 사진
+  const noticePrefix = `teams/${teamId}/notices/`
+  const notices = await db.collection(`teams/${teamId}/notices`).select('photos').get()
+  reads += Math.max(1, notices.size)
+  for (const d of notices.docs)
+    for (const p of (d.get('photos') ?? []) as { path?: string; thumbPath?: string }[]) {
+      if (p.path) labels.set(p.path, '공지 사진')
+      if (p.thumbPath) labels.set(p.thumbPath, '공지 사진')
+    }
+
   const uploadId = current.exists ? (current.get('uploadId') as string | undefined) : undefined
   // 방금(1시간 안) 올린 파일은 메시지 저장 전일 수 있어 정리하지 않는다.
   const recentMs = Number(process.env.USAGE_RECENT_MS ?? 3600_000) // 테스트에서 0으로 바꾼다
   const recent = (f: StoredFile) => Date.now() - Date.parse(f.created) < recentMs
   const labelOf = (f: StoredFile) => {
-    if (f.name.startsWith(chatPrefix)) return labels.get(f.name) ?? (recent(f) ? '방금 올린 파일' : UNUSED)
+    if (f.name.startsWith(chatPrefix) || f.name.startsWith(noticePrefix)) return labels.get(f.name) ?? (recent(f) ? '방금 올린 파일' : UNUSED)
     if (f.name.startsWith(schedulePrefix)) {
       const folder = f.name.slice(schedulePrefix.length).split('/')[0]
       if (!uploadId || folder !== uploadId) return recent(f) ? '방금 올린 파일' : UNUSED

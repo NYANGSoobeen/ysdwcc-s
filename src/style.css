@@ -4136,3 +4136,110 @@ a.st-link-btn {
 .danger-text {
   color: var(--danger);
 }
+
+/* ══ 📢 공지 게시판: 휴대폰 한 칸, PC 두 칸 ══ */
+.notice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.shell.desktop .notice-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.notice-anchor {
+  min-width: 0;
+}
+.notice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+.notice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.notice-head h3 {
+  margin: 0 0 2px;
+  color: var(--accent);
+  font-family: var(--font-serif);
+  font-size: 17px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.notice-head p {
+  margin: 0;
+}
+.notice-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.notice-card .photos {
+  border-radius: 10px;
+  overflow: hidden;
+}
+.notice-body.placing,
+.notice-body.placing * {
+  cursor: crosshair;
+}
+.notice-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+  color: var(--muted);
+}
+.notice-empty > div {
+  font-size: 44px;
+}
+.notice-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.notice-photos .preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  min-height: 72px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.notice-photos .preview img,
+.notice-photos .preview .photo-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.notice-photos .preview span {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+.notice-photos .preview.add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  font-size: 22px;
+}
+.notice-photos .preview.add small {
+  font-size: 11px;
+}
+.modal.notice-editor {
+  width: min(560px, calc(100vw - 24px));
+}
+.notice-editor textarea {
+  min-height: 160px;
+  resize: vertical;
+}
