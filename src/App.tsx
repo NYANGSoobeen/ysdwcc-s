@@ -262,10 +262,10 @@ function SignedIn({ user }: { user: User }) {
     currentRoom: current === 'chat' ? (roomId ?? null) : null,
     onSelectRoom: openChannel,
     uid: user.uid,
-    roleLabel: superAdmin ? '최고 관리자' : ROLE_LABELS[team.members[user.uid]],
+    roleLabel: [profile.position, superAdmin ? '최고 관리자' : ROLE_LABELS[team.members[user.uid]]].filter(Boolean).join(' · '),
     members: Object.keys(team.members)
       .filter((m) => m !== user.uid)
-      .map((m) => ({ uid: m, name: memberProfiles[m]?.name ?? '', role: ROLE_LABELS[team.members[m]] }))
+      .map((m) => ({ uid: m, name: memberProfiles[m]?.name ?? '', role: memberProfiles[m]?.position || ROLE_LABELS[team.members[m]] }))
       .filter((m) => m.name)
       .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     unread,

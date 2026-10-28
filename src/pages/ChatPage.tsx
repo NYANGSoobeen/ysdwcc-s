@@ -786,7 +786,7 @@ function MessageItem(props: {
         !mine && !m.deleted && m.mentions.includes(uid) ? ' mentioned-me' : ''
       }`}
     >
-      {!mine && (props.showAuthor ? <Avatar uid={props.authorUid} name={props.author} /> : <span className="avatar-space" />)}
+      {!mine && (props.showAuthor ? <Avatar uid={props.authorUid} name={props.author} card /> : <span className="avatar-space" />)}
       {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
         {m.deleted ? (

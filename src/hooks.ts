@@ -3,9 +3,12 @@ import { collection, doc, documentId, onSnapshot, query, where } from 'firebase/
 import { useEffect, useState } from 'react'
 import type { Role } from './api.ts'
 import { auth, db } from './firebase.ts'
+import { rememberPeople } from './ui/Avatar.tsx'
 
 export type Profile = {
   name: string
+  position?: string // 직급 (8번, 본인이 바꿈)
+  avatar?: string // '' | 'preset:아이디' | 'avatars/{uid}/파일.jpg' (src/ui/Avatar.tsx)
   email: string
   teamIds: string[]
   superAdmin?: boolean
@@ -35,13 +38,15 @@ export function useProfile(uid: string) {
     () =>
       onSnapshot(
         doc(db, 'users', uid),
-        (snap) =>
+        (snap) => {
+          if (snap.exists()) rememberPeople({ [snap.id]: snap.data() as Profile })
           setState(
             snap.exists()
               ? { profile: { name: '', email: '', teamIds: [], ...snap.data() }, missing: false }
               : // 오프라인 캐시에 아직 없을 때는 서버 응답을 기다린다.
                 { profile: null, missing: !snap.metadata.fromCache },
-          ),
+          )
+        },
         () => setState({ profile: null, missing: true }),
       ),
     [uid],
@@ -83,13 +88,14 @@ export function useMemberProfiles(uids: string[]) {
     for (let i = 0; i < ids.length; i += 30) {
       const chunk = ids.slice(i, i + 30)
       unsubscribes.push(
-        onSnapshot(query(collection(db, 'users'), where(documentId(), 'in', chunk)), (snap) =>
+        onSnapshot(query(collection(db, 'users'), where(documentId(), 'in', chunk)), (snap) => {
+          rememberPeople(Object.fromEntries(snap.docs.map((d) => [d.id, d.data() as Profile])))
           setProfiles((prev) => {
             const next = { ...prev }
             for (const d of snap.docs) next[d.id] = d.data() as Profile
             return next
-          }),
-        ),
+          })
+        }),
       )
     }
     return () => unsubscribes.forEach((u) => u())

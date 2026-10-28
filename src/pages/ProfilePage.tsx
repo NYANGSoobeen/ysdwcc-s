@@ -1,11 +1,11 @@
 import type { User } from 'firebase/auth'
-import { doc, updateDoc } from 'firebase/firestore'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { ROLE_LABELS } from '../api.ts'
-import { errorMessage, logOutAndWipe, toLoginId } from '../auth.ts'
+import { logOutAndWipe, toLoginId } from '../auth.ts'
 import { PasswordForm } from './PasswordForm.tsx'
-import { ask, toast } from '../ui/dialogs.tsx'
-import { db } from '../firebase.ts'
+import { ask } from '../ui/dialogs.tsx'
+import { AvatarFace } from '../ui/Avatar.tsx'
+import { ProfileEditor } from './ProfileEditor.tsx'
 import { ContactsSync } from './ContactsSync.tsx'
 import { InstallCard } from './InstallCard.tsx'
 import { PushCard } from './PushCard.tsx'
@@ -31,7 +31,7 @@ export function ProfilePage({ user, profile, team }: Props) {
         <InstallCard />
         <PushCard />
         <section className="card">
-          <NameForm uid={user.uid} name={profile.name} />
+          <ProfileSummary uid={user.uid} profile={profile} />
           <dl className="stats">
             <div><dt>아이디</dt><dd>{toLoginId(user.email)}</dd></div>
             <div><dt>팀</dt><dd>{team.name}</dd></div>
@@ -58,28 +58,20 @@ export function ProfilePage({ user, profile, team }: Props) {
   )
 }
 
-function NameForm({ uid, name }: { uid: string; name: string }) {
-  const [value, setValue] = useState(name)
-  const [saved, setSaved] = useState(false)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    try {
-      await updateDoc(doc(db, 'users', uid), { name: value.trim() })
-      setSaved(true)
-    } catch (err) {
-      toast(errorMessage(err), { error: true })
-    }
-  }
-
+// 👤 내 프로필: 사진·이름·직급, ✏️ 누르면 바꾸기 창
+function ProfileSummary({ uid, profile }: { uid: string; profile: Profile }) {
+  const [editing, setEditing] = useState(false)
   return (
-    <form className="inline-form" onSubmit={submit}>
-      <label>
-        이름
-        <input value={value} onChange={(e) => { setValue(e.target.value); setSaved(false) }} maxLength={30} required />
-      </label>
-      <button disabled={!value.trim() || value.trim() === name}>{saved ? '저장됨' : '저장'}</button>
-    </form>
+    <div className="profile-summary">
+      <AvatarFace uid={uid} name={profile.name || '나'} avatar={profile.avatar} className="big" />
+      <div>
+        <strong className="me-name">{profile.name || '이름 없음'}</strong>
+        <span className="muted">{profile.position || '직급 없음'}</span>
+      </div>
+      <button type="button" onClick={() => setEditing(true)}>
+        ✏️ 프로필 수정
+      </button>
+      {editing && <ProfileEditor uid={uid} profile={profile} onClose={() => setEditing(false)} />}
+    </div>
   )
 }
-

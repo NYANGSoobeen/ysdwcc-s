@@ -2,6 +2,7 @@ import { ROLE_LABELS } from '../api.ts'
 import { toLoginId } from '../auth.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
+import { Avatar } from '../ui/Avatar.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 import { filterMembers, RoleHelp, sortMembers } from './AdminPage.tsx'
 
@@ -30,12 +31,18 @@ export function MembersPage({ team, uid, onOpenAdmin }: { team: Team; uid: strin
         <ul className="list">
           {list.map((memberUid) => (
             <li key={memberUid} className="row">
+              <span className="member-row-avatar">
+                <Avatar uid={memberUid} name={profiles[memberUid]?.name ?? '?'} card />
+              </span>
               <div className="row-main">
                 <strong>
                   {profiles[memberUid]?.name ?? '…'}
                   {memberUid === uid && <span className="badge">나</span>}
                 </strong>
-                <span className="muted small">{toLoginId(profiles[memberUid]?.email)}</span>
+                <span className="muted small">
+                  {profiles[memberUid]?.position ? `${profiles[memberUid]?.position} · ` : ''}
+                  {toLoginId(profiles[memberUid]?.email)}
+                </span>
               </div>
               <span className="badge">{ROLE_LABELS[team.members[memberUid]]}</span>
             </li>

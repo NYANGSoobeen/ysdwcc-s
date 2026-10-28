@@ -13,6 +13,15 @@ service firebase.storage {
       return active() ? firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid] : null;
     }
 
+    // 👤 프로필 사진 (8번): 본인만 올리고 지운다. 앱이 480px JPEG로 줄여 올린다 (30~60KB).
+    match /avatars/{uid}/{fileName} {
+      allow read: if request.auth != null && active();
+      allow create: if request.auth != null && active() && request.auth.uid == uid
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size <= 300 * 1024;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // 😊 이모티콘 그림 (모든 팀 공용): 로그인한 직원은 보고, 최고 관리자만 올리고 지운다.
     // PNG·JPG·WebP는 앱이 256px로 줄여 올리고, 움직이는 GIF는 원본 그대로 1MB까지. 문서를 지우면 Functions가 그림도 지운다.
     match /stickers/{fileName} {

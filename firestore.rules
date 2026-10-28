@@ -120,7 +120,14 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if signedIn();
       allow update: if signedIn() && request.auth.uid == uid && isActive()
-        && onlyChanges(['name', 'platform', 'settings']);
+        && onlyChanges(['name', 'platform', 'settings', 'position', 'avatar'])
+        // 8번 프로필: 직급 20자, 사진은 기본 그림(preset:…) 또는 내 폴더 avatars/{uid}/ 의 사진만
+        && request.resource.data.get('position', '') is string
+        && request.resource.data.get('position', '').size() <= 20
+        && request.resource.data.get('avatar', '') is string
+        && (request.resource.data.get('avatar', '') == ''
+          || request.resource.data.get('avatar', '').matches('preset:[a-z0-9-]+')
+          || request.resource.data.get('avatar', '').matches('avatars/' + uid + '/[^/]+'));
 
       // 연락처 동기화 상태 등 본인만 보는 정보. Functions만 쓴다.
       match /private/{docId} {

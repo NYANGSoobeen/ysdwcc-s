@@ -149,6 +149,10 @@
   - 쓰기는 편집 이상(＋ 쓰기 → 창: 제목·내용·사진 붙이기/빼기), 고치기·지우기는 쓴 사람이나 관리자(⋯ 메뉴), 보기와 🏷️ 스티커 붙이기는 팀원 모두(보기 권한 포함, 6번과 같은 방식으로 공지 카드 안 비율). 글 속 주소는 링크, 사진은 누르면 크게.
   - 사진은 채팅처럼 긴 쪽 1600px + 썸네일 400px JPEG, Storage `teams/{teamId}/notices/{id}/{시각}_{n}.jpg`(규칙: 편집 이상, 2MB 미만 JPEG). 고치면 빠진 사진, 지우면 폴더째 `onNoticeWritten`이 지운다(10분 안에 올린 건 저장 중일 수 있어 남김). 용량 관리 종류 "공지 사진".
   - 실시간 구독은 공지 화면을 볼 때만, 최근 50개. 위쪽 검색칸은 제목·내용. PC 두 칸, 휴대폰 한 칸.
+- **👤 프로필 (8번, 2026-10-28, `src/ui/Avatar.tsx`, `src/pages/ProfileEditor.tsx`):** `users/{uid}.position`(직급 20자), `avatar` = `''`(이름 첫 글자 동그라미) | `preset:아이디`(기본 그림 16개, 파일 없이 그림 문자+바탕색 `AVATAR_PRESETS`) | `avatars/{uid}/{시각}.jpg`(사진). 규칙: 본인만, avatar는 기본 그림이나 내 폴더만. Storage `avatars/{uid}/`는 본인만 올리고 지움(JPEG 300KB까지).
+  - 내 정보 → 👤 카드 ✏️ 프로필 수정 창: 📷 사진 고르기(480px JPEG, 60KB 넘으면 화질 낮춰 다시 → 30~60KB, 고르는 즉시 올림) · 기본 그림 · 사진 없애기 · 이름 · 직급. **저장 안 하고 닫으면 그 창에서 올린 사진을 지운다**, 저장하면 안 고른 새 사진과 예전 사진도 지운다.
+  - `Avatar`는 uid만으로 그린다: `useProfile`·`useMemberProfiles`가 읽은 프로필을 `rememberPeople` 저장소에 넣어 둔다. `card`를 주면 누를 때 프로필 카드(사진 크게·이름·직급, `showProfileCard`): 채팅 말풍선 옆, 팀원 화면.
+  - 메뉴: 내 프로필 아래 "직급 · 권한", 팀원 목록은 직급(없으면 권한). 팀원 화면은 동그라미 + "직급 · 아이디".
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문). 스티커 글자는 칸 가로·세로 정가운데: 한글 글꼴은 위아래 여백이 달라 그냥 가운데 맞춤하면 아래로 쏠리므로, 글자 모양을 재서(`inkOffsetEm`, 크게 보기 PNG는 `drawSticker`의 `measureText`) 맞춘다. 글꼴 `STICKER_FONT`(Noto Sans KR)를 받은 뒤 다시 그린다. 기본 크기(확대 1, "화면맞춤"): 휴대폰은 너비에 맞춤, PC는 쪽 전체가 스크롤 없이 보이게(너비·높이 중 작은 쪽, 여백은 `.sched-scroll` padding을 재서 뺌). ＋로 확대하면 스크롤이 생긴다.
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **💾 용량 관리 (최고 관리자, 2026-10-28, 프론트 앱 "용량 관리" 탭과 같은 화면, 색은 우리 앱):** `src/pages/UsagePage.tsx`, 서버 `functions/src/usage.ts` + `getUsage`·`cleanUnusedFiles`·`countData`·`deleteMessagesInRange`. 메뉴 💾 용량 관리. 위에서부터:
@@ -201,9 +205,9 @@
 ## Firestore 데이터 구조 초안
 
 ```
-users/{uid}                      name, email, teamIds[], superAdmin, platform, settings{},
+users/{uid}                      name, position, avatar, email, teamIds[], superAdmin, platform, settings{},
                                  active, disabledReason, disabledAt, disabledBy, mustChangePassword, passwordChangedAt
-                                 (Functions가 생성, 본인은 name/platform/settings만 수정)
+                                 (Functions가 생성, 본인은 name/position/avatar/platform/settings만 수정)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
 pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
