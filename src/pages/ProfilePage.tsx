@@ -23,7 +23,7 @@ export function ProfilePage({ user, profile, team }: Props) {
     <div className="page">
       <header className="page-header">
         <MenuButton />
-        <h2>내 정보</h2>
+        <h2>👤 내 정보</h2>
         <span />
       </header>
       <div className="page-body two-col">

@@ -89,7 +89,7 @@ export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string;
     <div className={desktop ? 'page split-list' : 'contents'}>
       <header className="page-header">
         <MenuButton />
-        <h2>고객 {customers ? customers.length : ''}</h2>
+        <h2>📇 고객 {customers ? customers.length : ''}</h2>
         {canWrite ? (
           <button type="button" className="ghost" onClick={() => setAdding(!adding)}>
             {adding ? '닫기' : '+ 추가'}

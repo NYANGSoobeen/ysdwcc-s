@@ -82,7 +82,7 @@ function JoinPage() {
     <div className="page">
       <header className="page-header">
         <MenuButton />
-        <h2>프론트 채팅</h2>
+        <h2>🏌️ 프론트 채팅</h2>
         <span />
       </header>
       <div className="page-body">

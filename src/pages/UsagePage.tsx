@@ -32,7 +32,7 @@ export function UsagePage({ team }: { team: Team }) {
     <div className="page">
       <header className="page-header">
         <MenuButton />
-        <h2>용량 관리</h2>
+        <h2>📦 용량 관리</h2>
         <button type="button" className="ghost" onClick={refresh} disabled={loading}>
           새로고침
         </button>

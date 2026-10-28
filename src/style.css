@@ -3264,3 +3264,268 @@ html.keyboard-open .chat-hint {
   display: block;
   line-height: 1;
 }
+
+/* ══════════════════════════════════════════════════════════
+   왼쪽 메뉴: 프론트 앱 화면 틀(layout.html)과 같은 모양, 색은 우리 앱 (2026-10-28)
+   240px · 내 프로필(64px, 제목줄과 같은 높이) → 팀 바꾸기 → 팀원 → ▾ 단체 채팅 ＋ → 메뉴 → ▾ 관리자 전용 → 로그인 상태·버전
+   지금 화면은 알약 모양(Merino 바탕 · Venice Blue 글씨)
+   ══════════════════════════════════════════════════════════ */
+.drawer,
+.shell.desktop .sidebar {
+  width: 240px;
+  gap: 0;
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top)) 0 var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
+}
+.shell.desktop {
+  --sidebar-w: 240px;
+}
+.shell.desktop .sidebar {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* 내 프로필 */
+.menu-profile {
+  min-height: 64px;
+  gap: 8px;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+.menu-profile .avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.menu-profile-text strong,
+.menu-profile .me-name {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 700;
+}
+.menu-profile-text .small {
+  font-size: 11px;
+}
+.menu-profile.active {
+  background: var(--bg);
+}
+
+/* 팀 바꾸기 */
+.menu-team {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.menu-team .team-select,
+.shell.desktop .sidebar .menu-team .team-select {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+}
+.menu-team .team-select select {
+  min-height: 34px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+/* 팀원 목록 */
+.menu-roster {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.roster-title {
+  display: block;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--rock);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  min-height: 0;
+}
+.menu-roster .drawer-member {
+  gap: 8px;
+  min-height: 0;
+  padding: 5px 4px;
+  border-radius: 10px;
+}
+.menu-roster .drawer-member.active {
+  background: transparent;
+}
+.menu-roster .drawer-member .avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+.menu-roster .drawer-member strong {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.menu-roster .drawer-member .small {
+  color: var(--rock);
+  font-size: 10px;
+  font-weight: 600;
+}
+.roster-empty {
+  display: block;
+  padding: 2px 0;
+  font-size: 11.5px;
+}
+
+/* 메뉴 */
+.menu-nav {
+  flex: 1;
+  padding: 10px;
+}
+.menu-nav .drawer-list + .drawer-list {
+  margin-top: 0;
+}
+.drawer-label-row {
+  margin: 16px 8px 6px;
+}
+.menu-nav > .drawer-list:first-child .drawer-label-row {
+  margin-top: 6px;
+}
+.drawer-label-row .drawer-label,
+.drawer-label {
+  min-height: 0;
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 1px;
+}
+.nav-caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin: 0 5px 0 2px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.15s;
+}
+.drawer-label.closed .nav-caret {
+  transform: rotate(-90deg);
+}
+.drawer-label-row .badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+}
+.section-add {
+  min-width: 24px;
+  min-height: 24px;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 16px;
+}
+.drawer .drawer-item,
+.sidebar .drawer-item,
+.shell.desktop .sidebar .drawer-item {
+  gap: 6px;
+  min-height: 0;
+  padding: 9px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  box-shadow: none;
+}
+.drawer-item.sub {
+  padding-left: 22px;
+}
+.drawer-item span.nav-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.drawer-item .nav-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+}
+.drawer .drawer-item.active,
+.sidebar .drawer-item.active {
+  background: var(--merino);
+  color: var(--venice);
+  font-weight: 700;
+  box-shadow: none;
+}
+.drawer-item.add {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* 빨간 숫자 */
+.badge,
+.drawer-item span.badge {
+  background: #ff3b30;
+}
+
+/* 맨 아래: 로그인 상태 · 앱 이름 · 버전 */
+.menu-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 1;
+}
+.menu-foot .app-name {
+  margin: 4px 0 0;
+}
+button.menu-logout {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  text-decoration: underline;
+}
+
+/* 휴대폰 ☰ 버튼 (프론트 앱처럼 둥근 네모) */
+.menu-button,
+.ghost.menu-button {
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+/* 위쪽 제목줄: 화면 이름은 왼쪽, 명조, 주색 (PC 64px = 프로필 칸 높이) */
+.page-header:has(> .menu-button:not(.back-button)) {
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+}
+.page-header:has(> .menu-button:not(.back-button)) h2 {
+  text-align: left;
+  font-size: 16px;
+}
+.page-header h2 {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  color: var(--accent);
+}
+.shell.desktop .page-header:has(> .menu-button:not(.back-button)) {
+  min-height: 64px;
+  padding: 0 20px;
+}
+.shell.desktop .page-header:has(> .menu-button:not(.back-button)) h2 {
+  font-size: 19px;
+}
+.shell.desktop .page-header.chat-header {
+  min-height: 64px;
+  padding: 0 20px;
+}
+/* 메뉴 바탕과 같은 색 동그라미도 보이게 테두리 */
+.drawer .avatar,
+.sidebar .avatar {
+  box-shadow: 0 0 0 1px rgb(245 238 221 / 0.45);
+}

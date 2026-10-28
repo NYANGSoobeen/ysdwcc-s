@@ -43,7 +43,7 @@ export function AdminPage({ team, uid, superAdmin, teamIds, onSelectTeam, onOpen
     <div className="page">
       <header className="page-header">
         <MenuButton />
-        <h2>관리자</h2>
+        <h2>🛡️ 관리자</h2>
         <span />
       </header>
       <SearchBar placeholder="팀원 이름, 아이디 검색" />

@@ -16,7 +16,7 @@ export function MembersPage({ team, uid, onOpenAdmin }: { team: Team; uid: strin
     <div className="page">
       <header className="page-header">
         <MenuButton />
-        <h2>팀원 {Object.keys(team.members).length}명</h2>
+        <h2>👥 팀원 {Object.keys(team.members).length}명</h2>
         <span />
       </header>
       <SearchBar placeholder="팀원 이름, 아이디 검색" />

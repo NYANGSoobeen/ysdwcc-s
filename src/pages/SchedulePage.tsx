@@ -178,7 +178,7 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
     <div className="page schedule">
       <header className="page-header">
         <MenuButton />
-        <h2>스케줄</h2>
+        <h2>📅 스케줄</h2>
         {schedule ? (
           <button type="button" className="ghost" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="파일 메뉴">
             파일 ▾
