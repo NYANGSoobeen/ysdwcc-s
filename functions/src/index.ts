@@ -474,6 +474,8 @@ export const getUsage = onCall(async (req) => {
   let bytes = 0
   let photos = 0
   let scheduleBytes = 0
+  let videos = 0
+  let videoBytes = 0
   const months = new Map<string, { bytes: number; photos: number }>()
   for (const file of files) {
     const size = Number(file.metadata.size ?? 0)
@@ -485,6 +487,11 @@ export const getUsage = onCall(async (req) => {
     }
     // 사진 원본만 센다 (썸네일 ·_thumb.jpg, 첨부 파일 f_… 은 용량에만 넣는다)
     const isPhoto = /\/\d+\.jpg$/.test(file.name)
+    // 🎬 동영상(v_번호.확장자, 첫 장면 사진 제외)은 개수와 용량을 따로 보여 준다.
+    if (/\/v_\d+\.[a-z0-9]+$/.test(file.name)) {
+      videos += 1
+      videoBytes += size
+    }
     const month = String(file.metadata.timeCreated ?? '').slice(0, 7) || '알 수 없음'
     const entry = months.get(month) ?? { bytes: 0, photos: 0 }
     entry.bytes += size
@@ -498,6 +505,8 @@ export const getUsage = onCall(async (req) => {
       bytes,
       photos,
       scheduleBytes,
+      videos,
+      videoBytes,
       freeBytes: FREE_STORAGE_BYTES,
       byMonth: [...months.entries()]
         .map(([month, v]) => ({ month, ...v }))

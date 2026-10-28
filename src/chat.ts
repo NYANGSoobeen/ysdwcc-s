@@ -11,7 +11,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { deleteObject, getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage'
 import { api, type LinkPreview } from './api.ts'
 import { auth, db, storage } from './firebase.ts'
 
@@ -33,9 +33,26 @@ export const MAX_PHOTOS = 30
 export const extOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''
 export const isPhotoFile = (f: File) => f.type.startsWith('image/') && !/svg/.test(f.type)
 
+// 🎬 동영상: 줄이지 않고 원본 그대로 50MB까지 (storage.rules와 같게). 한 메시지에 하나.
+// Storage teams/{teamId}/chat/{msgId}/v_0.{확장자} + 첫 장면 사진 v_0_poster.jpg
+export type ChatVideo = { path: string; posterPath: string | null; name: string; size: number; type: string; w?: number; h?: number; dur?: number }
+export const VIDEO_EXTS = ['mp4', 'mov', 'm4v', 'webm', '3gp']
+export const VIDEO_MAX_BYTES = 50 * 1024 * 1024
+export const MAX_VIDEOS = 5
+export const isVideoFile = (f: File) => f.type.startsWith('video/') || VIDEO_EXTS.includes(extOf(f.name))
+const videoType = (f: File) =>
+  f.type.startsWith('video/') ? f.type : ({ mov: 'video/quicktime', webm: 'video/webm', '3gp': 'video/3gpp' } as Record<string, string>)[extOf(f.name)] ?? 'video/mp4'
+// Storage 파일 이름의 확장자 (규칙이 아는 것만)
+const videoExt = (f: File) => {
+  const e = extOf(f.name)
+  if (VIDEO_EXTS.includes(e)) return e
+  return { 'video/quicktime': 'mov', 'video/webm': 'webm', 'video/3gpp': '3gp' }[f.type] ?? 'mp4'
+}
+
 // 보낼 수 없는 파일이면 이유를 돌려준다.
 export function fileProblem(f: File) {
   if (isPhotoFile(f)) return null
+  if (isVideoFile(f)) return f.size > VIDEO_MAX_BYTES ? `"${f.name}"은(는) 50MB를 넘어 보낼 수 없어요. 갤러리에서 길이를 잘라(편집 → 자르기) 다시 보내 주세요.` : null
   if (!FILE_EXTS.includes(extOf(f.name))) return `"${f.name}"은(는) 보낼 수 없는 파일이에요. (엑셀·PDF·한글·워드·파워포인트·압축·텍스트만)`
   if (f.size > FILE_MAX_BYTES) return `"${f.name}"은(는) 10MB를 넘어 보낼 수 없어요.`
   return null
@@ -121,9 +138,10 @@ export type { LinkPreview }
 
 export type ReplyTo = { id: string; authorUid: string; text: string }
 
-export function replyPreview(message: { body: string; attachments: Attachment[]; files?: ChatFile[] }) {
+export function replyPreview(message: { body: string; attachments: Attachment[]; files?: ChatFile[]; video?: ChatVideo | null }) {
   if (message.body) return message.body.replace(/\s+/g, ' ').slice(0, 80)
   if (message.attachments.length) return `사진 ${message.attachments.length}장`
+  if (message.video) return '동영상'
   return message.files?.length ? `파일 ${message.files[0].name}` : ''
 }
 
@@ -198,6 +216,98 @@ export async function sendMessage(
   return messageRef.id
 }
 
+// 첫 장면 사진·크기·길이를 알아낸다. 이 브라우저가 못 여는 형식(PC의 아이폰 HEVC 등)이면 null → 미리보기 없이 보낸다.
+function videoInfo(file: File): Promise<{ w: number; h: number; dur: number; poster: Blob | null } | null> {
+  return new Promise((resolve) => {
+    const v = document.createElement('video')
+    const url = URL.createObjectURL(file)
+    let done = false
+    const end = (x: { w: number; h: number; dur: number; poster: Blob | null } | null) => {
+      if (done) return
+      done = true
+      URL.revokeObjectURL(url)
+      v.removeAttribute('src')
+      v.load()
+      resolve(x)
+    }
+    v.muted = true
+    v.playsInline = true
+    v.preload = 'auto'
+    v.onloadedmetadata = () => {
+      try {
+        v.currentTime = Math.min(0.5, (v.duration || 1) / 3)
+      } catch {
+        end({ w: v.videoWidth, h: v.videoHeight, dur: v.duration, poster: null })
+      }
+    }
+    v.onseeked = () => {
+      const k = Math.min(1, 640 / Math.max(v.videoWidth || 1, v.videoHeight || 1))
+      const c = document.createElement('canvas')
+      c.width = Math.max(1, Math.round((v.videoWidth || 320) * k))
+      c.height = Math.max(1, Math.round((v.videoHeight || 240) * k))
+      try {
+        c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height)
+      } catch {
+        return end({ w: v.videoWidth, h: v.videoHeight, dur: v.duration, poster: null })
+      }
+      c.toBlob((b) => end({ w: v.videoWidth, h: v.videoHeight, dur: v.duration, poster: b }), 'image/jpeg', 0.8)
+    }
+    v.onerror = () => end(null)
+    setTimeout(() => end(null), 10_000)
+    v.src = url
+  })
+}
+
+// 🎬 동영상 하나를 메시지로 보낸다 (원본 그대로, 올리는 동안 onProgress(0~100)).
+export async function sendVideoMessage(
+  teamId: string,
+  channelId: string,
+  file: File,
+  replyTo: ReplyTo | null = null,
+  onProgress?: (percent: number) => void,
+) {
+  const uid = auth.currentUser!.uid
+  const messageRef = doc(messagesRef(teamId, channelId))
+  const folder = `teams/${teamId}/chat/${messageRef.id}`
+  const type = videoType(file)
+  const meta = (contentType: string) => ({ contentType, customMetadata: { uploaderUid: uid } })
+  const uploaded: string[] = []
+  try {
+    const info = await videoInfo(file)
+    const video: ChatVideo = { path: `${folder}/v_0.${videoExt(file)}`, posterPath: null, name: file.name.slice(0, 120) || '동영상', size: file.size, type }
+    if (info?.w && info.h) Object.assign(video, { w: info.w, h: info.h })
+    if (info && Number.isFinite(info.dur) && info.dur > 0) video.dur = Math.round(info.dur * 10) / 10
+    if (info?.poster) {
+      const posterPath = `${folder}/v_0_poster.jpg`
+      await uploadBytes(ref(storage, posterPath), info.poster, meta('image/jpeg'))
+      uploaded.push(posterPath)
+      video.posterPath = posterPath
+    }
+    await new Promise<void>((resolve, reject) => {
+      const task = uploadBytesResumable(ref(storage, video.path), file, meta(type))
+      task.on('state_changed', (snap) => onProgress?.(Math.floor((snap.bytesTransferred / Math.max(1, snap.totalBytes)) * 100)), reject, () => resolve())
+    })
+    uploaded.push(video.path)
+    await setDoc(messageRef, {
+      authorUid: uid,
+      body: '',
+      mentions: [],
+      customerTags: [],
+      replyTo,
+      attachments: [],
+      files: [],
+      video,
+      hasPhotos: false,
+      createdAt: serverTimestamp(),
+      editedAt: null,
+    })
+  } catch (error) {
+    await Promise.allSettled(uploaded.map((path) => deleteObject(ref(storage, path))))
+    throw error
+  }
+  return messageRef.id
+}
+
 // 링크 미리보기: 보낸 뒤 서버가 읽어 온 제목·설명·사진을 메시지에 붙인다.
 // 🔎 #검색 결과 하나를 카드로 보낸다 (글 없이 link만, 답장 중이면 답장으로).
 export async function sendLinkMessage(teamId: string, channelId: string, link: LinkPreview, replyTo: ReplyTo | null = null) {
@@ -244,13 +354,14 @@ export async function editMessage(teamId: string, channelId: string, messageId: 
 export async function deleteMessage(
   teamId: string,
   channelId: string,
-  message: { id: string; attachments: Attachment[]; files: ChatFile[] },
+  message: { id: string; attachments: Attachment[]; files: ChatFile[]; video?: ChatVideo | null },
 ) {
   await updateDoc(doc(messagesRef(teamId, channelId), message.id), {
     deleted: true,
     body: '',
     attachments: [],
     files: [],
+    video: null,
     hasPhotos: false,
     replyTo: null,
     mentions: [],
@@ -262,6 +373,7 @@ export async function deleteMessage(
   await Promise.allSettled([
     ...message.attachments.flatMap((a) => [deleteObject(ref(storage, a.path)), deleteObject(ref(storage, a.thumbPath))]),
     ...message.files.map((f) => deleteObject(ref(storage, f.path))),
+    ...(message.video ? [message.video.path, message.video.posterPath].filter((p): p is string => !!p).map((p) => deleteObject(ref(storage, p))) : []),
   ])
 }
 

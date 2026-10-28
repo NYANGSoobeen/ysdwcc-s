@@ -4,11 +4,12 @@ import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
-import { copyText, EmojiButton, fileIcon, photoCols } from '../pages/ChatPage.tsx'
+import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import {
+  assetLink,
   assetUrl,
   connectFront,
   tryResume,
@@ -386,6 +387,7 @@ function replySnippet(m: FrontMessage) {
   if (m.text) return { text: m.text.replace(/\s+/g, ' ').slice(0, 80), kind: 'text' }
   if (m.images.length) return { text: m.images.length > 1 ? `사진 ${m.images.length}장` : '사진', kind: 'image' }
   if (m.sticker) return { text: '이모티콘', kind: 'sticker' }
+  if (m.video) return { text: '🎬 동영상', kind: 'text' }
   if (m.file) return { text: `📎 ${m.file.name.slice(0, 60)}`, kind: 'text' }
   if (m.link) return { text: `🔎 ${(m.link.title || m.link.site || '링크').slice(0, 60)}`, kind: 'text' }
   return { text: '', kind: 'text' }
@@ -465,6 +467,21 @@ function FrontMessageItem(props: {
                   <StorageImage key={id} path={`ydr/${id}`} load={() => assetUrl(id)} className="photo" onClick={() => props.onOpenPhoto(i)} />
                 ))}
               </div>
+            )}
+            {m.video && (
+              <VideoBox
+                video={{ name: m.video.name || '동영상', size: m.video.size ?? 0, w: m.video.w, h: m.video.h, dur: m.video.dur }}
+                loadSrc={() => assetLink(m.video!.assetId)}
+                poster={m.video.poster && <StorageImage path={`ydr/${m.video.poster}`} load={() => assetUrl(m.video!.poster!)} className="chat-video-poster" />}
+                onSave={async () => {
+                  try {
+                    toast('🎬 동영상 받는 중…')
+                    await saveFile(await assetUrl(m.video!.assetId), m.video!.name || '동영상.mp4')
+                  } catch {
+                    toast('동영상을 저장하지 못했어요.', { error: true })
+                  }
+                }}
+              />
             )}
             {m.sticker && <StorageImage path={`ydr/${m.sticker}`} load={() => assetUrl(m.sticker!)} alt="이모티콘" className="front-sticker" />}
             {m.file && (

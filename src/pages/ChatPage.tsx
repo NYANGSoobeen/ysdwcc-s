@@ -12,7 +12,11 @@ import {
   MENTION_ALL,
   fileProblem,
   isPhotoFile,
+  isVideoFile,
   MAIN_CHANNEL,
+  MAX_VIDEOS,
+  sendVideoMessage,
+  VIDEO_EXTS,
   MAX_PHOTOS,
   messagesRef,
   photoUrl,
@@ -24,6 +28,7 @@ import {
   setReaction,
   type Channel,
   type ChatFile,
+  type ChatVideo,
   type ReplyTo,
 } from '../chat.ts'
 import { fileName, saveFile } from '../download.ts'
@@ -355,7 +360,11 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   }
 
   async function remove(message: Message) {
-    const photoNote = message.attachments.length ? ` 사진 ${message.attachments.length}장도 함께 지워집니다.` : ''
+    const photoNote = message.attachments.length
+      ? ` 사진 ${message.attachments.length}장도 함께 지워집니다.`
+      : message.video
+        ? ' 동영상도 함께 지워집니다.'
+        : ''
     const ok = await ask({
       message: `이 메시지를 삭제할까요? 내용은 영구 삭제되고 "삭제된 메시지입니다"로 보입니다.${photoNote}`,
       ok: '삭제',
@@ -667,6 +676,7 @@ function MessageItem(props: {
           ...(m.attachments.length
             ? [{ icon: '💾', label: m.attachments.length > 1 ? `사진 ${m.attachments.length}장 저장` : '사진 저장', onSelect: () => void savePhotos() }]
             : []),
+          ...(m.video ? [{ icon: '💾', label: '동영상 저장', onSelect: () => void saveVideo(m.video!) }] : []),
           ...(m.files.length
             ? [{ icon: '💾', label: m.files.length > 1 ? `파일 ${m.files.length}개 저장` : '파일 저장', onSelect: () => void saveChatFiles(m.files) }]
             : []),
@@ -715,6 +725,14 @@ function MessageItem(props: {
                   <StorageImage key={a.thumbPath} path={a.thumbPath} className="photo" onClick={() => props.onOpenPhoto(i)} />
                 ))}
               </div>
+            )}
+            {m.video && (
+              <VideoBox
+                video={m.video}
+                loadSrc={() => photoUrl(m.video!.path)}
+                poster={m.video.posterPath && <StorageImage path={m.video.posterPath} className="chat-video-poster" />}
+                onSave={() => void saveVideo(m.video!)}
+              />
             )}
             {m.files.map((f) => (
               <button key={f.path} type="button" className="file-card" onClick={() => void openChatFile(f)}>
@@ -821,6 +839,62 @@ async function openChatFile(f: ChatFile) {
   }
 }
 
+// 🎬 말풍선 속 동영상: 첫 장면 + ▶ · 길이 · 크기. 누르면 그 자리에서 재생한다.
+// 주소로 바로 재생해서(스트리밍) 본 만큼만 받는다 (무료 사용량 절약). 미리 받아 두지 않는다.
+const fmtDur = (s: number) => `${Math.floor(Math.round(s) / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`
+export type VideoInfo = { name: string; size: number; w?: number; h?: number; dur?: number }
+// 프론트 채팅방도 같이 쓴다 (주소·첫 장면·저장만 다르게 넘긴다).
+export function VideoBox(props: { video: VideoInfo; loadSrc: () => Promise<string>; poster?: React.ReactNode; onSave: () => void }) {
+  const { video } = props
+  const [src, setSrc] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const ratio = video.w && video.h ? Math.max(0.5, Math.min(2, video.w / video.h)) : 16 / 9
+  async function play(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (loading || src) return
+    setLoading(true)
+    try {
+      setSrc(await props.loadSrc())
+    } catch {
+      toast('동영상을 불러오지 못했어요. 삭제되었을 수 있어요.', { error: true })
+    } finally {
+      setLoading(false)
+    }
+  }
+  async function cannotPlay() {
+    setSrc(null)
+    if (await ask({ title: '이 기기에서 재생할 수 없는 동영상이에요', message: '아이폰으로 찍은 동영상(HEVC)은 일부 컴퓨터에서 바로 재생이 안 돼요. 저장해서 기기의 동영상 앱으로 열어 주세요.', ok: '💾 저장' }))
+      props.onSave()
+  }
+  return (
+    <div className="chat-video" style={{ aspectRatio: String(ratio) }}>
+      {src ? (
+        <video src={src} controls autoPlay playsInline preload="metadata" onClick={(e) => e.stopPropagation()} onError={() => void cannotPlay()} />
+      ) : (
+        <button type="button" className="chat-video-cover" onClick={(e) => void play(e)} aria-label={`동영상 재생 ${video.name}`}>
+          {props.poster}
+          <span className="chat-video-play" aria-hidden="true">
+            {loading ? '⏳' : '▶'}
+          </span>
+          <span className="chat-video-meta">
+            {video.dur ? `${fmtDur(video.dur)} · ` : ''}
+            {formatSize(video.size)}
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+async function saveVideo(video: ChatVideo) {
+  try {
+    toast(`🎬 동영상 받는 중… (${formatSize(video.size)})`)
+    await saveFile(await photoUrl(video.path), video.name)
+  } catch {
+    toast('동영상을 저장하지 못했어요.', { error: true })
+  }
+}
+
 async function saveChatFiles(files: ChatFile[]) {
   for (const f of files) {
     try {
@@ -867,6 +941,7 @@ function Composer(props: {
   const galleryInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const videoInput = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const previews = usePreviews(photos)
   // 🔎 #검색: "#검색어"를 치면 입력칸 위에 검색 결과 (닫으면 글을 바꿀 때까지 안 뜬다)
@@ -915,7 +990,10 @@ function Composer(props: {
   function addFiles(list: File[]) {
     if (editing || list.length === 0) return
     const pics = list.filter(isPhotoFile)
-    const others = list.filter((f) => !isPhotoFile(f))
+    // 🎬 동영상은 사진·파일과 따로, 하나씩 메시지로 보낸다.
+    const vids = list.filter((f) => !isPhotoFile(f) && isVideoFile(f))
+    const others = list.filter((f) => !isPhotoFile(f) && !isVideoFile(f))
+    if (vids.length) void sendVideos(vids)
     const problems = others.map(fileProblem).filter(Boolean)
     if (problems.length) toast(problems[0]!, { error: true })
     const okFiles = others.filter((f) => !fileProblem(f))
@@ -923,6 +1001,33 @@ function Composer(props: {
     setPhotos((prev) => [...prev, ...pics].slice(0, MAX_PHOTOS))
     setFiles((prev) => [...prev, ...okFiles].slice(0, 10))
   }
+  // 🎬 동영상 보내기: 크기를 보여 주고 확인받은 뒤 하나씩 올린다 (원본 그대로, 50MB까지).
+  const [videoProgress, setVideoProgress] = useState<string | null>(null)
+  async function sendVideos(list: File[]) {
+    if (videoProgress) return toast('동영상을 올리는 중이에요. 다 올라간 뒤 다시 보내 주세요.', { error: true })
+    const big = list.map(fileProblem).filter(Boolean)
+    if (big.length) toast(big[0]!, { error: true })
+    const ok = list.filter((f) => !fileProblem(f) && f.size > 0).slice(0, MAX_VIDEOS)
+    if (list.length > MAX_VIDEOS) toast(`동영상은 한 번에 ${MAX_VIDEOS}개까지 보낼 수 있어요.`, { error: true })
+    if (!ok.length) return
+    const message = `${ok.map((f) => `🎬 ${f.name} (${formatSize(f.size)})`).join('\n')}\n\n크면 올리는 데 시간이 걸려요. 다 올라갈 때까지 앱을 끄지 말아 주세요.`
+    if (!(await ask({ title: ok.length > 1 ? `동영상 ${ok.length}개 보내기` : '동영상 보내기', message, ok: '보내기' }))) return
+    let reply = replyTo
+    if (reply) onSent()
+    for (const [i, f] of ok.entries()) {
+      const tag = ok.length > 1 ? ` (${i + 1}/${ok.length})` : ''
+      setVideoProgress(`🎬 동영상 올리는 중… 0%${tag}`)
+      try {
+        await sendVideoMessage(teamId, channelId, f, reply, (pct) => setVideoProgress(`🎬 동영상 올리는 중… ${pct}%${tag}`))
+        reply = null
+      } catch (err) {
+        toast(`동영상을 보내지 못했어요. ${errorMessage(err)}`, { error: true })
+        break
+      }
+    }
+    setVideoProgress(null)
+  }
+
   const addRef = useRef(addFiles)
   addRef.current = addFiles
   useEffect(() => props.registerAdd((list) => addRef.current(list)), [props.registerAdd])
@@ -947,6 +1052,7 @@ function Composer(props: {
     openMenu(
       [
         { icon: '🖼️', label: '사진 보관함', onSelect: () => galleryInput.current?.click() },
+        { icon: '🎬', label: '동영상 (50MB까지)', onSelect: () => videoInput.current?.click() },
         ...(isTouchUi() ? [{ icon: '📷', label: '사진 찍기', onSelect: () => cameraInput.current?.click() }] : []),
         { icon: '📁', label: '파일 선택', onSelect: () => fileInput.current?.click() },
       ],
@@ -1078,6 +1184,11 @@ function Composer(props: {
           올리는 중… {progress.done}/{progress.total}
         </p>
       )}
+      {videoProgress && (
+        <p className="muted small uploading" role="status">
+          {videoProgress}
+        </p>
+      )}
       {(replyTo || editing) && (
         <div className="composer-context">
           <div>
@@ -1131,13 +1242,14 @@ function Composer(props: {
         </button>
         <EmojiButton onPick={insertText} />
         <input ref={galleryInput} type="file" accept="image/*" multiple hidden onChange={pickInput} />
+        <input ref={videoInput} type="file" accept={['video/*', ...VIDEO_EXTS.map((e) => `.${e}`)].join(',')} multiple hidden onChange={pickInput} />
         <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={pickInput} />
         <input
           ref={fileInput}
           type="file"
           multiple
           hidden
-          accept={['image/*', ...FILE_EXTS.map((e) => `.${e}`)].join(',')}
+          accept={['image/*', 'video/*', ...FILE_EXTS.map((e) => `.${e}`), ...VIDEO_EXTS.map((e) => `.${e}`)].join(',')}
           onChange={pickInput}
         />
         <textarea

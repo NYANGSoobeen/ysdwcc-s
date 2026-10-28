@@ -84,6 +84,11 @@
   - 파일: 엑셀·CSV·PDF·한글·워드·파워포인트·압축·텍스트(`FILE_EXTS`), 10MB 이하. Storage `teams/{teamId}/chat/{msgId}/f_{번호}.{확장자}`(규칙도 같은 목록·크기), 메시지 `files[{path, name, size, type}]`. 파일 카드: PC에서 PDF는 새 탭, 나머지와 휴대폰은 저장(`saveFile`). 메시지 메뉴 💾 파일 저장.
   - 크게 보기(`PhotoViewer`): 이 방에 불러온 사진 전체를 ← → / 밀어서 넘김, 두 손가락 확대, 두 번 눌러 확대/원래대로, 확대 중엔 한 손가락으로 이동(밀어도 안 넘어감), PC는 휠 확대.
   - 용량 관리: 사진 장수는 원본(`숫자.jpg`)만 세고, 파일은 용량에만 넣는다. 기간 삭제는 파일도 함께 지운다.
+- **🎬 채팅 동영상 (2026-10-28, 프론트 앱과 같은 방식):**
+  - 입력칸 ＋ → 🎬 동영상 (50MB까지), 파일 선택·끌어다 놓기·붙여넣기로 고른 동영상도. 줄이지 않고 **원본 그대로 50MB 이하**(`VIDEO_MAX_BYTES`, `storage.rules`와 같이 바꾸기, 사용자와 정한 값: 무료 사용량 때문), 한 번에 5개까지, 크기를 보여 주고 확인받은 뒤 **동영상마다 메시지 하나**로 올린다(`sendVideoMessage`, "🎬 동영상 올리는 중… 45%"). 넘으면 "갤러리에서 길이를 잘라" 안내.
+  - Storage `teams/{teamId}/chat/{msgId}/v_0.{mp4|mov|m4v|webm|3gp}` + 첫 장면 사진 `v_0_poster.jpg`(긴 쪽 640px, 사진 규칙). 메시지 `video {path, posterPath, name, size, type, w, h, dur}`. 첫 장면을 못 뽑는 형식(PC의 아이폰 HEVC 등)은 미리보기 없이 보낸다.
+  - 말풍선(`VideoBox`): 첫 장면 + ▶ + "0:32 · 12MB". 누르면 그 자리에서 재생하는데, 다운로드 주소로 바로 재생해 **본 만큼만 받는다**(미리 받지 않음, 무료 사용량 절약). 재생 못 하면 저장 안내. 메시지 메뉴 💾 동영상 저장, 삭제하면 동영상·첫 장면 파일도 지움(기간 삭제·방 삭제는 폴더째). 푸시·답장 미리보기 "🎬 동영상", 용량 관리에 "동영상 N개 용량".
+  - 🏌️ 프론트 채팅방의 동영상(`video {assetId, poster, …}`)도 같은 모양으로 보고(`assetLink` = 다운로드 주소로 재생) 저장한다. 프론트 방에 동영상 보내기는 프론트 규칙상 게스트가 못 한다.
 - **링크 미리보기와 @멘션 (공통 기능 4-4):**
   - 링크: 보낸 뒤 앱이 서버 함수 `linkPreview`(`functions/src/linkPreview.ts`)를 불러 그 페이지의 og:title·description·image(없으면 <title>)를 읽어 메시지 `link {url, title, desc, image, site}`에 붙인다. 팀원만 부를 수 있고, 같은 주소는 7일 동안 `linkPreviews/{sha1}`(앱 접근 불가)에 저장해 다시 쓴다. 내부망·서버 주소(localhost, 10.x, 192.168.x, 169.254.x 등)와 80/443 외 포트는 읽지 않고(넘겨 주는 주소도 매번 검사), 6초·512KB까지만 읽는다. euc-kr 페이지도 읽는다.
   - @멘션: 입력칸에서 "@"를 치면 직원 목록(맨 위 @모두)이 뜨고 글자로 걸러진다. ↑↓·Enter·Tab·Esc, 휴대폰은 눌러서 고른다. 보낼 때 글 속 "@이름"/"@모두"로 `mentions[uid]`를 만든다(@모두 = 나를 뺀 팀원 전부). 말풍선의 @이름은 색칠, 나를 부른 말은 노란 테두리와 내 이름 노란 칠.
@@ -197,6 +202,7 @@ teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모
 teams/{teamId}/channels/{c}/reads/{uid}       at (마지막으로 읽은 시각, 기본 방은 c = main)
 teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], customerTags[customerId],
                                  replyTo{id, authorUid, text}, attachments[{path, thumbPath, width, height, size, thumbSize}], files[{path, name, size, type}],
+                                 video{path, posterPath, name, size, type, w, h, dur},
                                  reactions{uid: 이모지}, deleted, editedAt, link{url, title, desc, image, site},
                                  hasPhotos (사진 모아보기 조회용), createdAt, editedAt
 ```

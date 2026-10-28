@@ -14,6 +14,8 @@ export type Usage = {
     bytes: number
     photos: number
     scheduleBytes: number
+    videos?: number
+    videoBytes?: number
     freeBytes: number
     byMonth: { month: string; bytes: number; photos: number }[]
   }

@@ -25,7 +25,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions'
-import { connectStorageEmulator, getBlob, getStorage, ref } from 'firebase/storage'
+import { connectStorageEmulator, getBlob, getDownloadURL, getStorage, ref } from 'firebase/storage'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { auth, db, keepSignedIn } from '../firebase.ts'
 import { toast } from '../ui/dialogs.tsx'
@@ -249,6 +249,11 @@ export function assetUrl(id: string) {
   return url
 }
 
+// 동영상은 통째로 받지 않고 주소로 바로 재생한다 (본 만큼만 받음).
+export function assetLink(id: string) {
+  return getDownloadURL(ref(ydrStorage, `assets/${id}`))
+}
+
 // ── 프론트 직원 이름 (accounts/{아이디}, authorId = acc_아이디) ────
 export type FrontAccount = {
   loginId: string
@@ -304,6 +309,8 @@ export type FrontMessage = {
   images: string[]
   sticker: string | null
   file: { name: string; assetId: string } | null
+  // 🎬 프론트 앱이 보낸 동영상 {assetId, poster(첫 장면 assetId), name, size, mime, w, h, dur}
+  video: { assetId: string; poster?: string; name?: string; size?: number; mime?: string; w?: number; h?: number; dur?: number } | null
   link: { url: string; title?: string; desc?: string; site?: string; thumb?: string } | null
   deleted: boolean
   edited: boolean
@@ -330,6 +337,7 @@ export function toFrontMessage(id: string, d: Record<string, unknown>): FrontMes
     images: ids,
     sticker: (d.stickerAssetId as string) ?? null,
     file: (d.file as FrontMessage['file']) ?? null,
+    video: (d.video as FrontMessage['video'])?.assetId ? (d.video as FrontMessage['video']) : null,
     link: (d.link as FrontMessage['link']) ?? null,
     deleted: d.deleted === true,
     edited: d.edited === true,

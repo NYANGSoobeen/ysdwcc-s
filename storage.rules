@@ -33,7 +33,8 @@ service firebase.storage {
       allow read: if request.auth != null
         && active()
         && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
-      // 사진(압축본·썸네일): 2MB 미만 그림. 파일(f_번호.확장자): 엑셀·PDF·한글·워드·파워포인트·압축·텍스트, 10MB 이하.
+      // 사진(압축본·썸네일, 동영상 첫 장면 v_0_poster.jpg): 2MB 미만 그림. 파일(f_번호.확장자): 엑셀·PDF·한글·워드·파워포인트·압축·텍스트, 10MB 이하.
+      // 동영상(v_번호.확장자): 원본 그대로 50MB 이하 (src/chat.ts VIDEO_MAX_BYTES와 같게).
       allow create: if request.auth != null
         && role(teamId) in ['admin', 'editor']
         && request.resource.metadata.uploaderUid == request.auth.uid
@@ -41,7 +42,10 @@ service firebase.storage {
             && request.resource.size < 2 * 1024 * 1024
             && request.resource.contentType.matches('image/.*'))
           || (fileName.matches('f_[0-9]+[.](xls|xlsx|csv|pdf|hwp|hwpx|doc|docx|ppt|pptx|zip|txt)')
-            && request.resource.size <= 10 * 1024 * 1024));
+            && request.resource.size <= 10 * 1024 * 1024)
+          || (fileName.matches('v_[0-9]+[.](mp4|mov|m4v|webm|3gp)')
+            && request.resource.contentType.matches('video/.*')
+            && request.resource.size <= 50 * 1024 * 1024));
       // 메시지 저장에 실패했을 때 올린 사람이 직접 정리할 수 있게 한다.
       allow delete: if request.auth != null
         && resource.metadata.uploaderUid == request.auth.uid;

@@ -3529,3 +3529,66 @@ button.menu-logout {
 .sidebar .avatar {
   box-shadow: 0 0 0 1px rgb(245 238 221 / 0.45);
 }
+
+/* 🎬 채팅 동영상: 첫 장면 + ▶ · 길이·크기, 누르면 그 자리에서 재생 */
+.chat-video {
+  position: relative;
+  width: min(280px, 62vw);
+  max-height: 360px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0b1e2a;
+}
+.chat-video video,
+.chat-video-cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 360px;
+}
+.chat-video video {
+  background: #000;
+  object-fit: contain;
+}
+.chat-video-cover {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: #0b1e2a;
+  color: #fff;
+  cursor: pointer;
+}
+.chat-video-cover .chat-video-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+.chat-video-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 22px;
+  transform: translate(-50%, -50%);
+}
+.chat-video-meta {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 11px;
+}
+.bubble .chat-video + p {
+  margin-top: 6px;
+}

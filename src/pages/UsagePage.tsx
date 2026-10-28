@@ -53,6 +53,7 @@ export function UsagePage({ team }: { team: Team }) {
               </div>
               <p className="muted small">
                 채팅 사진 {usage.storage.photos.toLocaleString()}장
+                {(usage.storage.videos ?? 0) > 0 && ` · 동영상 ${usage.storage.videos}개 ${formatBytes(usage.storage.videoBytes ?? 0)}`}
                 {usage.storage.scheduleBytes > 0 && ` · 스케줄 ${formatBytes(usage.storage.scheduleBytes)}`} · 무료 공간의{' '}
                 {(ratio * 100).toFixed(1)}% 사용
                 {ratio > 0.8 && ' · 무료 한도에 가까워졌습니다. 오래된 채팅을 정리하세요.'}
