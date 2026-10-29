@@ -1,5 +1,5 @@
 import { collection, doc, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ROLE_LABELS } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import { ask, toast } from '../ui/dialogs.tsx'
@@ -22,6 +22,7 @@ import {
 import { db } from '../firebase.ts'
 import type { Profile, Team } from '../hooks.ts'
 import { cleanPhones, PhoneFields } from './CustomersPage.tsx'
+import { startCall } from '../phone.ts'
 
 type Props = {
   customerId: string
@@ -31,15 +32,14 @@ type Props = {
   embedded?: boolean // PC 2단 화면의 오른쪽 칸에 넣을 때
   onClose: () => void
   onOpenOther: (customerId: string) => void
+  onOpenSms?: (number: string) => void
 }
 
-export function CustomerDetail({ customerId, team, uid, profiles, embedded = false, onClose, onOpenOther }: Props) {
+export function CustomerDetail({ customerId, team, uid, profiles, embedded = false, onClose, onOpenOther, onOpenSms }: Props) {
   const frame = embedded ? 'detail-pane' : 'overlay'
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [notes, setNotes] = useState<Note[]>([])
   const [editing, setEditing] = useState(false)
-  const [callPrompt, setCallPrompt] = useState(false)
-  const calling = useRef(false)
   const role = team.members[uid]
   const canWrite = role !== 'viewer'
   const isAdmin = role === 'admin'
@@ -63,18 +63,6 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
       ),
     [customerId],
   )
-
-  // 앱에서 전화를 걸고 돌아오면 메모 창을 띄운다 (화면 6).
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && calling.current) {
-        calling.current = false
-        setCallPrompt(true)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [])
 
   if (!customer) {
     return (
@@ -122,9 +110,17 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
               {customer.phones.map((p) => (
                 <li key={p}>
                   <span>{formatPhone(p)}</span>
-                  <a className="call-button" href={`tel:${p}`} onClick={() => (calling.current = true)}>
-                    📞 전화
-                  </a>
+                  <span className="phone-actions">
+                    {onOpenSms && (
+                      <button type="button" className="call-button sms" onClick={() => onOpenSms(p)}>
+                        ✉️ 문자
+                      </button>
+                    )}
+                    {/* 통화가 끝나고 돌아오면 통화 메모 창이 뜬다 (CallMemoWatcher, 화면 6) */}
+                    <button type="button" className="call-button" onClick={() => void startCall(p, customer.id).catch((e) => toast(String(e.message ?? e), { error: true }))}>
+                      📞 전화
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -136,18 +132,7 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
           <NextContactField customer={customer} canWrite={canWrite} />
         </section>
 
-        {callPrompt && canWrite && (
-          <p className="notice">방금 통화한 내용을 메모해 두세요.</p>
-        )}
-        {canWrite && (
-          <NoteComposer
-            key={callPrompt ? 'call' : 'normal'}
-            customerId={customer.id}
-            initialKind={callPrompt ? '발신 통화' : '메모'}
-            autoFocus={callPrompt}
-            onSaved={() => setCallPrompt(false)}
-          />
-        )}
+        {canWrite && <NoteComposer customerId={customer.id} initialKind="메모" autoFocus={false} onSaved={() => {}} />}
 
         <section>
           <h3>상담 이력 {notes.length > 0 && <span className="muted">{notes.length}</span>}</h3>

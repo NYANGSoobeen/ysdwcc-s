@@ -6,6 +6,7 @@ import { clearNativeContacts } from './native.ts'
 import { passwordProblem } from './password.ts'
 import { disconnectFront } from './front/ydr.ts'
 import { disablePush } from './push.ts'
+import { wipePhoneData } from './phone.ts'
 import { forgetSignedIn, markAlive } from './session.ts'
 
 // 이메일이 없는 직원도 쓸 수 있게, "@"가 없는 아이디는 이 도메인을 붙여 계정을 만든다.
@@ -89,6 +90,8 @@ export async function logOutAndWipe(notice?: string) {
     // 저장소를 못 쓰는 환경이면 안내만 생략한다.
   }
   forgetSignedIn()
+  // 앱에서 건 전화 기록, 문자 본 시각 (이 기기에만 있던 것)
+  wipePhoneData()
   // 갤럭시 앱이면 폰 연락처에 넣은 고객도 지운다 (데이터 저장 규칙: 계정째 삭제).
   await clearNativeContacts()
   // 이 기기 알림을 끈다 (다음 사람에게 내 알림이 가지 않게).

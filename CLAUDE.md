@@ -21,7 +21,7 @@
   - 앱에서 건 전화(`tel:`)는 앱으로 돌아오면 메모 창을 띄운다 (화면 6)
   - 받은 전화는 "방금 받은 전화 메모하기" 버튼으로 기록한다 (화면 7)
   - Call Directory Extension으로 전화 올 때 고객 이름을 표시한다
-- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 맨 아래(버전 위), 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 갤럭시 앱은 1.2.1(versionCode 4), 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
+- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 맨 아래(버전 위), 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 배포된 갤럭시 앱은 1.2.1(versionCode 4), 코드는 1.3.0(versionCode 5, 전화·문자) — 서명 키를 받아 APK를 다시 만들어야 배포됨, 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
 - **앱 색상:** Merino `#F5EEDD`(바탕) · Rock Blue `#84B3CE`(보조) · Venice Blue `#16587B`(주색, 버튼·내 말풍선·메뉴 바탕). `src/style.css` 맨 위 `:root` 토큰에서 바꾼다 (어두운 모드는 Venice 계열 바탕 + Rock Blue 강조). 메뉴(☰, PC 왼쪽 메뉴)는 Venice Blue 바탕에 Merino 글씨. 채팅방 바탕은 Rock Blue를 Merino 쪽으로 누그러뜨린 `#BED3DC`(`--chat-bg`), 남의 말풍선은 미색, 내 말풍선은 Venice Blue, 날짜 줄은 짙은 남색 반투명.
 - **글꼴:** 본문 Noto Sans KR(400·500·700, 기본 16px), 제목·화면 이름·내 이름 Noto Serif KR(500·700, 내 이름 14px), 채팅 말풍선 14.5px·줄 간격 1.55, 메뉴 14px, 작은 안내 10.5~12.5px. 구글 폰트를 `index.html`에서 불러오고 서비스 워커가 기기에 저장(`google-fonts` 캐시). 입력칸은 아이폰 확대 방지로 16px 유지. 토큰은 `style.css`의 `--font-sans`, `--font-serif`.
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전은 저절로 적용한다 (`src/update.ts`): 새로고침·앱을 다시 열 때 새 버전을 찾으면 바로 바꾸고(한 번 더 새로고침), 쓰는 중이면 쓰던 글·열린 창·고른 사진·올리는 중인 것이 없을 때(`busy()`, 15초마다 확인) 바꾼다. 그동안은 하단 알림("새 버전이 있어요 · 지금 업데이트")을 띄운다. 새 버전 확인: 30분마다, 앱을 다시 볼 때(visibilitychange), PC 창으로 돌아올 때(focus, 5분에 한 번), 인터넷이 다시 될 때. 다시 불러와도 보던 화면은 sessionStorage로 그대로. `sw.js`·`push-sw.js`·`index.html`은 `firebase.json`에서 no-cache. 서비스 워커는 prompt 방식 그대로(skipWaiting 안 함, 옛 화면 조각이 지워지지 않게).
@@ -58,7 +58,7 @@
   - 메뉴 묶음: "단체 채팅", "관리자 전용"은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`).
   - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면은 📢 공지(7번에서 고객 → 공지로 바꿈).
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
-  - 앱 버전: 메뉴 맨 아래(`팀 · v0.6.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
+  - 앱 버전: 메뉴 맨 아래(`팀 · v0.7.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
   - 입력칸 글자는 16px 이상 (아이폰이 입력칸을 누를 때 화면을 확대하지 않게, `style.css` 끝 `@media (hover: none)` 규칙).
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.
@@ -148,6 +148,15 @@
   - 웹은 데이터만 보내고 서비스 워커(`push-sw.js`, workbox `importScripts`)가 알림을 그린다. **지금 보고 있는 방(앱이 서비스 워커에 알려 준 tag: `room-팀-방`, `front-방`, `notice-팀`)의 알림은 띄우지 않는다**, 다른 방이면 앱이 열려 있어도 띄운다. 알림을 누르면 열린 앱을 앞으로 가져와 그 방(`/?room=팀:방`, 프론트는 `/?front=방`)을 연다(`listenOpenRequests`).
   - 🏌️ 프론트 채팅 알림 `ydrGuestPush`(onRequest, 누구나 호출 가능, POST, 머리글 `x-ydr-secret`): 비밀값은 **코드·저장소에 넣지 않고** 최고 관리자가 관리자 화면 → "🏌️ 프론트 채팅 알림 연동"에서 만들고(`setFrontLinkSecret`, 한 번만 보여 줌) 서버 전용 문서 `meta/frontLink.secret`에만 둔다. 함수 주소 `https://us-west1-ysdwcc-s.cloudfunctions.net/ydrGuestPush`. kinds.front를 켠 기기만 받는다.
   - 테스트: `tests/push.test.mjs`(보내는 부분을 바꿔 끼워 내용 확인), 규칙 테스트. 실제 FCM 전달은 배포 후 실제 기기로 확인한다.
+- **📞 전화 · ✉️ 문자 (2026-10-29, 삼성 전화·메시지 앱과 비슷하게, `src/phone.ts`, `src/pages/PhonePage.tsx`, `MessagesPage.tsx`, `CallMemo.tsx`, `PhoneCommon.tsx`):** 메뉴 📇 고객 아래 📞 전화, ✉️ 문자. 사용자가 정한 방식: **기본 전화·문자 앱은 바꾸지 않고** 앱 안 화면으로 (통화 화면·받은 문자 알림은 삼성 기본 앱 그대로). 업무/개인은 번호로 나눈다(지금 팀 고객 번호 = 업무, `[업무]`/"업무" 표시).
+  - 갤럭시 앱 **1.3.0(versionCode 5)부터** Kotlin `PhonePlugin`(`android/.../phone/PhonePlugin.kt`, 플러그인 이름 `Phone`): 통화 기록 읽기(`READ_CALL_LOG`), 바로 전화 걸기(`CALL_PHONE`, 없으면 번호 넣은 전화 앱), 문자 대화 목록·대화 읽기(`READ_SMS`, SMS + MMS 글자·사진 장수), 문자 보내기(`SEND_SMS`, SmsManager, 기본 문자 앱이 아니라 안드로이드가 문자함에 저절로 적음), 개인 연락처 이름(`READ_CONTACTS`, 우리 "[업무]" 계정 제외). 바뀌면 ContentObserver → `changed` 이벤트. **통화 기록·문자는 폰 안에서 읽기만, 서버에 안 올림.** 권한이 회색으로 막히면(안드로이드 13+ 스토어 밖 앱) 앱 정보 ⋮ → "제한된 설정 허용" 안내(`PermissionCard`). 예전 갤럭시 앱이면 업데이트 안내(`OldAppCard`)하고 아이폰 방식으로.
+  - 📞 전화 화면: 아래 탭 ⌨️ 키패드(번호 모양 맞춤, 고객·연락처 찾기, 0 길게 = +, ✉️/📞/⌫) · 🕘 최근기록(날짜 묶음, 같은 번호 이어진 통화 "(3)", 전체/업무/개인/부재중, 줄을 누르면 펼쳐서 📞 전화·✉️ 문자·📝 메모·📇 고객/＋ 고객 추가·복사, 잘못 눌러 전화가 걸리지 않게) · 👥 연락처(업무 고객 + 개인 연락처). 보던 탭 sessionStorage `phone-sub`.
+  - **통화 후 메모 창(`CallMemoWatcher`, 어느 화면에서든):** 갤럭시 앱은 통화 기록에서 새로 생긴 연결된 통화(받은·건, 통화 시간 > 0) 중 가장 최근 것이 지금 팀 고객이면 "수신/발신 통화" 메모 창(통화 시간은 창에만 보이고 저장 안 함). 확인한 시각은 localStorage `call-memo-checked`(처음 켤 때는 지난 통화를 묻지 않음). 아이폰·브라우저는 앱에서 건 전화(`startCall` → sessionStorage `phone-call-pending`)에서 3초 넘게 있다 돌아오면 "발신 통화" 창(화면 6), 받은 전화는 최근기록의 "📝 방금 받은 전화 메모하기" → 고객 고르기(화면 7). 고객 상세의 📞 전화도 같은 방식(예전 화면 안 메모 안내는 없앰).
+  - 아이폰·브라우저 최근기록은 앱에서 건 전화만(localStorage `phone-app-calls`, 200개, 이 기기에만).
+  - ✉️ 문자 화면: 대화 목록(업무/개인, 검색, 안 읽은 수, ✏️ 새 문자) → 대화(말풍선, 날짜 줄, 📞, ⋯ 고객 보기/고객 추가, 입력칸 5줄·PC Enter 보내기, 보내는 중·실패 다시 보내기). 기본 문자 앱의 "읽음"은 바꿀 수 없어 이 앱에서 본 시각을 따로 기억(localStorage `sms-seen`). 받은·보낸 문자를 길게 눌러 **📝 상담 메모로 남기기**(종류 문자/카톡)를 해야만 팀에 공유된다. 아이폰·브라우저는 받는 사람·내용을 정하면 기본 문자 앱을 연다(`smsLink`, 아이폰 `&body=`). 다른 화면의 ✉️는 sessionStorage `sms-open`으로 그 번호 대화를 연다.
+  - 고객·통화 데이터 구독은 전화·문자 화면을 볼 때만(`useTeamCustomers`), 통화 후 메모는 새 통화 1건마다 번호로 고객 1번 찾기(읽기 절약).
+  - 로그아웃하면 `wipePhoneData()`가 이 기기의 앱 전화 기록·본 시각·확인 시각을 지운다.
+  - 테스트: 브라우저 e2e(아이폰 크기)와 가짜 안드로이드 다리(`window.androidBridge` + `Capacitor.PluginHeaders`/`nativePromise`)로 갤럭시 화면 흐름을 확인. 실제 갤럭시 권한·통화 기록·문자 보내기는 APK로 확인해야 한다.
 - **📢 공지 게시판 (7번, 2026-10-28, `src/pages/NoticesPage.tsx`, `src/notices.ts`):** 팀마다 `teams/{teamId}/notices/{id}` {title(100자), body(5000자), photos[채팅 사진과 같은 모양, 10장], authorUid, createdAt, editedAt, editedBy, stk, stkLast}. 메뉴 맨 위 📢 공지, 앱 첫 화면.
   - 쓰기는 편집 이상(＋ 쓰기 → 창: 제목·내용·사진 붙이기/빼기), 고치기·지우기는 쓴 사람이나 관리자(⋯ 메뉴), 보기와 🏷️ 스티커 붙이기는 팀원 모두(보기 권한 포함, 6번과 같은 방식으로 공지 카드 안 비율). 글 속 주소는 링크, 사진은 누르면 크게.
   - 사진은 채팅처럼 긴 쪽 1600px + 썸네일 400px JPEG, Storage `teams/{teamId}/notices/{id}/{시각}_{n}.jpg`(규칙: 편집 이상, 2MB 미만 JPEG). 고치면 빠진 사진, 지우면 폴더째 `onNoticeWritten`이 지운다(10분 안에 올린 건 저장 중일 수 있어 남김). 용량 관리 종류 "공지 사진".
@@ -176,8 +185,9 @@
 
 | 기능 | 안드로이드 | 아이폰 | 목업 |
 | --- | --- | --- | --- |
-| 업무/개인 통화기록 탭 | 폰 전체 통화 자동 분류 | 앱에서 건 전화와 메모한 통화만 | 1, 2, 7 |
-| 통화 후 분류/메모 창 | 모든 통화 후 자동 | 앱에서 건 전화만 자동 | 3, 6 |
+| 업무/개인 통화기록 탭 | 폰 전체 통화 자동 분류 (📞 전화 화면, 1.3.0) | 앱에서 건 전화와 메모한 통화만 | 1, 2, 7 |
+| 업무/개인 문자 (✉️ 문자 화면) | 폰 문자 읽기·보내기 (1.3.0) | 기본 문자 앱 열기 | - |
+| 통화 후 분류/메모 창 | 고객과 연결된 통화 후 자동 | 앱에서 건 전화만 자동 | 3, 6 |
 | 고객 상세, 상담 이력, 다음 연락 알림 | O | O | 4 |
 | 메모 작성자, 수정자, 수정 날짜, 수정 기록 | O | O | 4 |
 | 고객별 "내 폰에도 저장" | O | O | 4 |

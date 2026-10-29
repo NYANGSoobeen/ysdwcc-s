@@ -4384,3 +4384,499 @@ a.st-link-btn {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   letter-spacing: 1px;
 }
+
+/* ── 📞 전화 · ✉️ 문자 (삼성 전화·메시지 앱처럼) ── */
+.phone-page,
+.sms-page,
+.sms-thread {
+  position: relative;
+}
+.phone-body {
+  padding-bottom: 8px;
+}
+.phone-tabs {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
+}
+.phone-tabs button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 56px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.phone-tabs button span {
+  font-size: 20px;
+}
+.phone-tabs button.selected {
+  color: var(--accent);
+  font-weight: 700;
+}
+.phone-filters {
+  margin-top: -4px;
+}
+.phone-perm p {
+  margin: 0 0 6px;
+}
+.phone-hint p {
+  margin: 0 0 8px;
+}
+.phone-section {
+  margin: 4px 0 -8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.work-tag {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  vertical-align: 2px;
+}
+.person-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #c9ced2;
+  color: #fff;
+  font-weight: 700;
+  font-size: 17px;
+}
+.person-dot.work {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.call-list {
+  list-style: none;
+  margin: 0 -16px;
+  padding: 0;
+}
+.call-list > li.list-day {
+  padding: 12px 16px 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.call-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.call-row:active,
+.call-list li.open > .call-row {
+  background: rgb(var(--shadow) / 0.07);
+}
+.call-main {
+  flex: 1;
+  min-width: 0;
+}
+.call-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-row.missed .call-name {
+  color: var(--danger);
+}
+.call-sub {
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-icon.in {
+  color: #2e7d32;
+}
+.call-icon.out {
+  color: var(--accent);
+}
+.call-icon.missed {
+  color: var(--danger);
+}
+.call-time {
+  flex-shrink: 0;
+  font-size: 12.5px;
+}
+.row-actions {
+  display: flex;
+  justify-content: space-around;
+  gap: 4px;
+  padding: 2px 12px 10px 66px;
+  background: rgb(var(--shadow) / 0.07);
+}
+.row-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 52px;
+  min-height: 52px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+}
+.row-actions button small {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.row-actions button.call {
+  background: #2e9d4f;
+  color: #fff;
+}
+.row-actions button.call small {
+  color: #fff;
+}
+.round-action {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 18px;
+}
+.round-action.call {
+  background: #2e9d4f;
+  color: #fff;
+}
+
+/* 키패드 */
+.keypad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 380px;
+  width: 100%;
+  margin: 0 auto;
+}
+.keypad-display {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  text-align: center;
+}
+.keypad-number {
+  font-size: 32px;
+  letter-spacing: 1px;
+  word-break: break-all;
+  min-height: 44px;
+}
+.keypad-number .muted {
+  font-size: 16px;
+  letter-spacing: 0;
+}
+.keypad-who {
+  font-size: 14.5px;
+  color: var(--muted);
+}
+button.keypad-who {
+  border: 0;
+  background: none;
+  min-height: 0;
+  padding: 2px 6px;
+}
+.keypad-who.work {
+  color: var(--accent);
+  font-weight: 700;
+}
+.keypad-matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+.keypad-matches button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.keypad-matches .person-dot {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 18px;
+}
+.keypad-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border: 0;
+  border-radius: 32px;
+  background: none;
+  color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.keypad-key:active {
+  background: rgb(var(--shadow) / 0.1);
+}
+.keypad-key .digit {
+  font-size: 30px;
+  line-height: 1.1;
+}
+.keypad-key small {
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  min-height: 13px;
+}
+.keypad-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 18px;
+  padding-bottom: 8px;
+}
+.keypad-call {
+  width: 68px;
+  height: 68px;
+  border: 0;
+  border-radius: 50%;
+  background: #2e9d4f;
+  color: #fff;
+  font-size: 28px;
+}
+.keypad-call:disabled {
+  opacity: 0.5;
+}
+.keypad-side {
+  font-size: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+/* 문자 목록 */
+.sms-preview {
+  white-space: nowrap;
+}
+.sms-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sms-side .badge {
+  background: #ff3b30;
+  color: #fff;
+}
+.call-row.unread .call-name,
+.call-row.unread .sms-preview {
+  font-weight: 700;
+  color: var(--text);
+}
+.fab {
+  position: absolute;
+  right: 18px;
+  bottom: calc(18px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 22px;
+  box-shadow: 0 4px 14px rgb(var(--shadow) / 0.3);
+}
+
+/* 문자 대화 */
+.sms-thread-header h2 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+}
+.sms-thread-header h2 small {
+  font-size: 12px;
+  font-weight: 400;
+}
+.sms-head-actions {
+  display: flex;
+  align-items: center;
+}
+.sms-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg);
+}
+.sms-messages .day {
+  align-self: center;
+  margin: 10px 0 4px;
+  padding: 2px 12px;
+  border-radius: 12px;
+  background: rgb(var(--shadow) / 0.12);
+  font-size: 12px;
+  color: var(--text);
+}
+.sms-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 82%;
+}
+.sms-row.mine {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.sms-bubble {
+  padding: 9px 13px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.sms-row.mine .sms-bubble {
+  background: var(--mine);
+  color: var(--mine-text);
+  border-color: transparent;
+}
+.sms-mms {
+  font-size: 12.5px;
+  opacity: 0.8;
+}
+.sms-meta {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.sms-meta .link {
+  font-size: 12px;
+  min-height: 0;
+  padding: 0;
+}
+.sms-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px calc(8px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  position: relative;
+}
+.sms-composer textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 128px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  resize: none;
+  line-height: 22px;
+}
+.sms-count {
+  position: absolute;
+  right: 64px;
+  top: -18px;
+  font-size: 11px;
+}
+
+/* 통화 메모 창 · 새 문자 · 받은 전화 고르기 */
+.call-memo-who {
+  font-size: 16px;
+}
+.memo-pick .call-list,
+.new-sms .call-list {
+  margin: 4px 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.new-sms label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.new-sms textarea {
+  width: 100%;
+  margin-top: 6px;
+}
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+}
+a.button.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+a.button.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.phone-list .phone-actions {
+  display: flex;
+  gap: 6px;
+}
+.call-button.sms {
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.shell.desktop .phone-body .keypad {
+  margin-top: 12px;
+}
+.shell.desktop .call-list {
+  margin: 0;
+}

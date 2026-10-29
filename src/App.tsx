@@ -17,6 +17,9 @@ import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
+import { CallMemoWatcher } from './pages/CallMemo.tsx'
+import { MessagesPage, openSmsTo } from './pages/MessagesPage.tsx'
+import { PhonePage } from './pages/PhonePage.tsx'
 import { NoticesPage } from './pages/NoticesPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
 import { PasswordForm } from './pages/PasswordForm.tsx'
@@ -39,7 +42,7 @@ function savedTeam() {
 
 // F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
 const TAB_KEY = 'current-tab'
-const TABS: Tab[] = ['notices', 'customers', 'chat', 'front', 'schedule', 'members', 'admin', 'usage', 'profile']
+const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'members', 'admin', 'usage', 'profile']
 
 function savedTab(): Tab {
   try {
@@ -295,6 +298,19 @@ function SignedIn({ user }: { user: User }) {
         }
       : undefined,
   }
+  // 전화·문자 화면에서 고객 정보, 문자 대화로 옮겨 가기
+  const openCustomer = (id: string) => {
+    try {
+      sessionStorage.setItem('open-customer', `${team.id}:${id}`)
+    } catch {
+      // 기억 못 하면 고객 목록이 열린다
+    }
+    setTab('customers')
+  }
+  const openSms = (number: string) => {
+    openSmsTo(number)
+    setTab('messages')
+  }
   const search = {
     query: queries[current] ?? '',
     setQuery: (query: string) => setQueries((prev) => ({ ...prev, [current]: query })),
@@ -312,7 +328,9 @@ function SignedIn({ user }: { user: User }) {
         <div className="shell-main">
           <div className="shell-body">
             {current === 'notices' && <NoticesPage team={team} uid={user.uid} />}
-            {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} />}
+            {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} onOpenSms={openSms} />}
+            {current === 'phone' && <PhonePage team={team} uid={user.uid} onOpenCustomer={openCustomer} onOpenSms={openSms} />}
+            {current === 'messages' && <MessagesPage team={team} uid={user.uid} onOpenCustomer={openCustomer} />}
             {current === 'chat' && (
               <ChatPage
                 team={team}
@@ -339,6 +357,7 @@ function SignedIn({ user }: { user: User }) {
             {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
           </div>
         </div>
+        <CallMemoWatcher team={team} uid={user.uid} />
         {!desktop && (
           <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)}>
             {teamSelect}

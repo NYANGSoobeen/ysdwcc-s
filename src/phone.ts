@@ -1,0 +1,294 @@
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { useEffect, useMemo, useState } from 'react'
+import { normalizePhone, toCustomer, type Customer } from './customers.ts'
+import { db } from './firebase.ts'
+import { isAndroidApp } from './native.ts'
+
+// 📞 전화 · ✉️ 문자 (삼성 전화·메시지 앱과 비슷하게).
+// - 갤럭시 앱(1.3.0부터): Kotlin Phone 플러그인으로 이 폰의 통화 기록·문자를 읽고, 바로 전화 걸고, 문자를 보낸다.
+//   통화 기록과 문자는 폰 안에서 읽기만 하고 서버에는 올리지 않는다 (CLAUDE.md 데이터 저장 규칙).
+//   전화가 오고 가는 통화 화면, 받은 문자 알림은 삼성 기본 앱 그대로 (기본 앱을 바꾸지 않음).
+// - 아이폰·브라우저: 통화 기록·문자를 읽을 수 없어서, 앱에서 건 전화만 이 기기에 기록하고(tel:) 문자는 기본 문자 앱을 연다(sms:).
+// - 업무/개인은 번호로 나눈다: 지금 팀 고객 번호면 업무, 아니면 개인.
+
+export type CallEntry = {
+  id: string
+  number: string
+  name: string // 폰 연락처 이름 (통화 기록에 저장된 것)
+  type: number // 1 받은 전화, 2 건 전화, 3 부재중, 5 거절, 6 차단
+  date: number
+  duration: number // 초
+}
+export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number }
+export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number }
+export type DeviceContact = { name: string; number: string }
+type Perms = { calls: boolean; sms: boolean; contacts: boolean }
+
+type PhonePlugin = {
+  status(): Promise<Perms>
+  requestCalls(): Promise<{ granted: boolean }>
+  requestSms(): Promise<{ granted: boolean }>
+  requestContacts(): Promise<{ granted: boolean }>
+  openSettings(): Promise<void>
+  callLog(o: { limit?: number; since?: number }): Promise<{ calls: CallEntry[] }>
+  dial(o: { number: string }): Promise<{ direct: boolean }>
+  threads(o: { limit?: number }): Promise<{ threads: SmsThread[] }>
+  messages(o: { threadId: string; limit?: number; before?: number }): Promise<{ messages: SmsMessage[] }>
+  threadFor(o: { number: string }): Promise<{ threadId: string }>
+  sendSms(o: { number: string; text: string }): Promise<{ parts: number }>
+  contacts(): Promise<{ contacts: DeviceContact[] }>
+  addListener(event: 'changed', fn: (e: { what: 'calls' | 'sms' }) => void): Promise<PluginListenerHandle>
+}
+
+export const PhoneNative = registerPlugin<PhonePlugin>('Phone')
+// 갤럭시 앱이지만 1.3.0 전 버전이면 플러그인이 없다 → 업데이트 안내, 그동안은 아이폰과 같은 방식
+export const hasPhoneNative = isAndroidApp && Capacitor.isPluginAvailable('Phone')
+export const oldAndroidApp = isAndroidApp && !hasPhoneNative
+
+// ── 권한 ──
+const PERMS_CHANGED = 'phone-perms-changed'
+let perms: Perms = { calls: false, sms: false, contacts: false }
+let permsLoaded = false
+
+export function usePhonePerms() {
+  const [state, setState] = useState<Perms & { loaded: boolean }>({ ...perms, loaded: permsLoaded || !hasPhoneNative })
+  useEffect(() => {
+    if (!hasPhoneNative) return
+    const refresh = async () => {
+      perms = await PhoneNative.status().catch(() => perms)
+      permsLoaded = true
+      setState({ ...perms, loaded: true })
+    }
+    void refresh()
+    // 설정 화면에서 권한을 켜고 돌아오면 다시 확인
+    const onVisible = () => document.visibilityState === 'visible' && void refresh()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener(PERMS_CHANGED, refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener(PERMS_CHANGED, refresh)
+    }
+  }, [])
+  return state
+}
+
+// 권한 묻기. 막혀 있으면 false (→ 화면에서 "설정에서 허용" 안내)
+export async function askPermission(kind: 'calls' | 'sms' | 'contacts') {
+  const fn = kind === 'calls' ? PhoneNative.requestCalls : kind === 'sms' ? PhoneNative.requestSms : PhoneNative.requestContacts
+  const { granted } = await fn.call(PhoneNative).catch(() => ({ granted: false }))
+  window.dispatchEvent(new Event(PERMS_CHANGED))
+  return granted
+}
+
+// 통화 기록·문자가 바뀌면 (전화가 끝남, 문자가 옴) 다시 읽는다.
+export function usePhoneChanged(what: 'calls' | 'sms', fn: () => void) {
+  useEffect(() => {
+    if (!hasPhoneNative) return
+    let handle: PluginListenerHandle | undefined
+    let alive = true
+    void PhoneNative.addListener('changed', (e) => e.what === what && fn()).then((h) => {
+      if (alive) handle = h
+      else void h.remove()
+    })
+    const onVisible = () => document.visibilityState === 'visible' && fn()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      alive = false
+      void handle?.remove()
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+    // fn은 매번 새로 만들어져도 처음 것을 쓰면 오래된 값을 볼 수 있어 ref 대신 what만 본다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [what])
+}
+
+// ── 고객 번호로 업무/개인 나누기 ──
+// 번호 비교는 숫자만 남겨 국내 형식(+82…)으로 맞춘다.
+export const phoneKey = (n: string) => normalizePhone(n)
+
+// 전화·문자 화면을 보는 동안만 지금 팀 고객을 실시간으로 본다 (무료 사용량: 보는 화면만 구독).
+export function useTeamCustomers(teamId: string) {
+  const [customers, setCustomers] = useState<Customer[] | null>(null)
+  useEffect(
+    () =>
+      onSnapshot(query(collection(db, 'customers'), where('teamId', '==', teamId)), (snap) =>
+        setCustomers(snap.docs.map((d) => toCustomer(d.id, d.data()))),
+      ),
+    [teamId],
+  )
+  const byPhone = useMemo(() => {
+    const map = new Map<string, Customer>()
+    for (const c of customers ?? []) for (const p of c.phones) map.set(p, c)
+    return map
+  }, [customers])
+  return { customers, byPhone, find: (n: string) => byPhone.get(phoneKey(n)) }
+}
+
+// 폰 연락처(개인) 이름: 갤럭시 앱에서만, 한 번 읽어 메모리에만 둔다.
+let contactsCache: DeviceContact[] | null = null
+export function useDeviceContacts(enabled: boolean) {
+  const [list, setList] = useState<DeviceContact[]>(contactsCache ?? [])
+  useEffect(() => {
+    if (!hasPhoneNative || !enabled) return
+    if (contactsCache) return setList(contactsCache)
+    void PhoneNative.contacts()
+      .then(({ contacts }) => {
+        contactsCache = contacts
+        setList(contacts)
+      })
+      .catch(() => {})
+  }, [enabled])
+  const byPhone = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of list) map.set(phoneKey(c.number), c.name)
+    return map
+  }, [list])
+  return { contacts: list, nameOf: (n: string) => byPhone.get(phoneKey(n)) }
+}
+
+// ── 전화 걸기 ──
+// 아이폰·브라우저는 앱에서 건 전화를 이 기기에만 기록한다 (최근 기록 화면용, 서버에 안 올림).
+const APP_CALLS_KEY = 'phone-app-calls'
+const PENDING_KEY = 'phone-call-pending'
+export type PendingCall = { number: string; customerId?: string; at: number }
+
+export function appCalls(): CallEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(APP_CALLS_KEY) ?? '[]') as CallEntry[]
+  } catch {
+    return []
+  }
+}
+
+export async function startCall(number: string, customerId?: string) {
+  if (hasPhoneNative) {
+    // 갤럭시 앱은 통화가 끝난 뒤 통화 기록을 보고 메모 창을 띄운다 (CallMemoWatcher).
+    await PhoneNative.dial({ number })
+    return
+  }
+  try {
+    const list = [{ id: String(Date.now()), number, name: '', type: 2, date: Date.now(), duration: 0 }, ...appCalls()].slice(0, 200)
+    localStorage.setItem(APP_CALLS_KEY, JSON.stringify(list))
+    // 돌아오면 메모 창 (화면 6)
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ number, customerId, at: Date.now() } satisfies PendingCall))
+  } catch {
+    // 기억하지 못하면 메모 창만 안 뜬다.
+  }
+  location.href = `tel:${number}`
+}
+
+export function takePendingCall(): PendingCall | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY)
+    if (!raw) return null
+    const p = JSON.parse(raw) as PendingCall
+    // 전화 앱으로 넘어갔다 돌아온 경우만 (바로 돌아오면 아직 통화 전일 수 있어 기다린다)
+    if (Date.now() - p.at < 3000) return null
+    sessionStorage.removeItem(PENDING_KEY)
+    return Date.now() - p.at < 3 * 3600 * 1000 ? p : null
+  } catch {
+    return null
+  }
+}
+
+// ── 문자 보내기 (아이폰·브라우저·예전 갤럭시 앱은 기본 문자 앱을 연다) ──
+export function smsLink(number: string, body = '') {
+  const sep = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? '&' : '?'
+  return `sms:${number}${body ? `${sep}body=${encodeURIComponent(body)}` : ''}`
+}
+
+// 문자 대화를 이 앱에서 마지막으로 본 시각 (기본 문자 앱의 "읽음"은 바꿀 수 없어서 따로 기억)
+const SEEN_KEY = 'sms-seen'
+export function smsSeen(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? '{}') as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+export function markSmsSeen(threadId: string) {
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify({ ...smsSeen(), [threadId]: Date.now() }))
+  } catch {
+    // 기억하지 못하면 안 읽은 수가 남을 뿐
+  }
+}
+
+// 로그아웃하면 이 기기의 전화·문자 기록(앱에서 건 전화, 본 시각)을 지운다.
+export function wipePhoneData() {
+  for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED]) {
+    try {
+      localStorage.removeItem(k)
+    } catch {
+      // 지우지 못하는 환경
+    }
+  }
+  try {
+    sessionStorage.removeItem(PENDING_KEY)
+  } catch {
+    // 지우지 못하는 환경
+  }
+}
+
+// 갤럭시 앱 통화 후 메모 창: 여기까지 확인한 통화 시각
+export const CALL_MEMO_CHECKED = 'call-memo-checked'
+
+// ── 보여 주기 ──
+export function callTypeLabel(type: number) {
+  if (type === 1) return { icon: '↙', label: '받은 전화', kind: 'in' }
+  if (type === 2) return { icon: '↗', label: '건 전화', kind: 'out' }
+  if (type === 3) return { icon: '↙', label: '부재중 전화', kind: 'missed' }
+  if (type === 5) return { icon: '⊘', label: '거절한 전화', kind: 'missed' }
+  if (type === 6) return { icon: '⊘', label: '차단한 전화', kind: 'missed' }
+  return { icon: '•', label: '통화', kind: 'out' }
+}
+
+export function durationText(sec: number) {
+  if (sec <= 0) return ''
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  if (m >= 60) return `${Math.floor(m / 60)}시간 ${m % 60}분`
+  return m > 0 ? `${m}분 ${s}초` : `${s}초`
+}
+
+export function dayLabel(ms: number) {
+  const d = new Date(ms)
+  const today = new Date()
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diff = Math.round((start(today) - start(d)) / 86400000)
+  if (diff === 0) return '오늘'
+  if (diff === 1) return '어제'
+  return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', ...(d.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) })
+}
+
+export const timeText = (ms: number) => new Date(ms).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
+
+// 목록에 쓰는 짧은 시각: 오늘이면 시각, 어제, 그 전은 날짜
+export function shortWhen(ms: number) {
+  const label = dayLabel(ms)
+  if (label === '오늘') return timeText(ms)
+  if (label === '어제') return '어제'
+  const d = new Date(ms)
+  return `${d.getMonth() + 1}. ${d.getDate()}.`
+}
+
+// 번호 보기 좋게: 01012345678 → 010-1234-5678 (입력 중인 키패드 번호도)
+export function prettyNumber(n: string) {
+  const digits = n.replace(/[^\d+*#]/g, '')
+  if (digits.startsWith('+82')) return prettyNumber(`0${digits.slice(3)}`)
+  if (/^02/.test(digits)) {
+    if (digits.length <= 2) return digits
+    if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`
+    if (digits.length <= 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
+    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`
+  }
+  if (/^0\d/.test(digits)) {
+    if (digits.length <= 3) return digits
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`
+    if (digits.length <= 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`
+  }
+  if (/^1\d{3}/.test(digits) && digits.length === 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`
+  return digits
+}

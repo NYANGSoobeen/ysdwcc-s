@@ -70,4 +70,11 @@
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
     <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
+    <!-- 📞 전화 화면: 통화 기록 읽기(이 폰 안에서만, 서버에 안 올림), 바로 전화 걸기 -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- ✉️ 문자 화면: 문자 읽기·보내기(이 폰 안에서만, 서버에 안 올림). 받은 문자 알림은 삼성 메시지 앱이 그대로 -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 </manifest>

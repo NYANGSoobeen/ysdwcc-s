@@ -19,7 +19,7 @@ import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 const OPEN_KEY = 'open-customer'
 
-export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string; desktop: boolean }) {
+export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; uid: string; desktop: boolean; onOpenSms?: (number: string) => void }) {
   const [customers, setCustomers] = useState<Customer[] | null>(null)
   const { query: search } = useTabSearch()
   const [adding, setAdding] = useState(false)
@@ -80,6 +80,7 @@ export function CustomersPage({ team, uid, desktop }: { team: Team; uid: string;
       embedded={desktop}
       onClose={() => setOpenId(null)}
       onOpenOther={setOpenId}
+      onOpenSms={onOpenSms}
     />
   ) : null
 
