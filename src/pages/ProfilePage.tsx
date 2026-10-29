@@ -9,6 +9,7 @@ import { ProfileEditor } from './ProfileEditor.tsx'
 import { ContactsSync } from './ContactsSync.tsx'
 import { InstallCard } from './InstallCard.tsx'
 import { PushCard } from './PushCard.tsx'
+import { OffDayCard } from './OffDayCard.tsx'
 import type { Profile, Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
 
@@ -41,6 +42,7 @@ export function ProfilePage({ user, profile, team }: Props) {
         <PasswordForm title="비밀번호 바꾸기" />
         </div>
         <div className="col">
+        <OffDayCard uid={user.uid} profile={profile} />
         <ContactsSync uid={user.uid} />
         <button
           type="button"

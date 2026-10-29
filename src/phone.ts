@@ -23,13 +23,18 @@ export type CallEntry = {
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number }
 export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number }
 export type DeviceContact = { name: string; number: string; company?: string }
-type Perms = { calls: boolean; sms: boolean; contacts: boolean }
+type Perms = { calls: boolean; sms: boolean; contacts: boolean; phonestate?: boolean }
+export type OffDayLog = { at: number; number: string; silenced: boolean; sent: boolean }
 
 type PhonePlugin = {
   status(): Promise<Perms>
   requestCalls(): Promise<{ granted: boolean }>
   requestSms(): Promise<{ granted: boolean }>
   requestContacts(): Promise<{ granted: boolean }>
+  requestPhoneState(): Promise<{ granted: boolean }>
+  offDayConfig(o: { enabled: boolean; dates: string[]; numbers: string[]; message: string }): Promise<void>
+  offDayStatus(): Promise<{ phonestate: boolean; sms: boolean; silence: boolean; offToday: boolean; log: OffDayLog[] }>
+  openDndSettings(): Promise<void>
   openSettings(): Promise<void>
   callLog(o: { limit?: number; since?: number }): Promise<{ calls: CallEntry[] }>
   dial(o: { number: string }): Promise<{ direct: boolean }>
@@ -74,8 +79,15 @@ export function usePhonePerms() {
 }
 
 // 권한 묻기. 막혀 있으면 false (→ 화면에서 "설정에서 허용" 안내)
-export async function askPermission(kind: 'calls' | 'sms' | 'contacts') {
-  const fn = kind === 'calls' ? PhoneNative.requestCalls : kind === 'sms' ? PhoneNative.requestSms : PhoneNative.requestContacts
+export async function askPermission(kind: 'calls' | 'sms' | 'contacts' | 'phonestate') {
+  const fn =
+    kind === 'calls'
+      ? PhoneNative.requestCalls
+      : kind === 'sms'
+        ? PhoneNative.requestSms
+        : kind === 'phonestate'
+          ? PhoneNative.requestPhoneState
+          : PhoneNative.requestContacts
   const { granted } = await fn.call(PhoneNative).catch(() => ({ granted: false }))
   window.dispatchEvent(new Event(PERMS_CHANGED))
   return granted
@@ -217,6 +229,8 @@ export function markSmsSeen(threadId: string) {
 
 // 로그아웃하면 이 기기의 전화·문자 기록(앱에서 건 전화, 본 시각)을 지운다.
 export function wipePhoneData() {
+  // 🌙 휴무일 자동 응답도 끈다 (다음 사람 폰에서 내 문구가 나가지 않게)
+  if (hasPhoneNative) void PhoneNative.offDayConfig({ enabled: false, dates: [], numbers: [], message: '' }).catch(() => {})
   for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED]) {
     try {
       localStorage.removeItem(k)

@@ -21,7 +21,7 @@
   - 앱에서 건 전화(`tel:`)는 앱으로 돌아오면 메모 창을 띄운다 (화면 6)
   - 받은 전화는 "방금 받은 전화 메모하기" 버튼으로 기록한다 (화면 7)
   - Call Directory Extension으로 전화 올 때 고객 이름을 표시한다
-- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 맨 아래(버전 위), 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 배포된 갤럭시 앱은 1.2.1(versionCode 4), 코드는 1.3.0(versionCode 5, 전화·문자) — 서명 키를 받아 APK를 다시 만들어야 배포됨, 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
+- **앱 이름과 아이콘:** 홈 화면 이름 "양산동원지원팀"(정식 "양산동원로얄CC 지원팀": 메뉴 맨 아래(버전 위), 로그인 화면, 설치 이름). 브라우저 탭 제목(`index.html`의 `<title>`)은 "양산동원로얄CC지원팀" (프론트 앱 "양산동원로얄CC프론트"와 맞춤). 아이콘은 프론트 앱(양산동원프론트, 코랄색)과 같은 구성(원 테두리, 왕관, YANGSAN, 동원로얄 지원팀)에 앱 색상(Venice Blue 그라데이션 바탕, Merino 글씨)을 쓴다. 원본 `design/icon.svg`, PNG는 `public/icons/`와 `android/app/src/main/res/`(갤럭시 앱 1.1.0부터, 시작 화면은 Merino 바탕). 지금 배포된 갤럭시 앱은 1.2.1(versionCode 4), 코드는 1.3.0(versionCode 5, 전화·문자·휴무일 자동 응답) — 서명 키를 받아 APK를 다시 만들어야 배포됨, 갤럭시 앱 이름은 "양산동원로얄CC지원팀"(`strings.xml`, `capacitor.config.ts`).
 - **앱 색상:** Merino `#F5EEDD`(바탕) · Rock Blue `#84B3CE`(보조) · Venice Blue `#16587B`(주색, 버튼·내 말풍선·메뉴 바탕). `src/style.css` 맨 위 `:root` 토큰에서 바꾼다 (어두운 모드는 Venice 계열 바탕 + Rock Blue 강조). 메뉴(☰, PC 왼쪽 메뉴)는 Venice Blue 바탕에 Merino 글씨. 채팅방 바탕은 Rock Blue를 Merino 쪽으로 누그러뜨린 `#BED3DC`(`--chat-bg`), 남의 말풍선은 미색, 내 말풍선은 Venice Blue, 날짜 줄은 짙은 남색 반투명.
 - **글꼴:** 본문 Noto Sans KR(400·500·700, 기본 16px), 제목·화면 이름·내 이름 Noto Serif KR(500·700, 내 이름 14px), 채팅 말풍선 14.5px·줄 간격 1.55, 메뉴 14px, 작은 안내 10.5~12.5px. 구글 폰트를 `index.html`에서 불러오고 서비스 워커가 기기에 저장(`google-fonts` 캐시). 입력칸은 아이폰 확대 방지로 16px 유지. 토큰은 `style.css`의 `--font-sans`, `--font-serif`.
 - **웹앱:** React + Vite + TypeScript PWA (`src/`). Firebase Hosting으로 배포한다. 새 버전은 저절로 적용한다 (`src/update.ts`): 새로고침·앱을 다시 열 때 새 버전을 찾으면 바로 바꾸고(한 번 더 새로고침), 쓰는 중이면 쓰던 글·열린 창·고른 사진·올리는 중인 것이 없을 때(`busy()`, 15초마다 확인) 바꾼다. 그동안은 하단 알림("새 버전이 있어요 · 지금 업데이트")을 띄운다. 새 버전 확인: 30분마다, 앱을 다시 볼 때(visibilitychange), PC 창으로 돌아올 때(focus, 5분에 한 번), 인터넷이 다시 될 때. 다시 불러와도 보던 화면은 sessionStorage로 그대로. `sw.js`·`push-sw.js`·`index.html`은 `firebase.json`에서 no-cache. 서비스 워커는 prompt 방식 그대로(skipWaiting 안 함, 옛 화면 조각이 지워지지 않게).
@@ -58,7 +58,7 @@
   - 메뉴 묶음: "단체 채팅", "관리자 전용"은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`).
   - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면은 📢 공지(7번에서 고객 → 공지로 바꿈).
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
-  - 앱 버전: 메뉴 맨 아래(`팀 · v0.7.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
+  - 앱 버전: 메뉴 맨 아래(`팀 · v0.8.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
   - 입력칸 글자는 16px 이상 (아이폰이 입력칸을 누를 때 화면을 확대하지 않게, `style.css` 끝 `@media (hover: none)` 규칙).
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.
@@ -172,6 +172,15 @@
   - `Avatar`는 uid만으로 그린다: `useProfile`·`useMemberProfiles`가 읽은 프로필을 `rememberPeople` 저장소에 넣어 둔다. `card`를 주면 누를 때 프로필 카드(사진 크게·이름·직급, `showProfileCard`): 채팅 말풍선 옆, 팀원 화면.
   - 메뉴: 내 프로필 아래 "직급 · 권한", 팀원 목록은 직급(없으면 권한). 팀원 화면은 동그라미 + "직급 · 아이디".
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문). 스티커 글자는 칸 가로·세로 정가운데: 한글 글꼴은 위아래 여백이 달라 그냥 가운데 맞춤하면 아래로 쏠리므로, 글자 모양을 재서(`inkOffsetEm`, 크게 보기 PNG는 `drawSticker`의 `measureText`) 맞춘다. 글꼴 `STICKER_FONT`(Noto Sans KR)를 받은 뒤 다시 그린다. 기본 크기(확대 1, "화면맞춤"): 휴대폰은 너비에 맞춤, PC는 쪽 전체가 스크롤 없이 보이게(너비·높이 중 작은 쪽, 여백은 `.sched-scroll` padding을 재서 뺌). ＋로 확대하면 스크롤이 생긴다.
+- **📋 근무표 (스케줄 → 📋 근무표 탭, 기본 보기, 2026-10-29, `src/schedule/roster.ts`, `src/pages/RosterView.tsx`):** 스케줄 화면 위 탭 📋 근무표 | 🖼️ 원본 그림(예전 사진·PDF + 스티커, sessionStorage `schedule-view`).
+  - 데이터: `teams/{teamId}/roster/{YYYY-MM}` = {month, codes: {uid: {'일': 코드}}, fileName, updatedAt, updatedBy}. 규칙: 팀원 읽기, 편집 이상만 쓰기(문서 이름 = month, 정해진 칸만).
+  - 📥 엑셀 불러오기(편집 이상): **직원 세로 · 날짜 가로**(사용자가 정함). 앞 15줄에서 날짜 칸(1, 1일, 11/3, 2026. 11. 3.)이 가장 많은 줄 = 날짜 줄, 달은 날짜 칸·위쪽 글자("2026년 11월")·없으면 보던 달(창에서 고침). 이름 열 = 팀원 이름이 가장 많이 맞는 열("김지원 주임"처럼 뒤에 4글자까지 붙어도 맞춤). **팀원과 이름이 맞는 줄만** 가져오고 없는 이름은 건너뜀, 같은 이름 팀원이 둘이면 건너뛰고 안내, **엑셀에 없는 팀원(새 직원)은 비워 둠**. 코드: B0/bo → B0, 휴·휴무·OFF·오프·X → 휴, 나머지는 그대로(6자). 불러오면 그 달을 통째로 바꾼다(직접 고친 것도, 확인 창).
+  - 화면: 달 ‹ ›, 내 휴무 줄, 날짜 띠(요일·휴 n·오늘), 고른 날 카드 탭 **B0 n · 휴 n · 기타 · 비어 있음**(이름·직급·동그라미), ✏️ 고치기(편집 이상)면 → B0 / → 휴 / ✕, ▾ 한 달 표(PC는 처음부터 펼침, 고치기 중엔 칸을 누르면 B0 → 휴 → 비움).
+- **🌙 휴무일 자동 응답 (2026-10-29, `src/offday.ts`, `src/pages/OffDayCard.tsx`, 폰 `android/.../phone/OffDay.kt`):** 근무표에서 내가 **휴**인 날 **업무 고객 번호**(내 모든 팀)로 전화가 오면 벨 무음 + 내 문구로 **전화 올 때마다** 자동 문자(사용자가 정함). 개인 번호는 그대로 울림. 갤럭시 앱 1.3.0만, 아이폰은 집중 모드 안내.
+  - 내 정보 → 🌙 카드: 켜기(전화 상태 `READ_PHONE_STATE`+`READ_CALL_LOG`, 문자 권한 요청), 문구(직원마다, `users.settings.offDayReply {enabled, message}`, 300자, 기본 문구 `defaultOffDayMessage`), 다음 휴무, 권한 상태, 방해 금지 접근 안내, 삼성 배터리 절전 예외 안내, 최근 자동 응답 50건(폰에만).
+  - 웹앱(`useOffDaySync`, App에서 켰을 때만)이 내 휴무 날짜(이번 달·다음 달 roster 문서)와 고객 번호(내 팀 customers, 연락처 표시와 같은 조회), 문구를 `PhonePlugin.offDayConfig`로 폰 SharedPreferences `offday`에 넣는다. 로그아웃하면 끈다(`wipePhoneData`).
+  - 폰: 매니페스트 `OffDayReceiver`(PHONE_STATE, 앱이 꺼져 있어도) → 울릴 때 오늘이 휴무이고 고객 번호면(15초 안 같은 번호 중복 방송 무시) 무음: 방해 금지 접근(`ACCESS_NOTIFICATION_POLICY`, 설정에서 허용)이 있으면 무음 모드로 바꾸고 원래 모드 기억, 없으면 벨소리 볼륨만 잠깐 끔 → 통화가 끝나면(IDLE) 되돌림. 문자는 SmsManager. minSdk 24라 날짜는 SimpleDateFormat(LocalDate는 API 26).
+  - **기본 전화 앱이 아니라서** CallScreeningService(연락처에 있는 번호는 안 불림)는 쓰지 않았다. 실제 갤럭시에서 울리는 중 무음 전환, 삼성 절전에서 방송 수신은 확인 못 함.
 - **Storage CORS:** 칸 찾기와 스티커 합성 그림을 위해 쪽 그림 픽셀을 읽으므로 버킷에 CORS가 필요하다 (`cors.json`, 한 번만 `npm run storage:cors`). 없으면 그림은 보이지만 칸 찾기 대신 누른 자리에 기본 크기로 붙는다.
 - **💾 용량 관리 (최고 관리자, 2026-10-28, 프론트 앱 "용량 관리" 탭과 같은 화면, 색은 우리 앱):** `src/pages/UsagePage.tsx`, 서버 `functions/src/usage.ts` + `getUsage`·`cleanUnusedFiles`·`countData`·`deleteMessagesInRange`. 메뉴 💾 용량 관리. 위에서부터:
   1. **📁 파일 저장공간**: 막대(프로젝트 전체 Storage / 무료 5GB, 70%↑ 노랑·90%↑ 빨강), 이 팀 파일 수·다른 팀 용량, 표 `종류 | 개수 | 용량`(채팅 사진·채팅 동영상·채팅 파일·스케줄 사진·스케줄 파일·방금 올린 파일·기타·**사용하지 않는 파일**(빨강)). 🧹 정리(확인 → 서버가 지우기 직전에 다시 나눠 그새 쓰인 파일은 건너뜀), 🔍 어떤 파일인지 보기(96px 바둑판, 사진은 누르면 크게, 최근 300개), 콘솔 링크.
@@ -200,7 +209,7 @@
 | 동료 공유, 권한(관리자/편집/보기), 담당자 넘기기 | O | O | 5 |
 | 팀 채팅: 답장, 수정, 삭제, 검색, @동료, #고객 태그 | O | O | 9, 10 |
 | 처음 설치 시 고객 골라 오기 | 폰 연락처에서 고르기 + 엑셀·CSV·vcf (📥 가져오기) | 엑셀·CSV·vcf | 11 |
-| 퇴근 모드 (업무 전화 무음) | O | 집중 모드 안내 | 2, 8 |
+| 퇴근 모드 (업무 전화 무음) | 휴무일 자동 응답(근무표 휴 → 고객 전화 무음 + 자동 문자) | 집중 모드 안내 | 2, 8 |
 | 휴대폰 연락처에 표시 (고객 전체 동기화) | O | O | 8 |
 
 **담당자 넘기기**는 고객의 담당자(메모, 알림 책임)를 바꾸는 기능이다. 전화를 다른 번호로 돌리는 기능이 아니다 (앱이 특정 전화만 골라 착신전환하는 건 불가능).
@@ -247,6 +256,7 @@ teams/{teamId}/notices/{id}      title, body, photos[], authorUid, createdAt, ed
 teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null), size, pdfDropped,
                                  images[{assetId(경로), name:'1쪽', w, h, scale}],
                                  marks[{p(쪽 0부터), x, y, w?, h?, t}], marksAt, marksBy, authorId, createdAt
+teams/{teamId}/roster/{YYYY-MM}  month, codes{uid: {일: 'B0'|'휴'|…}}, fileName, updatedAt, updatedBy   (📋 근무표)
 teams/{teamId}/channels/{channelId}  name, createdBy, createdAt, bgStk, stkLast   (단체 채팅방, main은 기본 방 이름·배경 스티커만)
 teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모양
 teams/{teamId}/channels/{c}/reads/{uid}       at (마지막으로 읽은 시각, 기본 방은 c = main)

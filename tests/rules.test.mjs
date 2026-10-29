@@ -325,3 +325,27 @@ test('👤 프로필: 본인만 이름·직급·사진을 바꾸고, 사진은 �
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { teamIds: ['t1', 't2'] }))
   await assertFails(updateDoc(doc(fs('ed2'), 'users/ed'), { position: '남이 바꿈' }))
 })
+
+test('📋 근무표: 팀원은 보고, 편집 이상만 엑셀·직접 고치기로 바꾼다', async () => {
+  const r = (by, extra = {}) => ({ month: '2026-11', codes: { ed: { 3: '휴', 4: 'B0' } }, fileName: 'a.xlsx', updatedAt: serverTimestamp(), updatedBy: by, ...extra })
+  const path = 'teams/t1/roster/2026-11'
+  await assertFails(setDoc(doc(fs('viewer'), path), r('viewer')))
+  await assertFails(setDoc(doc(fs('outsider'), path), r('outsider')))
+  await assertFails(setDoc(doc(fs('ed'), path), r('ed2')))
+  await assertFails(setDoc(doc(fs('ed'), path), r('ed', { month: '2026-12' })))
+  await assertFails(setDoc(doc(fs('ed'), path), r('ed', { extra: 1 })))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/roster/11월'), r('ed', { month: '11월' })))
+  await assertSucceeds(setDoc(doc(fs('ed'), path), r('ed')))
+  await assertSucceeds(updateDoc(doc(fs('ed'), path), { 'codes.viewer.5': '휴', updatedAt: serverTimestamp(), updatedBy: 'ed' }))
+  await assertSucceeds(getDoc(doc(fs('viewer'), path)))
+  await assertFails(getDoc(doc(fs('outsider'), path)))
+  await assertFails(updateDoc(doc(fs('viewer'), path), { 'codes.viewer.5': 'B0', updatedAt: serverTimestamp(), updatedBy: 'viewer' }))
+  await assertFails(deleteDoc(doc(fs('viewer'), path)))
+  await assertSucceeds(deleteDoc(doc(fs('ed'), path)))
+})
+
+test('🌙 휴무일 자동 응답 문구는 내 settings에', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', email: 'ed@x.com', teamIds: ['t1'] }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { 'settings.offDayReply.enabled': true, 'settings.offDayReply.message': '휴무입니다' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'users/viewer'), { 'settings.offDayReply.enabled': true }))
+})

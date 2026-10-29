@@ -49,6 +49,15 @@
                 android:resource="@xml/contacts" />
         </service>
 
+        <!-- 🌙 휴무일 자동 응답: 전화가 오면 (앱이 꺼져 있어도) 고객 번호면 무음 + 자동 문자 -->
+        <receiver
+            android:name=".phone.OffDayReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -76,5 +85,8 @@
     <!-- ✉️ 문자 화면: 문자 읽기·보내기(이 폰 안에서만, 서버에 안 올림). 받은 문자 알림은 삼성 메시지 앱이 그대로 -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- 🌙 휴무일 자동 응답: 걸려 온 전화 알기, 무음 모드로 바꾸기(방해 금지 접근은 설정에서 따로 허용) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 </manifest>

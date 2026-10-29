@@ -13,6 +13,7 @@ import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
 import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellViewing, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
+import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
@@ -140,6 +141,8 @@ function SignedIn({ user }: { user: User }) {
 
   // 갤럭시 앱: 폰 연락처의 "지원팀" 계정을 내 모든 팀의 고객과 맞춘다.
   useNativeContactsSync(teamIds)
+  // 🌙 휴무일 자동 응답: 내 휴무 날짜·고객 번호·문구를 폰에 맞춰 둔다 (갤럭시 앱, 켰을 때만)
+  useOffDaySync(user.uid, teamIds, profile ?? null)
 
   useEffect(() => rememberSignedIn(user.uid), [user.uid])
 

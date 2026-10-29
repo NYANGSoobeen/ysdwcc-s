@@ -1,5 +1,5 @@
 import { onSnapshot } from 'firebase/firestore'
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { errorMessage } from '../auth.ts'
 import type { Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
@@ -25,13 +25,45 @@ import { StickerLayer, stickerColors } from '../schedule/StickerLayer.tsx'
 import { drawSticker, sameCell, STICKERS, type Mark } from '../schedule/stickers.ts'
 import { ZoomViewer } from '../schedule/ZoomViewer.tsx'
 import { useIsDesktop } from '../useMedia.ts'
+import { RosterView } from './RosterView.tsx'
 
 const stickerRows = [...new Set(STICKERS.map((s) => s.row))].sort()
 const ZOOM_STEP = 1.25
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 5
 
+// 📅 스케줄: 📋 근무표(엑셀에서 정리한 표, 기본) | 🖼️ 원본 그림(사진·PDF + 수정 스티커)
+const VIEW_KEY = 'schedule-view'
 export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
+  const [view, setViewState] = useState<'roster' | 'image'>(() => {
+    try {
+      return sessionStorage.getItem(VIEW_KEY) === 'image' ? 'image' : 'roster'
+    } catch {
+      return 'roster'
+    }
+  })
+  const setView = (v: 'roster' | 'image') => {
+    setViewState(v)
+    try {
+      sessionStorage.setItem(VIEW_KEY, v)
+    } catch {
+      // 기억 못 해도 괜찮다
+    }
+  }
+  const tabs = (
+    <div className="schedule-views" role="tablist" aria-label="스케줄 보기">
+      <button type="button" role="tab" aria-selected={view === 'roster'} className={view === 'roster' ? 'selected' : ''} onClick={() => setView('roster')}>
+        📋 근무표
+      </button>
+      <button type="button" role="tab" aria-selected={view === 'image'} className={view === 'image' ? 'selected' : ''} onClick={() => setView('image')}>
+        🖼️ 원본 그림
+      </button>
+    </div>
+  )
+  return view === 'roster' ? <RosterView team={team} uid={uid} tabs={tabs} /> : <ImageSchedule team={team} uid={uid} tabs={tabs} />
+}
+
+function ImageSchedule({ team, uid, tabs }: { team: Team; uid: string; tabs: ReactNode }) {
   const canEdit = team.members[uid] !== 'viewer'
   const [schedule, setSchedule] = useState<Schedule | null | undefined>(undefined)
   const [sticker, setSticker] = useState<string | null>(null)
@@ -187,6 +219,7 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
           <span />
         )}
       </header>
+      {tabs}
 
       {menuOpen && schedule && (
         <FileMenu

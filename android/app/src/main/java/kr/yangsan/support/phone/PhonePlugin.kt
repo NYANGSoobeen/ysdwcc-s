@@ -37,6 +37,8 @@ import com.getcapacitor.annotation.PermissionCallback
         Permission(alias = "calls", strings = [Manifest.permission.READ_CALL_LOG, Manifest.permission.CALL_PHONE]),
         Permission(alias = "sms", strings = [Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS]),
         Permission(alias = "contacts", strings = [Manifest.permission.READ_CONTACTS]),
+        // 🌙 휴무일 자동 응답: 걸려 온 번호 알기
+        Permission(alias = "phonestate", strings = [Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG]),
     ],
 )
 class PhonePlugin : Plugin() {
@@ -80,7 +82,8 @@ class PhonePlugin : Plugin() {
             JSObject()
                 .put("calls", granted("calls"))
                 .put("sms", granted("sms"))
-                .put("contacts", granted("contacts")),
+                .put("contacts", granted("contacts"))
+                .put("phonestate", granted("phonestate")),
         )
     }
 
@@ -92,6 +95,47 @@ class PhonePlugin : Plugin() {
 
     @PluginMethod
     fun requestContacts(call: PluginCall) = ask(call, "contacts")
+
+    @PluginMethod
+    fun requestPhoneState(call: PluginCall) = ask(call, "phonestate")
+
+    // ── 🌙 휴무일 자동 응답 (OffDay.kt) ──
+    // { enabled, dates: ['2026-11-03'], numbers: ['+821012345678'], message }
+    @PluginMethod
+    fun offDayConfig(call: PluginCall) {
+        val dates = call.getArray("dates", JSArray())!!
+        val numbers = call.getArray("numbers", JSArray())!!
+        OffDay.save(
+            context,
+            call.getBoolean("enabled", false)!!,
+            (0 until dates.length()).map { dates.getString(it) },
+            (0 until numbers.length()).map { numbers.getString(it) },
+            call.getString("message", "")!!,
+        )
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun offDayStatus(call: PluginCall) {
+        val log = OffDay.log(context)
+        call.resolve(
+            JSObject()
+                .put("phonestate", granted("phonestate"))
+                .put("sms", granted("sms"))
+                .put("silence", OffDay.canSilence(context))
+                .put("offToday", OffDay.isOffToday(context))
+                .put("log", log),
+        )
+    }
+
+    // 방해 금지 접근 설정 (무음 모드로 바꾸려면 필요)
+    @PluginMethod
+    fun openDndSettings(call: PluginCall) {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        call.resolve()
+    }
 
     private fun ask(call: PluginCall, alias: String) {
         if (granted(alias)) {
