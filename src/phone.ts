@@ -22,7 +22,7 @@ export type CallEntry = {
 }
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number }
 export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number }
-export type DeviceContact = { name: string; number: string }
+export type DeviceContact = { name: string; number: string; company?: string }
 type Perms = { calls: boolean; sms: boolean; contacts: boolean }
 
 type PhonePlugin = {

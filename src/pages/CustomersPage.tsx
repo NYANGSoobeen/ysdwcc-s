@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { CustomerDetail } from './CustomerDetail.tsx'
+import { ImportCustomers } from './ImportCustomers.tsx'
 import { MenuButton } from '../menu.tsx'
 import { ask } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
@@ -23,6 +24,7 @@ export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; u
   const [customers, setCustomers] = useState<Customer[] | null>(null)
   const { query: search } = useTabSearch()
   const [adding, setAdding] = useState(false)
+  const [importing, setImporting] = useState(false)
   // 열어 둔 고객은 F5(새로 고침) 뒤에도 다시 연다.
   const [openId, setOpenIdState] = useState<string | null>(() => {
     try {
@@ -92,13 +94,19 @@ export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; u
         <MenuButton />
         <h2>📇 고객 {customers ? customers.length : ''}</h2>
         {canWrite ? (
-          <button type="button" className="ghost" onClick={() => setAdding(!adding)}>
-            {adding ? '닫기' : '+ 추가'}
-          </button>
+          <span className="header-actions">
+            <button type="button" className="ghost" onClick={() => setImporting(true)} disabled={customers === null} aria-label="고객 한꺼번에 가져오기">
+              📥<span className="hide-narrow"> 가져오기</span>
+            </button>
+            <button type="button" className="ghost" onClick={() => setAdding(!adding)}>
+              {adding ? '닫기' : '+ 추가'}
+            </button>
+          </span>
         ) : (
           <span />
         )}
       </header>
+      {importing && customers && <ImportCustomers teamId={team.id} customers={customers} onClose={() => setImporting(false)} />}
       <SearchBar placeholder="이름, 회사, 전화번호 검색" />
       <div className="page-body">
         {adding && (
@@ -124,10 +132,21 @@ export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; u
         {customers !== null && (
           <section>
             {due.length > 0 && <h3>전체</h3>}
-            {rest.length === 0 ? (
-              <p className="center muted">
-                {search ? '검색 결과가 없습니다.' : canWrite ? '"+ 추가"로 첫 고객을 등록하세요.' : '등록된 고객이 없습니다.'}
-              </p>
+            {rest.length === 0 && !search && canWrite ? (
+              <div className="card import-first">
+                <p>
+                  <strong>처음이라면 고객을 한꺼번에 가져오세요</strong>
+                </p>
+                <p className="muted small">거래처 엑셀·CSV, 연락처 파일(.vcf), 갤럭시 앱은 폰 연락처에서 골라 올 수 있어요. 고객 번호의 통화·문자는 "업무"로 나뉘어요.</p>
+                <button type="button" className="primary" onClick={() => setImporting(true)}>
+                  📥 한꺼번에 가져오기
+                </button>
+                <button type="button" className="ghost" onClick={() => setAdding(true)}>
+                  + 한 명씩 추가
+                </button>
+              </div>
+            ) : rest.length === 0 ? (
+              <p className="center muted">{search ? '검색 결과가 없습니다.' : '등록된 고객이 없습니다.'}</p>
             ) : (
               <ul className="list">
                 {rest.map((c) => (

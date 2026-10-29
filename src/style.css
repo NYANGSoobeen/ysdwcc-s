@@ -4880,3 +4880,154 @@ a.button.disabled {
 .shell.desktop .call-list {
   margin: 0;
 }
+
+/* 📥 고객 한꺼번에 가져오기 */
+.modal.import-customers.wide {
+  width: min(680px, 100%);
+}
+.import-sources {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+.import-sources button {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  column-gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+  white-space: normal;
+  word-break: keep-all;
+  min-height: 0;
+}
+.import-sources button span {
+  grid-row: span 2;
+  font-size: 26px;
+}
+.import-sources button small {
+  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.45;
+}
+.import-source-note {
+  padding: 4px 4px 0;
+}
+.import-map {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+.import-map summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.import-map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.import-map-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.import-map-grid select {
+  min-width: 0;
+}
+.import-summary {
+  margin: 8px 0 6px;
+}
+.import-tools {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.import-tools input {
+  flex: 1;
+  min-width: 0;
+}
+.import-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.import-list li + li {
+  border-top: 1px solid var(--border);
+}
+.import-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.import-list input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  flex-shrink: 0;
+}
+.import-list li.skip {
+  opacity: 0.6;
+}
+.import-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 4px;
+}
+.import-who small {
+  flex-basis: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-status {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgb(var(--shadow) / 0.1);
+}
+.import-status.no-phone,
+.import-status.no-name {
+  color: var(--danger);
+}
+.import-done {
+  font-size: 18px;
+  font-weight: 700;
+}
+.import-first p {
+  margin: 0 0 6px;
+}
+.import-first .primary {
+  margin-right: 6px;
+}
+@media (max-width: 420px) {
+  .hide-narrow {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .import-tools {
+    flex-wrap: wrap;
+  }
+  .import-tools input {
+    flex-basis: 100%;
+  }
+  .import-tools button {
+    flex: 1;
+  }
+}

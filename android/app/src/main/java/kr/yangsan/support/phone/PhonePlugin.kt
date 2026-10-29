@@ -346,12 +346,25 @@ class PhonePlugin : Plugin() {
         }
     }
 
-    // ── 폰 연락처 (개인 연락처 이름을 보여 주기 위해 읽기만) ──
+    // ── 폰 연락처 (개인 연락처 이름 보여 주기, "폰 연락처에서 고객 골라 오기"에 읽기만) ──
+    // [{ name, number, company }] — 우리 앱이 넣은 "[업무]" 고객 연락처는 뺀다.
     @PluginMethod
     fun contacts(call: PluginCall) {
         if (!granted("contacts")) return call.reject("연락처 권한이 없습니다.", "NO_PERMISSION")
         execute {
             try {
+                // 회사(직장) 이름: 연락처마다 하나
+                val companies = HashMap<Long, String>()
+                context.contentResolver.query(
+                    ContactsContract.Data.CONTENT_URI,
+                    arrayOf(ContactsContract.Data.CONTACT_ID, ContactsContract.CommonDataKinds.Organization.COMPANY),
+                    "${ContactsContract.Data.MIMETYPE} = ?", arrayOf(ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE), null,
+                )?.use { c ->
+                    while (c.moveToNext()) {
+                        val company = c.getString(1)
+                        if (!company.isNullOrBlank()) companies.putIfAbsent(c.getLong(0), company.trim())
+                    }
+                }
                 val out = JSArray()
                 val seen = HashSet<String>()
                 context.contentResolver.query(
@@ -360,16 +373,21 @@ class PhonePlugin : Plugin() {
                         ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
                         ContactsContract.CommonDataKinds.Phone.NUMBER,
                         ContactsContract.RawContacts.ACCOUNT_TYPE,
+                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
                     ),
                     null, null, "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC",
                 )?.use { c ->
                     while (c.moveToNext()) {
-                        // 우리 앱이 넣은 "[업무]" 고객 연락처는 빼고 개인 연락처만
                         if (c.getString(2) == "kr.yangsan.support.account") continue
                         val name = c.getString(0) ?: continue
                         val number = c.getString(1) ?: continue
                         if (!seen.add(name + number.filter { it.isDigit() })) continue
-                        out.put(JSObject().put("name", name).put("number", number))
+                        out.put(
+                            JSObject()
+                                .put("name", name)
+                                .put("number", number)
+                                .put("company", companies[c.getLong(3)] ?: ""),
+                        )
                     }
                 }
                 call.resolve(JSObject().put("contacts", out))
