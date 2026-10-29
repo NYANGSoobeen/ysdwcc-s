@@ -5327,3 +5327,71 @@ a.button.disabled {
   margin: 4px 0 0;
   padding-left: 18px;
 }
+
+/* 휴대폰 맨 아래 탭: 📞 전화 · ✉️ 문자 · 📇 고객 · ⚙️ 설정(내 정보) */
+.bottom-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
+}
+.bottom-tabs button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 56px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.bottom-tabs button span {
+  font-size: 21px;
+  line-height: 1.2;
+  filter: grayscale(0.6);
+  opacity: 0.75;
+}
+.bottom-tabs button.selected {
+  color: var(--accent);
+  font-weight: 700;
+}
+.bottom-tabs button.selected span {
+  filter: none;
+  opacity: 1;
+}
+/* 키보드가 열렸거나, 검색 중이거나, 문자 대화 안에서는 숨긴다 (입력칸이 맨 아래) */
+.keyboard-open .bottom-tabs,
+.shell.searching .bottom-tabs,
+.shell:has(.sms-thread) .bottom-tabs {
+  display: none;
+}
+/* 아래 탭이 있으면 그 위 화면들의 아래 여백(노치)은 탭이 맡는다 */
+.shell:has(.bottom-tabs) .fab {
+  bottom: 18px;
+}
+/* 전화 화면 키패드·최근기록·연락처는 위쪽 탭으로 */
+.phone-tabs {
+  border-top: 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.phone-tabs button {
+  flex-direction: row;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 14px;
+  border-bottom: 3px solid transparent;
+}
+.phone-tabs button span {
+  font-size: 16px;
+}
+.phone-tabs button.selected {
+  border-bottom-color: var(--accent);
+}

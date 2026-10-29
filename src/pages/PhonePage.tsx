@@ -76,13 +76,6 @@ export function PhonePage({ team, uid, onOpenCustomer, onOpenSms }: Props) {
         <h2>📞 전화</h2>
         <span />
       </header>
-      <div className="page-body phone-body">
-        {oldAndroidApp && <OldAppCard />}
-        {sub === 'keypad' && <Keypad customers={customers ?? []} contacts={contacts} ctx={ctx} />}
-        {sub === 'recent' && <Recent ctx={ctx} callsGranted={perms.calls} loaded={perms.loaded} />}
-        {sub === 'contacts' && <Contacts customers={customers} contacts={contacts} contactsGranted={perms.contacts} ctx={ctx} />}
-      </div>
-      {picking && <MemoCustomerPicker customers={customers ?? []} onClose={() => setPicking(false)} />}
       <nav className="phone-tabs" aria-label="전화 화면">
         {(
           [
@@ -97,6 +90,13 @@ export function PhonePage({ team, uid, onOpenCustomer, onOpenSms }: Props) {
           </button>
         ))}
       </nav>
+      <div className="page-body phone-body">
+        {oldAndroidApp && <OldAppCard />}
+        {sub === 'keypad' && <Keypad customers={customers ?? []} contacts={contacts} ctx={ctx} />}
+        {sub === 'recent' && <Recent ctx={ctx} callsGranted={perms.calls} loaded={perms.loaded} />}
+        {sub === 'contacts' && <Contacts customers={customers} contacts={contacts} contactsGranted={perms.contacts} ctx={ctx} />}
+      </div>
+      {picking && <MemoCustomerPicker customers={customers ?? []} onClose={() => setPicking(false)} />}
     </div>
   )
 }

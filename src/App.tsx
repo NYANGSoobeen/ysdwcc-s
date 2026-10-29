@@ -359,6 +359,24 @@ function SignedIn({ user }: { user: User }) {
             {current === 'front' && <FrontChatPage roomId={frontRoomId} onOpenRoom={openFrontRoom} />}
             {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
           </div>
+          {/* 휴대폰: 맨 아래 자주 쓰는 화면 (전화 · 문자 · 고객 · 설정). 채팅방 안에서는 입력칸 자리라 숨긴다. */}
+          {!desktop && current !== 'chat' && current !== 'front' && (
+            <nav className="bottom-tabs" aria-label="자주 쓰는 화면">
+              {(
+                [
+                  ['phone', '📞', '전화'],
+                  ['messages', '✉️', '문자'],
+                  ['customers', '📇', '고객'],
+                  ['profile', '⚙️', '설정'],
+                ] as const
+              ).map(([id, icon, label]) => (
+                <button key={id} type="button" className={current === id ? 'selected' : ''} aria-current={current === id ? 'page' : undefined} onClick={() => setTab(id)}>
+                  <span aria-hidden="true">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
         <CallMemoWatcher team={team} uid={user.uid} />
         {!desktop && (
