@@ -47,6 +47,8 @@ const config = {
         display: 'standalone',
         background_color: '#f5eedd',
         theme_color: '#16587b',
+        // 갤럭시 크롬 홈 화면 앱: 통신사 앱 통화 요약을 "공유"로 받기 (?memo=, src/sharedMemo.ts)
+        share_target: { action: '/', method: 'GET', params: { title: 'memo_title', text: 'memo' } },
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

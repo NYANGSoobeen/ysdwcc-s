@@ -22,6 +22,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- 📝 통신사 앱(에이닷 등) 통화 요약을 "공유"로 받아 상담 메모 창에 채운다 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
         </activity>
 
         <!-- "지원팀" 연락처 계정 (고객을 폰 연락처에 표시) -->

@@ -24,6 +24,7 @@ import { useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { Modal, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 import { openCallMemo } from './CallMemo.tsx'
+import { pushSharedMemo, readClipboard } from '../sharedMemo.ts'
 import { addAsCustomer, copyNumber, OldAppCard, PermissionCard, PersonDot, searchPeople, type Person } from './PhoneCommon.tsx'
 
 // 📞 전화 (삼성 전화 앱처럼 아래 탭: 키패드 · 최근기록 · 연락처)
@@ -317,6 +318,11 @@ function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: bool
           </button>
         ))}
       </div>
+      {ctx.canWrite && (
+        <button type="button" className="summary-paste" onClick={() => void pasteSummary()}>
+          📋 복사한 통화 요약으로 메모하기 <small className="muted">(에이닷 등)</small>
+        </button>
+      )}
       {!native && (
         <div className="card phone-hint">
           <p className="muted small">
@@ -500,6 +506,13 @@ function ContactRow({ name, sub, number, customer, ctx }: { name: string; sub: s
       {open && <RowActions actions={actions()} />}
     </li>
   )
+}
+
+// 통신사 앱 요약을 복사해 왔을 때: 클립보드 글로 요약 메모 창 (요약 속 번호로 고객 찾기, src/sharedMemo.ts)
+async function pasteSummary() {
+  const text = await readClipboard()
+  if (!text) return toast('복사한 글이 없어요. 통신사 앱(에이닷 등)에서 통화 요약을 먼저 복사해 주세요.', { error: true, long: true })
+  pushSharedMemo(text)
 }
 
 // "방금 받은 전화 메모하기": 고객을 골라 메모 창 열기

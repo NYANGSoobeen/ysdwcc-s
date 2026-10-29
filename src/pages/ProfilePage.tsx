@@ -10,6 +10,7 @@ import { ContactsSync } from './ContactsSync.tsx'
 import { InstallCard } from './InstallCard.tsx'
 import { PushCard } from './PushCard.tsx'
 import { OffDayCard } from './OffDayCard.tsx'
+import { SummaryGuideCard } from './SummaryGuideCard.tsx'
 import type { Profile, Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
 
@@ -43,6 +44,7 @@ export function ProfilePage({ user, profile, team }: Props) {
         </div>
         <div className="col">
         <OffDayCard uid={user.uid} profile={profile} />
+        <SummaryGuideCard />
         <ContactsSync uid={user.uid} />
         <button
           type="button"
