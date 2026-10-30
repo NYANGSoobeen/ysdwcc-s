@@ -494,10 +494,17 @@ class PhonePlugin : Plugin() {
                     }
                     ChatStore.markRead(context, address)
                 }
+                // 같은 번호의 대화를 모두 (1.6.4): 채팅+로만 받은 대화(rcs:번호)에서 우리 앱으로 보낸 문자는 문자함의 다른 대화에 들어가고,
+                // 폰에 따라 010…/+8210… 모양이 달라 대화가 둘로 나뉘기도 한다 → 번호로 대화를 찾아 함께 보여 준다
+                val ids = linkedSetOf<Long>()
+                if (threadId >= 0) ids.add(threadId)
+                if (!address.isNullOrBlank()) ids.addAll(threadsOf(address))
+                if (ids.isEmpty()) ids.add(-1L)
+                val inIds = ids.joinToString(",")
                 context.contentResolver.query(
                     Telephony.Sms.CONTENT_URI,
                     arrayOf(Telephony.Sms._ID, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE, Telephony.Sms.STATUS),
-                    "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.DATE} < ?", arrayOf(threadId.toString(), before.toString()),
+                    "${Telephony.Sms.THREAD_ID} IN ($inIds) AND ${Telephony.Sms.DATE} < ?", arrayOf(before.toString()),
                     "${Telephony.Sms.DATE} DESC LIMIT $limit",
                 )?.use { c ->
                     while (c.moveToNext()) {
@@ -516,7 +523,7 @@ class PhonePlugin : Plugin() {
                 context.contentResolver.query(
                     Telephony.Mms.CONTENT_URI,
                     arrayOf(Telephony.Mms._ID, Telephony.Mms.DATE, Telephony.Mms.MESSAGE_BOX),
-                    "${Telephony.Mms.THREAD_ID} = ? AND ${Telephony.Mms.DATE} < ?", arrayOf(threadId.toString(), (before / 1000).toString()),
+                    "${Telephony.Mms.THREAD_ID} IN ($inIds) AND ${Telephony.Mms.DATE} < ?", arrayOf((before / 1000).toString()),
                     "${Telephony.Mms.DATE} DESC LIMIT $limit",
                 )?.use { c ->
                     while (c.moveToNext()) {
@@ -538,6 +545,25 @@ class PhonePlugin : Plugin() {
                 call.reject("문자를 읽지 못했습니다: ${e.message}", e)
             }
         }
+    }
+
+    // 이 번호와 주고받은 문자가 있는 대화 id들 (번호 모양이 달라도 같은 번호면)
+    private fun threadsOf(address: String): Set<Long> {
+        val key = OffDay.local(address)
+        val tail = key.filter { it.isDigit() }.takeLast(8)
+        if (tail.length < 4) return emptySet()
+        val out = linkedSetOf<Long>()
+        try {
+            context.contentResolver.query(
+                Telephony.Sms.CONTENT_URI, arrayOf(Telephony.Sms.THREAD_ID, Telephony.Sms.ADDRESS),
+                "${Telephony.Sms.ADDRESS} LIKE ?", arrayOf("%$tail"), null,
+            )?.use { c ->
+                while (c.moveToNext()) if (OffDay.local(c.getString(1) ?: "") == key) out.add(c.getLong(0))
+            }
+        } catch (_: Exception) {
+            // 못 찾으면 받은 대화 id만
+        }
+        return out
     }
 
     // 번호로 대화 찾기 (없으면 첫 문자를 보낼 때 생긴다)

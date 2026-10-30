@@ -245,7 +245,7 @@ function ThreadList({ who, onOpen }: { who: (a: string) => { customer?: Customer
 }
 
 // ── 한 대화 ──
-type Local = SmsMessage & { local?: true; retry?: string }
+type Local = SmsMessage & { local?: true; retry?: string; sent?: true }
 
 function SmsThreadView(props: {
   open: Open
@@ -301,7 +301,8 @@ function SmsThreadView(props: {
     atBottom.current = true
     try {
       await PhoneNative.sendSms({ number: open.address, text: body })
-      setPending((p) => p.filter((m) => m.id !== id))
+      // 문자함에 저장되는 게 조금 늦을 수 있어, 불러온 목록에 이 글이 보일 때까지 "보냄"으로 남겨 둔다 (아래 all)
+      setPending((p) => p.map((m) => (m.id === id ? { ...m, sending: false, sent: true } : m)))
       load()
     } catch (err) {
       setPending((p) => p.map((m) => (m.id === id ? { ...m, sending: false, failed: true } : m)))
@@ -327,7 +328,9 @@ function SmsThreadView(props: {
       { icon: '📋', label: '번호 복사', onSelect: () => void copyNumber(open.address) },
     ].filter(Boolean) as MenuAction[]
 
-  const all: Local[] = [...(messages ?? []), ...pending]
+  // 보낸 글이 문자함에서 불러와지면 화면의 임시 글은 뺀다 (2분 안에 같은 글을 내가 보낸 것)
+  const shown = pending.filter((p) => !(p.sent && messages?.some((m) => m.mine && m.text === p.text && m.date >= p.date - 120_000)))
+  const all: Local[] = [...(messages ?? []), ...shown]
   return (
     <div className="page sms-thread">
       <header className="page-header sms-thread-header">
