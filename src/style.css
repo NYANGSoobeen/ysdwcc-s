@@ -6134,5 +6134,6 @@ a.button:not(.primary) {
   padding: 4px 0 2px;
 }
 .android-app .bottom-tabs {
-  padding-bottom: max(0px, calc(var(--safe-area-inset-bottom, 0px) - 8px));
+  /* 제스처 막대면 0, ◁ ○ ▢ 버튼 줄이면 그 높이 (src/native.ts) */
+  padding-bottom: var(--tabs-bottom-pad, 0px);
 }
