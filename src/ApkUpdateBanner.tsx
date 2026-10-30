@@ -7,7 +7,8 @@ import { ask, toast } from './ui/dialogs.tsx'
 // - 1.3.2부터(Updater 플러그인): "업데이트"를 누르면 앱이 직접 받아 바로 안드로이드 설치 화면을 연다
 //   (인터넷 앱·Download 폴더를 거치지 않음). 처음 한 번은 "이 앱에서 설치 허용"을 켜야 한다.
 // - 그 전 앱: APK 주소를 열어 받게 한다(받은 파일을 눌러 덮어 설치).
-// 스토어 밖 앱이라 마지막 "설치"는 사용자가 누른다. "나중에"는 하루 동안 안 띄운다.
+// 스토어 밖 앱이라 마지막 "설치"는 사용자가 누른다. "나중에"는 이번에 앱을 쓰는 동안만 숨기고(sessionStorage),
+// 앱을 완전히 닫았다 다시 열면 또 띄운다 (사용자 요청 2026-10-30).
 const LATER_KEY = 'apk-update-later'
 
 type UpdaterPlugin = {
@@ -24,7 +25,7 @@ export function ApkUpdateBanner() {
   useEffect(() => {
     if (!isAndroidApp) return
     try {
-      if (Date.now() - Number(localStorage.getItem(LATER_KEY) ?? 0) < 24 * 3600 * 1000) return
+      if (sessionStorage.getItem(LATER_KEY)) return
     } catch {
       // 기억 못 하면 그냥 띄운다
     }
@@ -75,7 +76,7 @@ export function ApkUpdateBanner() {
             className="later"
             onClick={() => {
               try {
-                localStorage.setItem(LATER_KEY, String(Date.now()))
+                sessionStorage.setItem(LATER_KEY, '1')
               } catch {
                 // 기억 못 하면 다음에 또 뜬다
               }
