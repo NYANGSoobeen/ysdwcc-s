@@ -47,11 +47,11 @@ export function openSmsTo(number: string) {
 
 type Props = { team: Team; uid: string; onOpenCustomer: (id: string) => void }
 
-export function MessagesPage({ team, uid, onOpenCustomer }: Props) {
+export function MessagesPage({ team, onOpenCustomer }: Props) {
   const perms = usePhonePerms()
   const { customers, find } = useTeamCustomers(team.id)
   const { contacts, nameOf } = useDeviceContacts(perms.contacts)
-  const canWrite = team.members[uid] !== 'viewer'
+  const canWrite = team.myRole !== 'viewer'
   const native = hasPhoneNative && perms.sms
   const [open, setOpenState] = useState<Open | null>(() => {
     try {

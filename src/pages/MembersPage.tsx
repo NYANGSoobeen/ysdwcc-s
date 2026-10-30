@@ -9,7 +9,7 @@ import { filterMembers, RoleHelp, sortMembers } from './AdminPage.tsx'
 // 모든 팀원이 보는 팀원 목록 (보기 전용). 관리는 ☰ 메뉴 → 관리자에서 한다.
 export function MembersPage({ team, uid, onOpenAdmin }: { team: Team; uid: string; onOpenAdmin: () => void }) {
   const profiles = useMemberProfiles(Object.keys(team.members))
-  const isAdmin = team.members[uid] === 'admin'
+  const isAdmin = team.myRole === 'admin'
   const { query } = useTabSearch()
   const list = filterMembers(sortMembers(team, profiles), profiles, query)
 

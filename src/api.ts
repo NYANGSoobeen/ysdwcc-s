@@ -78,7 +78,7 @@ export const api = {
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
   cleanUnusedFiles: call<{ teamId: string; paths: string[] }, { deleted: number; bytes: number; skipped: number }>('cleanUnusedFiles'),
   countData: call<{ teamId: string }, DataCount>('countData'),
-  getMyAccess: call<void, { superAdmin: boolean }>('getMyAccess'),
+  getMyAccess: call<void, { superAdmin: boolean; refresh?: boolean }>('getMyAccess'),
   createTeam: call<{ name: string }, { teamId: string }>('createTeam'),
   enableContactsSync: call<void, { username: string; password: string }>('enableContactsSync'),
   disableContactsSync: call<void, { ok: true }>('disableContactsSync'),

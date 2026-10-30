@@ -38,7 +38,7 @@ export function ProfilePage({ user, profile, team }: Props) {
           <dl className="stats">
             <div><dt>아이디</dt><dd>{toLoginId(user.email)}</dd></div>
             <div><dt>팀</dt><dd>{team.name}</dd></div>
-            <div><dt>권한</dt><dd>{profile.superAdmin ? '최고 관리자 (모든 팀)' : ROLE_LABELS[team.members[user.uid]]}</dd></div>
+            <div><dt>권한</dt><dd>{profile.superAdmin ? '최고 관리자 (모든 팀)' : ROLE_LABELS[team.myRole ?? 'viewer']}</dd></div>
           </dl>
         </section>
         <PasswordForm title="비밀번호 바꾸기" />

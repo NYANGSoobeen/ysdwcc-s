@@ -63,8 +63,8 @@ export function SchedulePage({ team, uid }: { team: Team; uid: string }) {
   return view === 'roster' ? <RosterView team={team} uid={uid} tabs={tabs} /> : <ImageSchedule team={team} uid={uid} tabs={tabs} />
 }
 
-function ImageSchedule({ team, uid, tabs }: { team: Team; uid: string; tabs: ReactNode }) {
-  const canEdit = team.members[uid] !== 'viewer'
+function ImageSchedule({ team, tabs }: { team: Team; uid: string; tabs: ReactNode }) {
+  const canEdit = team.myRole !== 'viewer'
   const [schedule, setSchedule] = useState<Schedule | null | undefined>(undefined)
   const [sticker, setSticker] = useState<string | null>(null)
   const [pending, setPending] = useState<Mark[]>([])

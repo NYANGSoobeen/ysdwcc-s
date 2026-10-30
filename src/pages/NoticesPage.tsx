@@ -4,7 +4,7 @@ import { errorMessage } from '../auth.ts'
 import type { Attachment } from '../chat.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
-import { useMemberProfiles, type Team } from '../hooks.ts'
+import { teamPeople, useMemberProfiles, type Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
 import { deleteNotice, MAX_NOTICE_PHOTOS, NOTICE_PAGE, noticesRef, saveNotice, setNoticeOrder, setNoticePinned, useNotices, type Notice } from '../notices.ts'
 import { MAX_STUCK, stick, stuckList, unstick, type StickerChoice } from '../stuck.ts'
@@ -17,9 +17,9 @@ import { useIsDesktop } from '../useMedia.ts'
 // PC(넓은 화면)는 두 칸, 휴대폰은 한 칸.
 export function NoticesPage({ team, uid }: { team: Team; uid: string }) {
   const notices = useNotices(team.id)
-  const role = team.members[uid]
+  const role = team.myRole
   const canWrite = role === 'admin' || role === 'editor'
-  const profiles = useMemberProfiles(Object.keys(team.members))
+  const profiles = useMemberProfiles(teamPeople(team))
   const names = useMemo(() => Object.fromEntries(Object.entries(profiles).map(([id, p]) => [id, p.name])), [profiles])
   const { query } = useTabSearch()
   const q = query.trim().toLowerCase()

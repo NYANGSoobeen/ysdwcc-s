@@ -235,6 +235,17 @@ function StaffRow(props: {
     })
   }
 
+  // 👑 최고 관리자는 팀에 속하지 않아도 모든 팀을 관리한다 → 팀원 목록·알림·읽음 숫자에서 빠진다
+  async function leaveTeam() {
+    const ok = await ask({
+      title: '이 팀에서 빠지기',
+      message: `${team.name} 팀원 목록에서 빠질까요?\n\n최고 관리자는 팀에 속하지 않아도 모든 팀을 그대로 보고 관리해요. 대신 이 팀 채팅 알림은 오지 않고, 팀원 목록·근무표·@부르기에 나오지 않아요.`,
+      ok: '빠지기',
+    })
+    if (!ok) return
+    void run(() => api.removeMember({ teamId: team.id, uid: memberUid }), `${team.name} 팀원 목록에서 빠졌어요. 계속 관리할 수 있어요.`)
+  }
+
   // 관리 메뉴: ⋯ 버튼, PC 오른쪽 클릭, 휴대폰 길게 누르기
   const actions = (): MenuAction[] =>
     canManage && !isMe
@@ -250,7 +261,10 @@ function StaffRow(props: {
             : { icon: '⛔', label: '사용 중지', onSelect: () => void toggleActive() },
           { icon: '🗑️', label: '팀에서 삭제', danger: true, onSelect: () => void remove() },
         ]
-      : [{ icon: '✏️', label: '내 이름·직급 수정', onSelect: () => setEditing(true) }]
+      : [
+          { icon: '✏️', label: '내 이름·직급 수정', onSelect: () => setEditing(true) },
+          ...(profile?.superAdmin ? [{ icon: '🚪', label: '이 팀에서 빠지기 (최고 관리자)', onSelect: () => void leaveTeam() }] : []),
+        ]
   const menu = useItemMenu(actions, name)
 
   const position = profile?.position ?? ''

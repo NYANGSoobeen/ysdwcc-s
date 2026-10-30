@@ -18,16 +18,22 @@ service cloud.firestore {
       return !exists(user) || get(user).data.get('active', true) != false;
     }
 
+    // 최고 관리자: 로그인 토큰의 superAdmin 표시(Functions getMyAccess가 넣음, 문서 읽기 없음).
+    // 어느 팀에도 속하지 않아도 모든 팀을 관리자로 본다 (팀원 목록에는 안 나옴).
+    function isSuper() {
+      return signedIn() && request.auth.token.get('superAdmin', false) == true;
+    }
+
     function isMember(teamId) {
-      return signedIn() && request.auth.uid in members(teamId) && isActive();
+      return isSuper() || (signedIn() && request.auth.uid in members(teamId) && isActive());
     }
 
     function canEdit(teamId) {
-      return isMember(teamId) && members(teamId)[request.auth.uid] in ['admin', 'editor'];
+      return isSuper() || (isMember(teamId) && members(teamId)[request.auth.uid] in ['admin', 'editor']);
     }
 
     function isAdmin(teamId) {
-      return isMember(teamId) && members(teamId)[request.auth.uid] == 'admin';
+      return isSuper() || (isMember(teamId) && members(teamId)[request.auth.uid] == 'admin');
     }
 
     function unchanged(field) {
@@ -83,12 +89,12 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     function inSomeTeam() {
-      return signedIn() && isActive() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && me().get('teamIds', []).size() > 0;
+      return isSuper() || (signedIn() && isActive() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().get('teamIds', []).size() > 0);
     }
     function isSuperAdmin() {
-      return signedIn() && isActive() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && me().get('superAdmin', false) == true;
+      return isSuper() || (signedIn() && isActive() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().get('superAdmin', false) == true);
     }
     match /stickerPacks/{packId} {
       allow read: if inSomeTeam();

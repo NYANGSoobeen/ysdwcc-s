@@ -189,8 +189,8 @@ function CreateTeamForm({ onCreated }: { onCreated: (teamId: string) => void }) 
     <form className="card form" onSubmit={submit}>
       <strong>새 팀 만들기</strong>
       <p className="muted small">
-        최고 관리자는 모든 팀에 관리자로 들어가 있어, 위 목록이나 화면 맨 위에서 팀을 바꿔 가며 모든 팀의 고객, 채팅,
-        스케줄, 팀원을 볼 수 있습니다. 새 팀을 만들면 그 팀으로 바뀌니, 👥 직원 관리 → "＋ 직원 등록"으로 팀원을 넣으세요.
+        최고 관리자는 팀에 속하지 않아도 위 목록이나 메뉴의 팀 바꾸기로 모든 팀의 고객, 채팅, 스케줄, 팀원을 보고 관리해요
+        (팀원 목록에는 안 나와요). 새 팀을 만들면 그 팀으로 바뀌니, 👥 직원 관리 → "＋ 직원 등록"으로 팀원을 넣으세요.
       </p>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 지원팀" maxLength={30} aria-label="새 팀 이름" required />
       {error && <p className="error">{error}</p>}

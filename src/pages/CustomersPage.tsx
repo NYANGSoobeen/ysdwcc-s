@@ -11,7 +11,7 @@ import {
   type Customer,
 } from '../customers.ts'
 import { db } from '../firebase.ts'
-import { useMemberProfiles, type Team } from '../hooks.ts'
+import { teamPeople, useMemberProfiles, type Team } from '../hooks.ts'
 import { CustomerDetail } from './CustomerDetail.tsx'
 import { ImportCustomers } from './ImportCustomers.tsx'
 import { MenuButton } from '../menu.tsx'
@@ -43,8 +43,8 @@ export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; u
       // 기억하지 못해도 동작에는 문제없다.
     }
   }
-  const profiles = useMemberProfiles(Object.keys(team.members))
-  const canWrite = team.members[uid] !== 'viewer'
+  const profiles = useMemberProfiles(teamPeople(team))
+  const canWrite = team.myRole !== 'viewer'
 
   useEffect(
     () =>

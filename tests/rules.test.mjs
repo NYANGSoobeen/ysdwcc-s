@@ -124,6 +124,17 @@ test('본인이 최고 관리자 표시를 스스로 붙일 수 없다', async (
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { superAdmin: true }))
 })
 
+test('최고 관리자(토큰 표시)는 팀에 속하지 않아도 모든 팀을 관리자로 본다', async () => {
+  const boss = env.authenticatedContext('boss', { superAdmin: true }).firestore()
+  await assertSucceeds(getDoc(doc(boss, 'teams/t1')))
+  await assertSucceeds(getDocs(collection(boss, 'teams')))
+  await assertSucceeds(setDoc(doc(boss, 'teams/t1/messages/b1'), { authorUid: 'boss', body: '공지', createdAt: 3 }))
+  await assertSucceeds(updateDoc(doc(boss, 'teams/t1'), { name: '이름' }))
+  // 토큰 표시가 없으면 (users 문서만 고쳐도) 안 된다
+  await assertFails(getDoc(doc(fs('stranger'), 'teams/t1')))
+  await assertFails(getDocs(collection(fs('admin'), 'teams')))
+})
+
 test('갤럭시 앱의 여러 팀 고객 조회: 내 팀들만 한 번에 읽을 수 있다', async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'teams/t2'), { name: '2팀', members: { ed: 'viewer', other: 'admin' } })

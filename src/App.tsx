@@ -1,11 +1,11 @@
 import type { User } from 'firebase/auth'
 import { doc, updateDoc } from 'firebase/firestore'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, ROLE_LABELS } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
 import { db } from './firebase.ts'
-import { useAuthUser, useMemberProfiles, useProfile, useSeenStamp, useTeam, useTeamNames } from './hooks.ts'
+import { useAllTeamIds, useAuthUser, useMemberProfiles, useProfile, useSeenStamp, useSuperAdminUids, useSuperClaim, useTeam, useTeamNames, teamPeople } from './hooks.ts'
 import { useMentionAlerts } from './useMentionAlerts.ts'
 import { useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
@@ -95,14 +95,33 @@ function SignedIn({ user }: { user: User }) {
   useSeenStamp(user.uid, profile)
   // 고른 팀: 이 화면에서 고른 것 → 계정에 기억한 것(다른 기기에서 고른 것도) → 이 기기에 기억한 것 → 첫 팀
   const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>()
-  const teamIds = profile?.teamIds ?? []
+  // 내가 속한 팀 (연락처 표시·휴무일처럼 "내 팀"이 필요한 곳)
+  const myTeamIds = profile?.teamIds ?? []
+  // 👑 최고 관리자는 속하지 않아도 모든 팀을 본다 (로그인 토큰 표시가 준비된 뒤)
+  const isSuper = profile?.superAdmin === true
+  const superReady = useSuperClaim(user, isSuper)
+  const allTeamIds = useAllTeamIds(isSuper && superReady)
+  const teamIds = isSuper && allTeamIds ? allTeamIds : myTeamIds
   // 다른 기기에서 팀을 바꾸면 여기도 따라간다.
   const accountTeam = profile?.settings?.team
   useEffect(() => setSelectedTeamId(undefined), [accountTeam])
   const teamId = [selectedTeamId, profile?.settings?.team, savedTeam()].find((id) => id && teamIds.includes(id)) ?? teamIds[0]
-  const { team, denied } = useTeam(teamId)
+  const { team: rawTeam, denied } = useTeam(teamId, superReady ? 1 : 0)
+  const superUids = useSuperAdminUids()
+  const superKey = superUids.join(',')
+  const team = useMemo(
+    () =>
+      rawTeam
+        ? {
+            ...rawTeam,
+            myRole: rawTeam.members[user.uid] ?? (isSuper ? ('admin' as const) : undefined),
+            people: [...new Set([...Object.keys(rawTeam.members), ...(superKey ? superKey.split(',') : [])])],
+          }
+        : null,
+    [rawTeam, user.uid, isSuper, superKey],
+  )
   const channels = useChannels(team?.id)
-  const memberProfiles = useMemberProfiles(Object.keys(team?.members ?? {}))
+  const memberProfiles = useMemberProfiles(team ? teamPeople(team) : [])
   const memberNames = Object.fromEntries(Object.entries(memberProfiles).map(([id, p]) => [id, p.name]))
   const teamNames = useTeamNames(teamIds)
   const [tab, setTabState] = useState<Tab>(savedTab)
@@ -143,9 +162,9 @@ function SignedIn({ user }: { user: User }) {
   }, [profile, myRoleHere])
 
   // 갤럭시 앱: 폰 연락처의 "지원팀" 계정을 내 모든 팀의 고객과 맞춘다.
-  useNativeContactsSync(teamIds)
+  useNativeContactsSync(myTeamIds)
   // 🌙 휴무일 자동 응답: 내 휴무 날짜·고객 번호·문구를 폰에 맞춰 둔다 (갤럭시 앱, 켰을 때만)
-  useOffDaySync(user.uid, teamIds, profile ?? null)
+  useOffDaySync(user.uid, myTeamIds, profile ?? null)
 
   useEffect(() => rememberSignedIn(user.uid), [user.uid])
 
@@ -239,7 +258,8 @@ function SignedIn({ user }: { user: User }) {
   }, [viewingTag])
 
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.
-  const removed = missing || (profile !== null && teamIds.length === 0)
+  // (최고 관리자는 팀에 속하지 않아도 되므로 제외)
+  const removed = missing || (profile !== null && myTeamIds.length === 0 && !isSuper)
   // 관리자가 사용 중지하면 바로 로그아웃하고 로그인 화면에 이유를 보여 준다.
   const disabled = profile?.active === false
   useEffect(() => {
@@ -253,12 +273,12 @@ function SignedIn({ user }: { user: User }) {
   // 임시 비밀번호(새 계정, 관리자가 초기화)로 들어오면 먼저 비밀번호를 바꾼다.
   if (profile?.mustChangePassword) return <FirstPassword name={profile.name} loginId={toLoginId(user.email)} />
   if (denied) return <Loading message="팀 정보를 확인하는 중…" />
-  if (!profile || !team) return <Loading />
+  if (!profile || !team) return <Loading message={isSuper && allTeamIds?.length === 0 ? '팀이 아직 없어요. (최고 관리자)' : undefined} />
 
   // 용량 관리는 최고 관리자만 본다 (서버 함수도 최고 관리자만 허용).
   const superAdmin = profile.superAdmin === true
   // 관리자 화면은 이 팀의 관리자만 (팀을 바꿨는데 그 팀 관리자가 아니면 고객 화면으로)
-  const isAdmin = team.members[user.uid] === 'admin'
+  const isAdmin = team.myRole === 'admin'
   const current = (tab === 'usage' && !superAdmin) || ((tab === 'admin' || tab === 'staff') && !isAdmin) ? 'notices' : tab
 
   const teamSelect =
@@ -274,7 +294,7 @@ function SignedIn({ user }: { user: User }) {
         </select>
       </label>
     ) : null
-  const canWrite = team.members[user.uid] !== 'viewer'
+  const canWrite = team.myRole !== 'viewer'
   const menuProps = {
     current,
     isAdmin,
@@ -286,7 +306,7 @@ function SignedIn({ user }: { user: User }) {
     currentRoom: current === 'chat' ? (roomId ?? null) : null,
     onSelectRoom: openChannel,
     uid: user.uid,
-    roleLabel: [profile.position, superAdmin ? '최고 관리자' : ROLE_LABELS[team.members[user.uid]]].filter(Boolean).join(' · '),
+    roleLabel: [profile.position, superAdmin ? '최고 관리자' : ROLE_LABELS[team.myRole ?? 'viewer']].filter(Boolean).join(' · '),
     members: Object.keys(team.members)
       .filter((m) => m !== user.uid)
       .map((m) => ({ uid: m, name: memberProfiles[m]?.name ?? '', role: memberProfiles[m]?.position || ROLE_LABELS[team.members[m]] }))

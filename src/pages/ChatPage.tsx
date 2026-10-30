@@ -40,7 +40,7 @@ import { MAX_STUCK, stick, stuckList, unstick, type StickerChoice, type StuckSti
 import { showStickerInfo, StickerPicker, StuckLayer, StuckList } from '../ui/Stuck.tsx'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
-import { useMemberProfiles, type Team } from '../hooks.ts'
+import { teamPeople, useMemberProfiles, type Team } from '../hooks.ts'
 import { useMessages, type Message } from '../useMessages.ts'
 import { badgeText, markRead, unreadBy, useRoomReads } from '../reads.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
@@ -84,8 +84,8 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   const { messages, hasMore, loaded, loadingOlder, loadOlder, peek } = useMessages(ref)
   const [showGallery, setShowGallery] = useState(false)
   const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
-  const profiles = useMemberProfiles(Object.keys(team.members))
-  const myRole = team.members[uid]
+  const profiles = useMemberProfiles(teamPeople(team))
+  const myRole = team.myRole
   const canWrite = myRole !== 'viewer'
   const isAdmin = myRole === 'admin'
   const canManage = room.id === MAIN_CHANNEL ? isAdmin : isAdmin || (canWrite && room.createdBy === uid)

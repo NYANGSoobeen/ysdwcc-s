@@ -31,7 +31,7 @@ type Tab = 'B0' | '휴' | 'etc' | 'none'
 const MONTH_KEY = 'roster-month'
 
 export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs: ReactNode }) {
-  const canEdit = team.members[uid] !== 'viewer'
+  const canEdit = team.myRole !== 'viewer'
   const desktop = useIsDesktop()
   const today = new Date()
   const [month, setMonthState] = useState(() => {

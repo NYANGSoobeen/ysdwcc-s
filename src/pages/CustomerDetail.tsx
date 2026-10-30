@@ -40,7 +40,7 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [notes, setNotes] = useState<Note[]>([])
   const [editing, setEditing] = useState(false)
-  const role = team.members[uid]
+  const role = team.myRole
   const canWrite = role !== 'viewer'
   const isAdmin = role === 'admin'
   const nameOf = (id: string | null | undefined) => (id && profiles[id]?.name) || '나간 팀원'

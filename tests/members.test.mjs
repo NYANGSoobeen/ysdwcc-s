@@ -75,7 +75,7 @@ test('관리자만 팀원을 추가하고, 추가된 사람은 로그인 계정�
 
 test('마지막 관리자는 강등하거나 삭제할 수 없다', async () => {
   await expectError(fn.updateMemberRole.run(as(adminUid, { teamId, uid: adminUid, role: 'editor' })), 'failed-precondition')
-  await expectError(fn.removeMember.run(as(adminUid, { teamId, uid: adminUid })), 'failed-precondition')
+  // (최고 관리자 본인은 팀에서 빠질 수 있다 — 아래 최고 관리자 시험. 일반 관리자의 마지막 관리자 보호도 거기서 확인)
 })
 
 test('권한 변경과 비밀번호 초기화', async () => {
@@ -226,26 +226,41 @@ test('기간별 삭제: 미리 보기는 지우지 않고, 삭제는 그 기간�
   await expectError(fn.deleteMessagesInRange.run(as(adminUid, { teamId, from: 10, to: 5, dryRun: true })), 'invalid-argument')
 })
 
-test('최고 관리자: 첫 관리자는 최고 관리자이고, 새 팀을 만들면 그 팀의 관리자가 된다', async () => {
+test('최고 관리자: 팀에 속하지 않아도 모든 팀을 관리하고, 새 팀에는 들어가지 않는다', async () => {
   assert.equal((await db.doc(`users/${adminUid}`).get()).get('superAdmin'), true)
-  assert.deepEqual(await fn.getMyAccess.run(as(adminUid, {})), { superAdmin: true })
+  const access = await fn.getMyAccess.run(as(adminUid, {}))
+  assert.equal(access.superAdmin, true)
+  assert.equal((await getAuth().getUser(adminUid)).customClaims?.superAdmin, true, '로그인 토큰에 최고 관리자 표시')
   const { teamId: newTeam } = await fn.createTeam.run(as(adminUid, { name: '지원팀' }))
-  assert.equal((await db.doc(`teams/${newTeam}`).get()).get(`members.${adminUid}`), 'admin')
-  assert.ok((await db.doc(`users/${adminUid}`).get()).get('teamIds').includes(newTeam))
+  assert.deepEqual((await db.doc(`teams/${newTeam}`).get()).get('members'), {})
+  assert.ok(!(await db.doc(`users/${adminUid}`).get()).get('teamIds').includes(newTeam))
 
-  // 다른 관리자는 팀을 만들 수 없고, 최고 관리자를 빼거나 강등할 수 없다
+  // 속하지 않은 팀에도 직원을 등록한다
   const { uid: otherAdmin } = await fn.addMember.run(
     as(adminUid, { teamId: newTeam, name: '팀장', email: 'lead@workphone.local', password: 'pass123', role: 'admin' }),
   )
   await expectError(fn.createTeam.run(as(otherAdmin, { name: '몰래 만든 팀' })), 'permission-denied')
-  assert.deepEqual(await fn.getMyAccess.run(as(otherAdmin, {})), { superAdmin: false })
-  await expectError(fn.removeMember.run(as(otherAdmin, { teamId: newTeam, uid: adminUid })), 'failed-precondition')
-  await expectError(fn.updateMemberRole.run(as(otherAdmin, { teamId: newTeam, uid: adminUid, role: 'viewer' })), 'failed-precondition')
-  // 직원 관리: 다른 관리자는 최고 관리자의 이름·직급을 못 바꾸고, 최고 관리자는 바꿀 수 있다
-  await expectError(fn.setMemberProfile.run(as(otherAdmin, { teamId: newTeam, uid: adminUid, position: '사원' })), 'failed-precondition')
+  assert.equal((await fn.getMyAccess.run(as(otherAdmin, {}))).superAdmin, false)
+  // 일반 관리자는 그 팀의 마지막 관리자면 빠질 수 없다
+  await expectError(fn.removeMember.run(as(otherAdmin, { teamId: newTeam, uid: otherAdmin })), 'failed-precondition')
+  // 다른 관리자는 최고 관리자를 빼거나 강등하거나 이름·직급을 바꿀 수 없다 (최고 관리자가 속한 첫 팀에서)
+  await fn.addMember.run(as(adminUid, { teamId, name: '팀장', email: 'lead@workphone.local', password: 'pass123', role: 'admin' }))
+  await expectError(fn.removeMember.run(as(otherAdmin, { teamId, uid: adminUid })), 'failed-precondition')
+  await expectError(fn.updateMemberRole.run(as(otherAdmin, { teamId, uid: adminUid, role: 'viewer' })), 'failed-precondition')
+  await expectError(fn.setMemberProfile.run(as(otherAdmin, { teamId, uid: adminUid, position: '사원' })), 'failed-precondition')
   await fn.setMemberProfile.run(as(adminUid, { teamId: newTeam, uid: otherAdmin, position: '팀장', name: '이팀장' }))
   assert.equal((await db.doc(`users/${otherAdmin}`).get()).get('position'), '팀장')
   assert.equal((await db.doc(`users/${otherAdmin}`).get()).get('name'), '이팀장')
+
+  // 최고 관리자 본인은 팀에서 빠질 수 있고, 계정은 남으며 그 팀을 계속 관리한다
+  const { accountDeleted } = await fn.removeMember.run(as(adminUid, { teamId, uid: adminUid }))
+  assert.equal(accountDeleted, false)
+  assert.equal((await db.doc(`teams/${teamId}`).get()).get(`members.${adminUid}`), undefined)
+  assert.deepEqual((await db.doc(`users/${adminUid}`).get()).get('teamIds'), [])
+  await fn.updateMemberRole.run(as(adminUid, { teamId, uid: otherAdmin, role: 'admin' }))
+  // 다시 넣어 둔다 (아래 시험들은 최고 관리자가 첫 팀에 있다고 가정)
+  await db.doc(`teams/${teamId}`).update({ [`members.${adminUid}`]: 'admin' })
+  await db.doc(`users/${adminUid}`).update({ teamIds: [teamId] })
 })
 
 test('최고 관리자 표시가 생기기 전에 만든 프로젝트: 첫 팀 관리자가 최고 관리자가 된다', async () => {
@@ -254,10 +269,10 @@ test('최고 관리자 표시가 생기기 전에 만든 프로젝트: 첫 팀 �
   const { uid: second } = await fn.addMember.run(
     as(adminUid, { teamId, name: '부관리자', email: 'sub@workphone.local', password: 'pass123', role: 'admin' }),
   )
-  assert.deepEqual(await fn.getMyAccess.run(as(adminUid, {})), { superAdmin: true })
+  assert.equal((await fn.getMyAccess.run(as(adminUid, {}))).superAdmin, true)
   assert.equal((await db.doc('meta/setup').get()).get('ownerUid'), adminUid)
   // 한 명이 정해지면 같은 팀의 다른 관리자는 최고 관리자가 되지 않는다
-  assert.deepEqual(await fn.getMyAccess.run(as(second, {})), { superAdmin: false })
+  assert.equal((await fn.getMyAccess.run(as(second, {}))).superAdmin, false)
 })
 
 test('용량 관리는 최고 관리자만 (다른 팀 관리자는 불가)', async () => {

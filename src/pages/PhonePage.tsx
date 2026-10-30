@@ -36,7 +36,7 @@ type Filter = 'all' | 'work' | 'personal' | 'missed'
 
 type Props = { team: Team; uid: string; onOpenCustomer: (id: string) => void; onOpenSms: (number: string, name?: string) => void }
 
-export function PhonePage({ team, uid, onOpenCustomer, onOpenSms }: Props) {
+export function PhonePage({ team, onOpenCustomer, onOpenSms }: Props) {
   const [sub, setSubState] = useState<Sub>(() => {
     try {
       return (sessionStorage.getItem(SUB_KEY) as Sub) || 'recent'
@@ -55,7 +55,7 @@ export function PhonePage({ team, uid, onOpenCustomer, onOpenSms }: Props) {
   const perms = usePhonePerms()
   const { customers, find } = useTeamCustomers(team.id)
   const { contacts, nameOf } = useDeviceContacts(perms.contacts)
-  const canWrite = team.members[uid] !== 'viewer'
+  const canWrite = team.myRole !== 'viewer'
   const [picking, setPicking] = useState(false)
   // 누른 줄은 펼쳐서 버튼(전화·문자·메모·고객)을 보여 준다 (삼성 전화 앱처럼, 잘못 눌러 전화가 걸리지 않게)
   const [openRow, setOpenRow] = useState<string | null>(null)

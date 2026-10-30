@@ -9,8 +9,18 @@ service firebase.storage {
       return !firestore.exists(user) || firestore.get(user).data.get('active', true) != false;
     }
 
+    // 최고 관리자: 로그인 토큰의 superAdmin 표시(Functions가 넣음). 어느 팀에도 속하지 않아도 모든 팀을 관리자로 본다.
+    function isSuper() {
+      return request.auth != null && request.auth.token.get('superAdmin', false) == true;
+    }
+
     function role(teamId) {
-      return active() ? firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members[request.auth.uid] : null;
+      return isSuper() ? 'admin'
+        : active() ? firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members.get(request.auth.uid, null) : null;
+    }
+
+    function inTeam(teamId) {
+      return isSuper() || (active() && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members);
     }
 
     // 👤 프로필 사진 (8번): 본인만 올리고 지운다. 앱이 480px JPEG로 줄여 올린다 (30~60KB).
@@ -27,18 +37,17 @@ service firebase.storage {
     match /stickers/{fileName} {
       allow read: if request.auth != null && active();
       allow create: if request.auth != null && active()
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true
+        && (isSuper() || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true)
         && request.resource.contentType.matches('image/(png|gif|jpeg|webp)')
         && request.resource.size <= 1024 * 1024;
       allow delete: if request.auth != null && active()
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true;
+        && (isSuper() || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true);
     }
 
     // 근무표(스케줄): 쪽 그림(PNG/JPEG)과 원본 PDF(1MB 이하만). 교체·삭제 시 Functions가 폴더째 지운다.
     match /teams/{teamId}/schedule/{uploadId}/{fileName} {
       allow read: if request.auth != null
-        && active()
-        && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
+        && inTeam(teamId);
       allow create: if request.auth != null
         && role(teamId) in ['admin', 'editor']
         && request.resource.metadata.uploaderUid == request.auth.uid
@@ -52,8 +61,7 @@ service firebase.storage {
     // 📢 공지 사진: 압축본과 썸네일 (2MB 미만 JPEG). 공지를 고치거나 지우면 Functions가 안 쓰는 사진을 지운다.
     match /teams/{teamId}/notices/{noticeId}/{fileName} {
       allow read: if request.auth != null
-        && active()
-        && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
+        && inTeam(teamId);
       allow create: if request.auth != null
         && role(teamId) in ['admin', 'editor']
         && request.resource.metadata.uploaderUid == request.auth.uid
@@ -66,8 +74,7 @@ service firebase.storage {
     // 채팅 사진: 압축본과 썸네일. 메시지가 삭제되면 Functions가 폴더째 지운다.
     match /teams/{teamId}/chat/{msgId}/{fileName} {
       allow read: if request.auth != null
-        && active()
-        && request.auth.uid in firestore.get(/databases/(default)/documents/teams/$(teamId)).data.members;
+        && inTeam(teamId);
       // 사진(압축본·썸네일, 동영상 첫 장면 v_0_poster.jpg): 2MB 미만 그림. 파일(f_번호.확장자): 엑셀·PDF·한글·워드·파워포인트·압축·텍스트, 10MB 이하.
       // 동영상(v_번호.확장자): 원본 그대로 50MB 이하 (src/chat.ts VIDEO_MAX_BYTES와 같게).
       allow create: if request.auth != null

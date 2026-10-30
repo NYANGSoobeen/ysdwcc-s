@@ -174,7 +174,8 @@ async function requireAdmin(req: CallableRequest, teamId: unknown) {
   const id = text(teamId, '팀')
   const snap = await getFirestore().doc(`teams/${id}`).get()
   const members = (snap.get('members') ?? {}) as Record<string, Role>
-  if (members[uid] !== 'admin') throw new HttpsError('permission-denied', '관리자만 할 수 있습니다.')
+  // 최고 관리자는 팀에 속하지 않아도 모든 팀의 관리자다
+  if (members[uid] !== 'admin' && !(await isSuperAdmin(uid))) throw new HttpsError('permission-denied', '관리자만 할 수 있습니다.')
   return { uid, teamId: id, members }
 }
 
@@ -238,7 +239,8 @@ export const createFirstAdmin = onCall(async (req) => {
 })
 
 // ── 최고 관리자와 여러 팀 ────────────────────────────────────
-// 최고 관리자(처음 만든 관리자)는 새 팀을 만들 수 있고, 모든 팀에 관리자로 들어가 있어 모든 팀을 본다.
+// 최고 관리자(처음 만든 관리자)는 새 팀을 만들 수 있고, 어느 팀에도 속하지 않아도 모든 팀을 관리자로 본다
+// (2026-10-30: 로그인 토큰의 superAdmin 표시로 보안 규칙이 통과시킨다, 팀원 목록·알림·읽음 숫자에는 안 들어감).
 // superAdmin 표시는 Functions만 쓴다 (보안 규칙상 본인은 name/platform/settings만 수정 가능).
 
 async function isSuperAdmin(uid: string) {
@@ -265,9 +267,16 @@ async function requireSuperAdmin(req: CallableRequest) {
 }
 
 // 앱이 최고 관리자 화면(팀 만들기)을 보여 줄지 정한다.
+// 최고 관리자면 로그인 토큰에 superAdmin 표시를 넣는다 → 앱이 토큰을 새로 받으면(refresh) 보안 규칙이 모든 팀을 열어 준다.
 export const getMyAccess = onCall(async (req) => {
   const uid = requireUid(req)
-  return { superAdmin: await isSuperAdmin(uid) }
+  const superAdmin = await isSuperAdmin(uid)
+  const hasClaim = req.auth?.token?.superAdmin === true
+  if (superAdmin !== hasClaim) {
+    const user = await getAuth().getUser(uid)
+    await getAuth().setCustomUserClaims(uid, { ...(user.customClaims ?? {}), superAdmin: superAdmin || undefined })
+  }
+  return { superAdmin, refresh: superAdmin !== hasClaim }
 })
 
 export const createTeam = onCall(async (req) => {
@@ -276,16 +285,16 @@ export const createTeam = onCall(async (req) => {
   const db = getFirestore()
   const team = db.collection('teams').doc()
   const batch = db.batch()
-  batch.set(team, { name, members: { [uid]: 'admin' }, createdAt: FieldValue.serverTimestamp() })
-  batch.set(db.doc(`users/${uid}`), { teamIds: FieldValue.arrayUnion(team.id) }, { merge: true })
+  // 최고 관리자는 팀에 들어가지 않는다 (속하지 않아도 모든 팀을 본다). 팀원은 직원 관리에서 등록한다.
+  batch.set(team, { name, members: {}, createdAt: FieldValue.serverTimestamp() })
   await batch.commit()
   return { teamId: team.id }
 })
 
-// 최고 관리자는 모든 팀의 관리자로 남아 있어야 한다.
+// 다른 관리자는 최고 관리자를 강등·삭제·중지할 수 없다 (최고 관리자 본인은 팀에서 빠질 수 있음).
 async function protectSuperAdmin(uid: string) {
   if ((await getFirestore().doc(`users/${uid}`).get()).get('superAdmin') === true) {
-    throw new HttpsError('failed-precondition', '최고 관리자는 모든 팀의 관리자로 남아 있어야 합니다.')
+    throw new HttpsError('failed-precondition', '최고 관리자는 다른 관리자가 바꿀 수 없습니다.')
   }
 }
 
@@ -371,10 +380,12 @@ export const setMemberProfile = onCall(async (req) => {
 // 팀에서 빼면 보안 규칙상 즉시 팀 데이터에 접근할 수 없다.
 // 더 이상 속한 팀이 없으면 계정도 지워 다시 로그인할 수 없게 한다.
 export const removeMember = onCall(async (req) => {
-  const { teamId, members } = await requireAdmin(req, req.data?.teamId)
+  const { uid: actor, teamId, members } = await requireAdmin(req, req.data?.teamId)
   const uid = requireMember(members, req.data?.uid)
-  await protectSuperAdmin(uid)
-  if (isLastAdmin(members, uid)) {
+  // 최고 관리자는 본인만 팀에서 빠질 수 있고(빠져도 모든 팀을 봄), 계정은 지우지 않는다.
+  const targetSuper = (await getFirestore().doc(`users/${uid}`).get()).get('superAdmin') === true
+  if (targetSuper && actor !== uid) await protectSuperAdmin(uid)
+  if (!targetSuper && isLastAdmin(members, uid)) {
     throw new HttpsError('failed-precondition', '관리자가 최소 1명은 있어야 합니다.')
   }
 
@@ -386,7 +397,7 @@ export const removeMember = onCall(async (req) => {
   await batch.commit()
 
   const remaining = ((await userRef.get()).get('teamIds') ?? []) as string[]
-  if (remaining.length > 0) return { accountDeleted: false }
+  if (remaining.length > 0 || targetSuper) return { accountDeleted: false }
 
   await userRef.delete()
   try {
@@ -807,7 +818,7 @@ export const linkPreview = onCall({ timeoutSeconds: 15 }, async (req) => {
   const uid = requireUid(req)
   const db = getFirestore()
   const user = await db.doc(`users/${uid}`).get()
-  if (!user.exists || user.get('active') === false || !((user.get('teamIds') ?? []) as string[]).length) {
+  if (!user.exists || user.get('active') === false || (!((user.get('teamIds') ?? []) as string[]).length && user.get('superAdmin') !== true)) {
     throw new HttpsError('permission-denied', '팀원만 쓸 수 있습니다.')
   }
   const url = text(req.data?.url, '주소', 2000)
@@ -900,7 +911,7 @@ export const webSearch = onCall({ timeoutSeconds: 20 }, async (req) => {
   const uid = requireUid(req)
   const db = getFirestore()
   const user = await db.doc(`users/${uid}`).get()
-  if (!user.exists || user.get('active') === false || !((user.get('teamIds') ?? []) as string[]).length) {
+  if (!user.exists || user.get('active') === false || (!((user.get('teamIds') ?? []) as string[]).length && user.get('superAdmin') !== true)) {
     throw new HttpsError('permission-denied', '팀원만 쓸 수 있습니다.')
   }
   const q = text(req.data?.q, '검색어', 100)

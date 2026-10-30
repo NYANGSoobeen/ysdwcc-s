@@ -50,9 +50,9 @@ async function customerTarget(teamId: string, number: string, kind: string, extr
   return { customerId: found.id, name: found.name, company: (snap?.get('company') as string) ?? '', number: e164, kind, ...extra }
 }
 
-export function CallMemoWatcher({ team, uid }: { team: Team; uid: string }) {
+export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
   const [target, setTarget] = useState<CallMemoTarget | null>(null)
-  const canWrite = team.members[uid] !== 'viewer'
+  const canWrite = team.myRole !== 'viewer'
   const { calls } = usePhonePerms()
 
   useEffect(() => {
