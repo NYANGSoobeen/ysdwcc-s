@@ -5,6 +5,7 @@ import { StorageImage } from '../components/StorageImage.tsx'
 import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
+import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
@@ -630,6 +631,7 @@ function FrontComposer(props: {
           </button>
         </div>
       )}
+      <ClipboardChip inputRef={textarea} onPaste={(t) => insertAt(textarea.current, body, t, setBody)} />
       <div className="composer-row">
         <EmojiButton
           onPick={(emoji) => {

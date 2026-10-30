@@ -24,6 +24,8 @@ import {
   type SmsMessage,
 } from '../phone.ts'
 import { clearSmsAlert } from '../phoneAlerts.ts'
+import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
+import { EmojiButton } from './ChatPage.tsx'
 import { isAndroidBrowser } from '../native.ts'
 import { useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, Modal, toast } from '../ui/dialogs.tsx'
@@ -364,7 +366,9 @@ function SmsThreadView(props: {
           />
         ))}
       </div>
+      <ClipboardChip inputRef={inputRef} onPaste={(t) => insertAt(inputRef.current, text, t, setText)} />
       <form className="sms-composer" onSubmit={submit}>
+        <EmojiButton onPick={(emoji) => insertAt(inputRef.current, text, emoji, setText)} />
         <textarea
           ref={inputRef}
           value={text}

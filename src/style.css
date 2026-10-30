@@ -6261,3 +6261,22 @@ p.recent-memos {
   gap: 8px;
   margin-top: 12px;
 }
+
+/* 📋 입력칸을 누르면 뜨는 "붙여넣기" 칩 (src/ui/ClipboardChip.tsx) */
+.clip-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  margin: 4px 10px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+}

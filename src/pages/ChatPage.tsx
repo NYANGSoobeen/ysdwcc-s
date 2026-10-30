@@ -1,3 +1,4 @@
+import { ClipboardChip } from '../ui/ClipboardChip.tsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { doc } from 'firebase/firestore'
 import { db } from '../firebase.ts'
@@ -1354,6 +1355,7 @@ function Composer(props: {
           ))}
         </ul>
       )}
+      <ClipboardChip inputRef={textarea} onPaste={(t) => insertText(t)} />
       <div className="composer-row">
         <button type="button" className="round-button attach-button" onClick={openAttachMenu} aria-label="사진·파일 보내기" disabled={Boolean(editing)}>
           ＋

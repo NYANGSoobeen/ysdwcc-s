@@ -50,6 +50,8 @@ type PhonePlugin = {
   alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean; personal: boolean; memo: boolean }): Promise<void>
   // 📝 받은 전화 끝나면 바로 메모 (1.6.0): "다른 앱 위에 표시" 권한, 뜬 알림 지우기
   overlayStatus(): Promise<{ granted: boolean }>
+  // 📋 클립보드 글 읽기 (1.6.3, src/ui/ClipboardChip.tsx)
+  readClipboard(opts?: { peek?: boolean }): Promise<{ text?: string; has?: boolean }>
   openOverlaySettings(): Promise<void>
   clearAfterCall(): Promise<void>
   alertsStatus(): Promise<AlertsStatus>

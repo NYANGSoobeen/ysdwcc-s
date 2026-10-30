@@ -151,6 +151,29 @@ class PhonePlugin : Plugin() {
         call.resolve()
     }
 
+    // 📋 입력칸 "복사한 글 붙여넣기" (1.6.3): 앱이 앞에 있을 때 폰 클립보드의 글
+    // peek: 글이 있는지만 (안드로이드 12+의 "클립보드에서 붙여넣음" 안내가 입력칸을 누를 때마다 뜨지 않게, 내용은 안 읽음)
+    @PluginMethod
+    fun readClipboard(call: PluginCall) {
+        val peek = call.getBoolean("peek", false) == true
+        activity.runOnUiThread {
+            try {
+                val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                if (peek) {
+                    val d = cm?.primaryClipDescription
+                    val has = cm?.hasPrimaryClip() == true && d != null &&
+                        (d.hasMimeType(android.content.ClipDescription.MIMETYPE_TEXT_PLAIN) || d.hasMimeType(android.content.ClipDescription.MIMETYPE_TEXT_HTML))
+                    call.resolve(JSObject().put("has", has))
+                    return@runOnUiThread
+                }
+                val text = cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+                call.resolve(JSObject().put("text", text.take(4000)))
+            } catch (e: Exception) {
+                call.resolve(JSObject().put("text", ""))
+            }
+        }
+    }
+
     @PluginMethod
     fun clearAfterCall(call: PluginCall) {
         PhoneAlerts.clearAfterCall(context)
