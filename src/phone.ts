@@ -430,11 +430,43 @@ export function loadCalls(): Promise<void> {
     .finally(() => (callsLoading = null))
   return callsLoading
 }
+// 같은 번호의 대화는 한 줄로 (2026-10-30 사용자 요청: 010…과 +8210…이 폰에서 다른 대화로 나뉨, 채팅+만 받은 rcs:번호 대화도).
+// 줄의 대화 id는 가장 먼저 생긴 문자 대화(숫자가 가장 작은 것)로 고정해 "본 시각"(sms-seen)이 흔들리지 않게 한다.
+// 대화를 열면 폰 쪽(PhonePlugin.messages, 1.6.4)이 번호로 같은 번호의 대화를 모두 모아 보여 준다.
+function mergeThreads(list: SmsThread[]): SmsThread[] {
+  const groups = new Map<string, SmsThread[]>()
+  for (const t of list) {
+    const digits = t.address.replace(/\D/g, '')
+    // 글자 주소(광고 발신 이름 등)·짧은 번호는 그대로
+    const key = digits.length >= 8 ? phoneKey(t.address) : `#${t.threadId}`
+    const g = groups.get(key)
+    if (g) g.push(t)
+    else groups.set(key, [t])
+  }
+  const idOrder = (t: SmsThread) => (/^\d+$/.test(t.threadId) ? Number(t.threadId) : Number.MAX_SAFE_INTEGER)
+  const out: SmsThread[] = []
+  for (const g of groups.values()) {
+    if (g.length === 1) {
+      out.push(g[0])
+      continue
+    }
+    const latest = g.reduce((a, b) => (b.date > a.date ? b : a))
+    const first = g.reduce((a, b) => (idOrder(b) < idOrder(a) ? b : a))
+    out.push({
+      ...latest,
+      threadId: first.threadId,
+      unread: g.reduce((n, t) => n + t.unread, 0),
+      rcs: g.some((t) => t.rcs) || undefined,
+    })
+  }
+  return out.sort((a, b) => b.date - a.date)
+}
+
 export function loadThreads(): Promise<void> {
   if (!hasPhoneNative) return Promise.resolve()
   threadsLoading ??= PhoneNative.threads({ limit: 300 })
     .then(({ threads }) => {
-      threadsCache = threads
+      threadsCache = mergeThreads(threads)
       emitPhoneData()
     })
     .finally(() => (threadsLoading = null))

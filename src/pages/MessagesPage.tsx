@@ -28,7 +28,7 @@ import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { EmojiButton } from './ChatPage.tsx'
 import { isAndroidBrowser } from '../native.ts'
 import { useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
-import { ask, Modal, toast } from '../ui/dialogs.tsx'
+import { ask, Modal, tell, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 import { addAsCustomer, copyNumber, OldAppCard, PermissionCard, PersonDot, searchPeople } from './PhoneCommon.tsx'
 
@@ -133,6 +133,7 @@ export function MessagesPage({ team, onOpenCustomer }: Props) {
       <div className="page-body">
         {oldAndroidApp && <OldAppCard />}
         {hasPhoneNative && perms.loaded && <PermissionCard kind="sms" what="이 폰의 문자" granted={perms.sms} />}
+        {hasPhoneNative && perms.sms && <ChatPlusOffCard />}
         {hasPhoneNative && perms.sms && perms.chat === false && <ChatPlusCard />}
         {native ? (
           <ThreadList who={who} onOpen={setOpen} />
@@ -360,7 +361,11 @@ function SmsThreadView(props: {
         {messages === null && <p className="center muted">불러오는 중…</p>}
         {messages && all.length === 0 && <p className="center muted">아직 주고받은 문자가 없어요. 아래에 써서 보내 보세요.</p>}
         {/* 💬 채팅+(RCS)로 받은 글이 있으면 맨 위에 한 번만 (말마다 붙이면 많아 보여서, 2026-10-30 사용자 요청) */}
-        {all.some((m) => m.rcs) && <div className="sms-rcs-note">💬 채팅+ 대화 · 받은 글만 보여요 (삼성 메시지에서 보낸 채팅+는 안 보여요)</div>}
+        {all.some((m) => m.rcs) && (
+          <button type="button" className="sms-rcs-note" onClick={() => void showChatPlusOff()}>
+            💬 채팅+ 대화 · 삼성 메시지에서 보낸 답장은 여기 안 보여요 · <u>채팅+ 끄는 법</u>
+          </button>
+        )}
         {all.map((m, i) => (
           <SmsBubble
             key={m.id}
@@ -560,6 +565,77 @@ function NewMessage(props: {
         )}
       </div>
     </Modal>
+  )
+}
+
+// 💬 채팅+ 끄기 안내 (2026-10-30 사용자가 정함): 채팅+(RCS)는 삼성 메시지 전용 저장소에 있어 다른 앱이 읽을 수 없다.
+// 끄면 주고받는 문자가 모두 일반 문자·사진 문자로 오가서 이 앱이 보낸 것·받은 것을 전부 읽는다(끄기 전 채팅+ 내역은 그대로 못 읽음).
+const CHATPLUS_OFF_HIDE = 'chatplus-off-hide'
+function chatPlusOffSteps() {
+  return (
+    <ol className="small chatplus-steps">
+      <li>
+        <b>삼성 메시지</b> 앱을 열어요.
+      </li>
+      <li>오른쪽 위 <b>⋮</b> → <b>설정</b></li>
+      <li>
+        <b>채팅 설정</b>(폰에 따라 "채팅+ 설정", "채팅 기능") → <b>채팅+ 사용</b>을 꺼요.
+      </li>
+      <li className="muted">구글 메시지 앱을 쓰면: 프로필 사진 → 메시지 설정 → RCS 채팅 → 끄기</li>
+    </ol>
+  )
+}
+function showChatPlusOff() {
+  return tell({
+    title: '💬 채팅+ 끄는 법',
+    message: (
+      <>
+        <p className="small">
+          채팅+(파란 말풍선) 문자는 삼성 메시지 앱만 읽을 수 있어서, 이 앱에는 <b>받은 글만 일부</b> 보이고 내가 보낸 답장은 안 보여요. 채팅+를 끄면 모든 문자가
+          일반 문자로 오가서 여기에 <b>보낸 것·받은 것이 다</b> 보여요.
+        </p>
+        {chatPlusOffSteps()}
+        <p className="small muted">끄기 전에 주고받은 채팅+ 내역은 그대로 삼성 메시지에서만 보여요. 읽음 표시·입력 중 표시 같은 채팅+ 기능도 없어져요.</p>
+      </>
+    ),
+  })
+}
+function ChatPlusOffCard() {
+  const threads = useSmsThreads(true, () => {})
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return !!localStorage.getItem(CHATPLUS_OFF_HIDE)
+    } catch {
+      return false
+    }
+  })
+  // 채팅+로 받은 대화가 있을 때만 (채팅+를 이미 껐거나 안 쓰는 폰에는 안 보임)
+  if (hidden || !threads?.some((t) => t.rcs)) return null
+  return (
+    <div className="card phone-hint">
+      <p className="small">
+        <strong>💬 채팅+를 끄면 모든 문자가 여기 보여요</strong>
+        <br />
+        <span className="muted">채팅+(파란 말풍선)로 주고받은 문자는 삼성 메시지 앱만 읽을 수 있어 내 답장이 여기 안 보여요.</span>
+      </p>
+      {chatPlusOffSteps()}
+      <div className="button-row">
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => {
+            try {
+              localStorage.setItem(CHATPLUS_OFF_HIDE, '1')
+            } catch {
+              // 다음에 또 보일 뿐
+            }
+            setHidden(true)
+          }}
+        >
+          껐어요 · 안 볼게요
+        </button>
+      </div>
+    </div>
   )
 }
 

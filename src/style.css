@@ -6200,6 +6200,10 @@ p.recent-memos {
 }
 .sms-rcs-note {
   align-self: center;
+  border: 0;
+  min-height: 0;
+  line-height: 1.5;
+  cursor: pointer;
   margin: 4px auto 8px;
   padding: 4px 12px;
   border-radius: 12px;
@@ -6283,4 +6287,10 @@ p.recent-memos {
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.chatplus-steps {
+  margin: 6px 0 8px;
+  padding-left: 20px;
+  line-height: 1.7;
 }
