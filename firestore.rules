@@ -146,6 +146,21 @@ service cloud.firestore {
       match /private/{docId} {
         allow read: if signedIn() && request.auth.uid == uid;
       }
+
+      // 🔒 고객에 대한 개인 메모: 본인만 읽고 쓴다 (관리자도 못 봄). 고객을 지우면 Functions가 같이 지운다.
+      match /customerNotes/{noteId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid && isActive()
+          && request.resource.data.keys().hasOnly(['customerId', 'kind', 'body', 'createdAt', 'editedAt'])
+          && request.resource.data.customerId is string && request.resource.data.customerId.size() > 0
+          && request.resource.data.kind is string && request.resource.data.kind.size() <= 20
+          && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 4000
+          && request.resource.data.createdAt == request.time;
+        allow update: if signedIn() && request.auth.uid == uid && isActive()
+          && onlyChanges(['body', 'editedAt'])
+          && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 4000
+          && request.resource.data.editedAt == request.time;
+      }
     }
 
     // carddavTokens(연락처 동기화 접속 정보)와 meta는 앱에서 접근할 수 없다 (규칙 없음 = 거부).

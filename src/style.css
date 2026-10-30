@@ -5984,3 +5984,84 @@ a.button:not(.primary) {
 .modal-actions .danger-button {
   width: auto;
 }
+
+/* 🔒 개인 메모 / 👥 공용 메모 (2026-10-30) */
+.memo-scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.memo-scope button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-height: 46px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+.memo-scope button small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.memo-scope button.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--rock) 22%, var(--surface));
+  color: var(--accent);
+}
+.memo-scope button:disabled {
+  opacity: 0.45;
+}
+.note-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.note-tabs button {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+.note-tabs button.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.note-tabs button.selected .muted {
+  color: inherit;
+  opacity: 0.8;
+}
+.note.private-note {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.device-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.device-notes li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.device-notes p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+}

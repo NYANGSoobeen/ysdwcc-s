@@ -135,6 +135,19 @@ test('최고 관리자(토큰 표시)는 팀에 속하지 않아도 모든 팀�
   await assertFails(getDocs(collection(fs('admin'), 'teams')))
 })
 
+test('🔒 고객 개인 메모: 본인만 쓰고 읽는다 (관리자도 못 봄)', async () => {
+  const mine = doc(fs('ed'), 'users/ed/customerNotes/p1')
+  await assertSucceeds(setDoc(mine, { customerId: 'c1', kind: '메모', body: '나만 봄', createdAt: serverTimestamp(), editedAt: null }))
+  await assertSucceeds(getDoc(mine))
+  await assertSucceeds(getDocs(query(collection(fs('ed'), 'users/ed/customerNotes'), where('customerId', '==', 'c1'))))
+  await assertSucceeds(updateDoc(mine, { body: '고침', editedAt: serverTimestamp() }))
+  await assertFails(updateDoc(mine, { customerId: 'c2' }))
+  await assertFails(getDoc(doc(fs('admin'), 'users/ed/customerNotes/p1')))
+  await assertFails(setDoc(doc(fs('admin'), 'users/ed/customerNotes/p2'), { customerId: 'c1', kind: '메모', body: 'x', createdAt: serverTimestamp(), editedAt: null }))
+  await assertFails(setDoc(doc(fs('ed'), 'users/ed/customerNotes/p3'), { customerId: 'c1', kind: '메모', body: '', createdAt: serverTimestamp(), editedAt: null }))
+  await assertSucceeds(deleteDoc(mine))
+})
+
 test('갤럭시 앱의 여러 팀 고객 조회: 내 팀들만 한 번에 읽을 수 있다', async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'teams/t2'), { name: '2팀', members: { ed: 'viewer', other: 'admin' } })

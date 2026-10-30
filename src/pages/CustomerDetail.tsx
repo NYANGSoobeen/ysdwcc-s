@@ -1,3 +1,4 @@
+import { addMyCustomerNote, deleteMyCustomerNote, editMyCustomerNote, useMyCustomerNotes, type PrivateNote } from '../privateNotes.ts'
 import { collection, doc, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ROLE_LABELS } from '../api.ts'
@@ -39,6 +40,8 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
   const frame = embedded ? 'detail-pane' : 'overlay'
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [notes, setNotes] = useState<Note[]>([])
+  const myNotes = useMyCustomerNotes(customerId)
+  const [noteView, setNoteView] = useState<'shared' | 'mine'>('shared')
   const [editing, setEditing] = useState(false)
   const role = team.myRole
   const canWrite = role !== 'viewer'
@@ -132,11 +135,28 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
           <NextContactField customer={customer} canWrite={canWrite} />
         </section>
 
-        {canWrite && <NoteComposer customerId={customer.id} initialKind="메모" autoFocus={false} onSaved={() => {}} />}
+        <NoteComposer customerId={customer.id} initialKind="메모" autoFocus={false} canShare={canWrite} onSaved={(scope) => setNoteView(scope)} />
 
         <section>
-          <h3>상담 이력 {notes.length > 0 && <span className="muted">{notes.length}</span>}</h3>
-          {notes.length === 0 ? (
+          <div className="note-tabs" role="tablist" aria-label="상담 이력">
+            <button type="button" role="tab" aria-selected={noteView === 'shared'} className={noteView === 'shared' ? 'selected' : ''} onClick={() => setNoteView('shared')}>
+              👥 공용 상담 이력 <span className="muted">{notes.length}</span>
+            </button>
+            <button type="button" role="tab" aria-selected={noteView === 'mine'} className={noteView === 'mine' ? 'selected' : ''} onClick={() => setNoteView('mine')}>
+              🔒 내 메모 <span className="muted">{myNotes.length}</span>
+            </button>
+          </div>
+          {noteView === 'mine' ? (
+            myNotes.length === 0 ? (
+              <p className="muted small">나만 보는 메모가 없어요. 위에서 "🔒 개인"을 골라 남기면 팀원·관리자는 못 보고 나만 봐요.</p>
+            ) : (
+              <ul className="notes">
+                {myNotes.map((n) => (
+                  <PrivateNoteItem key={n.id} note={n} />
+                ))}
+              </ul>
+            )
+          ) : notes.length === 0 ? (
             <p className="muted small">아직 기록이 없습니다.</p>
           ) : (
             <ul className="notes">
@@ -318,18 +338,21 @@ function EditCustomerForm(props: { customer: Customer; onDone: () => void; onOpe
   )
 }
 
-function NoteComposer(props: { customerId: string; initialKind: string; autoFocus: boolean; onSaved: () => void }) {
+function NoteComposer(props: { customerId: string; initialKind: string; autoFocus: boolean; canShare: boolean; onSaved: (scope: 'shared' | 'mine') => void }) {
   const [kind, setKind] = useState(props.initialKind)
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
+  // 👥 공용(팀 상담 이력) / 🔒 개인(나만, 보기 권한은 개인만)
+  const [scope, setScope] = useState<'shared' | 'mine'>(props.canShare ? 'shared' : 'mine')
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     try {
-      await addNote(props.customerId, kind, body.trim())
+      if (scope === 'mine') await addMyCustomerNote(props.customerId, kind, body.trim())
+      else await addNote(props.customerId, kind, body.trim())
       setBody('')
-      props.onSaved()
+      props.onSaved(scope)
     } catch (err) {
       toast(errorMessage(err), { error: true })
     } finally {
@@ -339,6 +362,14 @@ function NoteComposer(props: { customerId: string; initialKind: string; autoFocu
 
   return (
     <form className="card form" onSubmit={submit}>
+      <div className="memo-scope" role="radiogroup" aria-label="누가 볼까요">
+        <button type="button" role="radio" aria-checked={scope === 'shared'} className={scope === 'shared' ? 'selected' : ''} disabled={!props.canShare} onClick={() => setScope('shared')}>
+          👥 공용 <small>팀이 함께 봐요</small>
+        </button>
+        <button type="button" role="radio" aria-checked={scope === 'mine'} className={scope === 'mine' ? 'selected' : ''} onClick={() => setScope('mine')}>
+          🔒 개인 <small>나만 봐요</small>
+        </button>
+      </div>
       <div className="chips" role="radiogroup" aria-label="기록 종류">
         {NOTE_KINDS.map((k) => (
           <button
@@ -356,13 +387,13 @@ function NoteComposer(props: { customerId: string; initialKind: string; autoFocu
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="상담 내용을 적어 주세요"
+        placeholder={scope === 'mine' ? '나만 보는 메모를 적어 주세요' : '상담 내용을 적어 주세요'}
         rows={3}
         autoFocus={props.autoFocus}
         aria-label="상담 메모"
       />
       <button className="primary" disabled={busy || !body.trim()}>
-        {busy ? '저장하는 중…' : '메모 저장'}
+        {busy ? '저장하는 중…' : scope === 'mine' ? '🔒 내 메모 저장' : '메모 저장'}
       </button>
     </form>
   )
@@ -460,6 +491,58 @@ function NoteItem(props: {
           ))}
         </ol>
       )}
+    </li>
+  )
+}
+
+// 🔒 나만 보는 고객 메모 (수정 기록 없이 고치기·지우기)
+function PrivateNoteItem({ note }: { note: PrivateNote }) {
+  const [editing, setEditing] = useState(false)
+  const [body, setBody] = useState(note.body)
+  const when = (ms: number) => new Date(ms).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' })
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    try {
+      if (body.trim() !== note.body) await editMyCustomerNote(note.id, body.trim())
+      setEditing(false)
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+  async function remove() {
+    if (!(await ask({ message: '이 메모를 삭제할까요?', ok: '삭제', danger: true }))) return
+    try {
+      await deleteMyCustomerNote(note.id)
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+  return (
+    <li className="note card private-note">
+      <div className="note-head">
+        <span className="badge kind">🔒 {note.kind}</span>
+        <span className="muted small">나만 봐요 · {when(note.at)}</span>
+      </div>
+      {editing ? (
+        <form className="form" onSubmit={save}>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} aria-label="내 메모 수정" />
+          <div className="button-row">
+            <button className="primary" disabled={!body.trim()}>저장</button>
+            <button type="button" onClick={() => { setBody(note.body); setEditing(false) }}>취소</button>
+          </div>
+        </form>
+      ) : (
+        <p className="note-body">{note.body}</p>
+      )}
+      <div className="note-foot">
+        <span className="muted small">{note.editedAt ? `수정됨 · ${when(note.editedAt)}` : ''}</span>
+        {!editing && (
+          <span>
+            <button type="button" className="link" onClick={() => setEditing(true)}>수정</button>
+            <button type="button" className="link danger" onClick={() => void remove()}>삭제</button>
+          </span>
+        )}
+      </div>
     </li>
   )
 }

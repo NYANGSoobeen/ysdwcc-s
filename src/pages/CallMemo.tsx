@@ -4,6 +4,7 @@ import { errorMessage } from '../auth.ts'
 import { addNote, findCustomerByPhone, formatPhone, NOTE_KINDS, normalizePhone } from '../customers.ts'
 import { db } from '../firebase.ts'
 import { phonesIn } from '../importCustomers.ts'
+import { addDeviceNote, addMyCustomerNote, useDeviceNotes } from '../privateNotes.ts'
 import { guessKind, MEMO_MAX, onSharedMemo, readClipboard, takeSharedMemo } from '../sharedMemo.ts'
 import type { Team } from '../hooks.ts'
 import {
@@ -33,6 +34,7 @@ export type CallMemoTarget = {
   at?: number
   duration?: number
   approx?: boolean // 통화 시간이 어림값 (아이폰·PC: 앱 밖에 있던 시간)
+  personal?: boolean // 고객이 아닌 번호: 🔒 개인 메모만 (이 기기에만 저장)
   body?: string // 미리 채울 내용 (통신사 앱 통화 요약)
   summary?: boolean
 }
@@ -54,6 +56,7 @@ async function customerTarget(teamId: string, number: string, kind: string, extr
 
 export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
   const [target, setTarget] = useState<CallMemoTarget | null>(null)
+  // 보기 권한은 👥 공용 메모를 못 쓰고 🔒 내 메모만
   const canWrite = team.myRole !== 'viewer'
   const { calls } = usePhonePerms()
 
@@ -65,7 +68,7 @@ export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
 
   // 아이폰·브라우저: 앱에서 건 전화에서 돌아오면
   useEffect(() => {
-    if (hasPhoneNative || !canWrite) return
+    if (hasPhoneNative) return
     const check = async () => {
       if (document.visibilityState !== 'visible') return
       const p = takePendingCall()
@@ -93,7 +96,6 @@ export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
     const check = async () => {
       const text = takeSharedMemo()
       if (!text) return
-      if (!canWrite) return toast('보기 권한은 상담 메모를 남길 수 없어요.', { error: true })
       const kind = guessKind(text)
       for (const n of phonesIn(text)) {
         const t = await customerTarget(team.id, n, kind, { body: text, summary: true, at: Date.now() })
@@ -107,7 +109,7 @@ export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
 
   // 갤럭시 앱: 통화 기록에 새로 생긴, 연결된 고객 통화
   const checkLog = async () => {
-    if (!hasPhoneNative || !calls || !canWrite || document.visibilityState !== 'visible') return
+    if (!hasPhoneNative || !calls || document.visibilityState !== 'visible') return
     let since = 0
     try {
       since = Number(localStorage.getItem(CALL_MEMO_CHECKED) ?? 0)
@@ -139,15 +141,18 @@ export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
   }, [calls, team.id])
 
   if (!target) return null
-  return <CallMemoSheet key={`${target.customerId}-${target.at ?? 0}`} teamId={team.id} target={target} onClose={() => setTarget(null)} />
+  return <CallMemoSheet key={`${target.customerId}-${target.at ?? 0}`} teamId={team.id} target={target} canShare={canWrite} onClose={() => setTarget(null)} />
 }
 
 type Picked = { id: string; name: string; company: string }
 
-function CallMemoSheet({ teamId, target, onClose }: { teamId: string; target: CallMemoTarget; onClose: () => void }) {
+function CallMemoSheet({ teamId, target, canShare, onClose }: { teamId: string; target: CallMemoTarget; canShare: boolean; onClose: () => void }) {
   const [kind, setKind] = useState(target.kind)
   const [body, setBody] = useState(target.body ?? '')
   const [busy, setBusy] = useState(false)
+  // 👥 공용(팀이 봄) / 🔒 나만 보기. 고객이 아닌 번호는 나만 보기(이 기기에만), 보기 권한은 공용을 못 씀
+  const [scope, setScope] = useState<'shared' | 'mine'>(target.personal || !canShare ? 'mine' : 'shared')
+  const personalNotes = useDeviceNotes(target.personal ? (target.number ?? '') : '')
   const [who, setWho] = useState<Picked | null>(target.customerId ? { id: target.customerId, name: target.name, company: target.company ?? '' } : null)
 
   async function paste() {
@@ -158,11 +163,22 @@ function CallMemoSheet({ teamId, target, onClose }: { teamId: string; target: Ca
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!body.trim() || !who) return
+    if (!body.trim()) return
+    if (target.personal) {
+      addDeviceNote(target.number ?? '', kind, body.trim())
+      toast('🔒 내 메모로 이 기기에 저장했어요.')
+      return onClose()
+    }
+    if (!who) return
     setBusy(true)
     try {
-      await addNote(who.id, kind, body.trim().slice(0, MEMO_MAX))
-      toast(`${who.name} 상담 이력에 저장했어요.`)
+      if (scope === 'mine') {
+        await addMyCustomerNote(who.id, kind, body.trim())
+        toast(`🔒 ${who.name} 내 메모로 저장했어요. (나만 봐요)`)
+      } else {
+        await addNote(who.id, kind, body.trim().slice(0, MEMO_MAX))
+        toast(`${who.name} 상담 이력에 저장했어요.`)
+      }
       onClose()
     } catch (err) {
       toast(errorMessage(err), { error: true })
@@ -176,8 +192,13 @@ function CallMemoSheet({ teamId, target, onClose }: { teamId: string; target: Ca
   return (
     <Modal onClose={() => !busy && onClose()} labelledBy="call-memo-title" className="call-memo" closeOnOutside={false}>
       <form className="form" onSubmit={save}>
-        <h3 id="call-memo-title">{target.summary ? '📝 통화 요약 → 상담 메모' : '📞 통화 메모'}</h3>
-        {who ? (
+        <h3 id="call-memo-title">{target.summary ? '📝 통화 요약 → 상담 메모' : target.personal ? '🔒 내 메모' : '📞 통화 메모'}</h3>
+        {target.personal ? (
+          <div className="call-memo-who">
+            <strong>{target.name || formatPhone(target.number ?? '')}</strong>
+            {info && <div className="muted small">{info}</div>}
+          </div>
+        ) : who ? (
           <div className="call-memo-who">
             <strong>{who.name}</strong>
             {who.company && <span className="muted"> · {who.company}</span>}
@@ -190,6 +211,16 @@ function CallMemoSheet({ teamId, target, onClose }: { teamId: string; target: Ca
           </div>
         ) : (
           <CustomerPick teamId={teamId} onPick={setWho} />
+        )}
+        {!target.personal && (
+          <div className="memo-scope" role="radiogroup" aria-label="누가 볼까요">
+            <button type="button" role="radio" aria-checked={scope === 'shared'} className={scope === 'shared' ? 'selected' : ''} disabled={!canShare} onClick={() => setScope('shared')}>
+              👥 공용 <small>팀이 함께 봐요</small>
+            </button>
+            <button type="button" role="radio" aria-checked={scope === 'mine'} className={scope === 'mine' ? 'selected' : ''} onClick={() => setScope('mine')}>
+              🔒 개인 <small>나만 봐요</small>
+            </button>
+          </div>
         )}
         <div className="chips" role="radiogroup" aria-label="기록 종류">
           {NOTE_KINDS.map((k) => (
@@ -213,13 +244,30 @@ function CallMemoSheet({ teamId, target, onClose }: { teamId: string; target: Ca
           <span className="muted small">통신사 앱(에이닷 등) 요약을 복사해 왔다면</span>
         </div>
         <p className="muted small">
-          상담 이력에 저장돼 팀원과 함께 봐요. 통화 시간{target.summary ? '과 녹음 파일은' : '은'} 저장하지 않아요.
+          {target.personal
+            ? '고객이 아닌 번호라 이 기기에만 저장해요 (서버에 안 올라가요, 로그아웃하면 지워져요).'
+            : scope === 'mine'
+              ? '나만 보는 메모로 저장해요. 팀원·관리자는 못 봐요 (PC·휴대폰에서 같이 보여요).'
+              : '상담 이력에 저장돼 팀원과 함께 봐요.'}{' '}
+          통화 시간{target.summary ? '과 녹음 파일은' : '은'} 저장하지 않아요.
         </p>
+        {target.personal && personalNotes.length > 0 && (
+          <ul className="device-notes">
+            {personalNotes.slice(0, 5).map((n) => (
+              <li key={n.id}>
+                <span className="muted small">
+                  {n.kind} · {timeText(n.at)}
+                </span>
+                <p>{n.body}</p>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onClose} disabled={busy}>
             나중에
           </button>
-          <button type="submit" className="primary" disabled={busy || !body.trim() || !who}>
+          <button type="submit" className="primary" disabled={busy || !body.trim() || (!who && !target.personal)}>
             저장
           </button>
         </div>

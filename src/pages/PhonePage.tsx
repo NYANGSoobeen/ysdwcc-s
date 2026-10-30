@@ -1,3 +1,4 @@
+import { DEVICE_NOTES_KEY, deviceNoteNumbers, noteKey } from '../privateNotes.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Customer } from '../customers.ts'
 import { formatPhone } from '../customers.ts'
@@ -279,6 +280,13 @@ function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: bool
   }
   useEffect(load, [native])
   usePhoneChanged('calls', load)
+  // 🔒 이 기기에 내 메모가 있는 번호 (고객이 아닌 번호)
+  const [noted, setNoted] = useState(deviceNoteNumbers)
+  useEffect(() => {
+    const reload = () => setNoted(deviceNoteNumbers())
+    window.addEventListener(DEVICE_NOTES_KEY, reload)
+    return () => window.removeEventListener(DEVICE_NOTES_KEY, reload)
+  }, [])
   // 아이폰·PC: 돌아와서 통화 시간 어림값을 적으면 다시 읽는다
   useEffect(() => {
     if (native) return
@@ -353,29 +361,36 @@ function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: bool
       {calls && groups.length === 0 && <p className="center muted">{query ? `"${query}"에 맞는 통화가 없어요.` : '통화 기록이 없어요.'}</p>}
       <ul className="call-list">
         {groups.map((g, i) => (
-          <CallRow key={g.key} group={g} ctx={ctx} day={i === 0 || dayLabel(groups[i - 1].first.date) !== dayLabel(g.first.date) ? dayLabel(g.first.date) : null} />
+          <CallRow
+            key={g.key}
+            group={g}
+            ctx={ctx}
+            hasNote={noted.has(noteKey(g.first.number))}
+            day={i === 0 || dayLabel(groups[i - 1].first.date) !== dayLabel(g.first.date) ? dayLabel(g.first.date) : null}
+          />
         ))}
       </ul>
     </>
   )
 }
 
-function CallRow({ group, ctx, day }: { group: Group; ctx: RowCtx; day: string | null }) {
+function CallRow({ group, ctx, day, hasNote }: { group: Group; ctx: RowCtx; day: string | null; hasNote: boolean }) {
   const c = group.first
   const customer = ctx.find(c.number)
   const name = customer?.name ?? ctx.nameOf(c.number) ?? (c.name || '')
   const t = callTypeLabel(c.type)
-  const memo: MenuAction[] =
-    customer && ctx.canWrite
-      ? [
-          {
-            icon: '📝',
-            label: '통화 메모 남기기',
-            onSelect: () =>
-              openCallMemo({ customerId: customer.id, name: customer.name, company: customer.company, number: c.number, kind: c.type === 2 ? '발신 통화' : '수신 통화', at: c.date, duration: c.duration, approx: c.approx }),
-          },
-        ]
-      : []
+  const kind = c.type === 2 ? '발신 통화' : '수신 통화'
+  // 고객: 📝 통화 메모 (창에서 👥 공용 / 🔒 개인 고름), 고객이 아닌 번호: 🔒 내 메모 (이 기기에만)
+  const memo: MenuAction[] = customer
+    ? [
+        {
+          icon: '📝',
+          label: '통화 메모 남기기',
+          onSelect: () =>
+            openCallMemo({ customerId: customer.id, name: customer.name, company: customer.company, number: c.number, kind, at: c.date, duration: c.duration, approx: c.approx }),
+        },
+      ]
+    : [{ icon: '🔒', label: hasNote ? '내 메모 보기·남기기' : '내 메모', onSelect: () => openCallMemo({ customerId: '', personal: true, name, number: c.number, kind, at: c.date, duration: c.duration, approx: c.approx }) }]
   const actions = () => personActions(ctx, c.number, customer, memo)
   const menu = useItemMenu(actions, name || prettyNumber(c.number))
   const open = ctx.openRow === group.key
@@ -397,6 +412,11 @@ function CallRow({ group, ctx, day }: { group: Group; ctx: RowCtx; day: string |
             <div className="call-name">
               {customer && <span className="work-tag">업무</span>}
               {name || prettyNumber(c.number)}
+              {hasNote && !customer && (
+                <span className="note-lock" title="내 메모 있음" aria-label="내 메모 있음">
+                  {' '}🔒
+                </span>
+              )}
               {group.count > 1 && <span className="muted"> ({group.count})</span>}
             </div>
             <div className="call-sub">

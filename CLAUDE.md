@@ -177,6 +177,9 @@
     - 갤럭시 앱(1.3.0): `MainActivity`에 ACTION_SEND text/plain 받기 → 같은 주소로 웹뷰를 연다. 갤럭시 크롬 홈 화면 앱: manifest `share_target`(GET, title→memo_title, text→memo).
     - 어디서나: 복사 → 📞 전화 화면 "📋 복사한 통화 요약으로 메모하기" 또는 메모 창 "📋 붙여넣기"(`readClipboard`, 아이폰은 붙여넣기 확인 말풍선).
   - 에이닷의 실제 공유 메뉴·요약 글 모양(번호가 들어가는지)은 확인 못 함 → 직원 샘플을 받으면 고객 찾기를 맞춘다.
+- **🔒 개인 메모 · 👥 공용 메모 (2026-10-30, `src/privateNotes.ts`, 사용자가 정함):** 메모를 쓸 때 "👥 공용(팀이 함께 봐요) / 🔒 개인(나만 봐요)"을 고른다(고객 상세 메모 칸, 통화 메모 창). 보기 권한은 개인만.
+  - 고객에 대한 개인 메모 → 서버 `users/{uid}/customerNotes/{id}` {customerId, kind, body, createdAt, editedAt}, 규칙상 본인만(관리자도 못 봄), PC·폰 같이 보임. 고객 상세 "🔒 내 메모" 탭(수정 기록 없이 고치기·지우기). 고객을 지우면 `onCustomerDeleted`가 collectionGroup으로 같이 지운다(색인 fieldOverrides `customerNotes.customerId`), 계정을 지우면 `recursiveDelete`로 같이.
+  - 고객이 아닌 번호(개인 통화) 메모 → **이 기기에만**(localStorage `private-phone-notes`, 500개, 서버 안 올림, 로그아웃하면 `wipePhoneData`가 지움). 📞 최근기록 줄 → 🔒 내 메모(메모 창에 그 번호 최근 메모 5개), 메모 있는 번호는 이름 옆 🔒.
 - **📥 고객 한꺼번에 가져오기 (처음 셋팅, 화면 11, 2026-10-29, `src/importCustomers.ts`, `src/pages/ImportCustomers.tsx`):** 고객 화면 머리줄 📥 가져오기(편집 이상, 고객 목록을 다 불러온 뒤에만 열림 — 안 그러면 "이미 있음" 판단이 빠짐), 고객이 없으면 목록 자리에 안내 카드.
   - 가져올 곳: 📄 엑셀(.xlsx, `read-excel-file` 9.3.10을 고를 때만 불러옴, 줄이 가장 많은 시트)·CSV·텍스트(UTF-8 아니면 EUC-KR로 읽음, 쉼표/탭) · 📇 연락처 파일 .vcf(아이폰 연락처 앱·구글 연락처 내보내기, 팩스 번호 제외) · 📱 갤럭시 앱(1.3.0) 폰 연락처에서 고르기(`PhonePlugin.contacts`가 회사 이름도 줌, 같은 이름+회사의 번호는 한 고객으로). 예전 .xls는 .xlsx로 저장해 달라고 안내. "📎 엑셀 양식 받기"(CSV: 이름·회사·휴대폰·전화번호2).
   - 열 맞추기(`guessMapping`): 앞 10줄에서 머리줄(성명/이름/담당자, 회사/업체/거래처/상호/소속, 전화/휴대폰/연락처/번호 — 팩스·사업자 제외)을 찾고, 없으면 내용으로(번호가 60% 넘는 열 = 전화). 화면의 "열 맞추기"에서 이름·회사·전화번호 1·2·머리줄을 바꿀 수 있다. 엑셀이 숫자로 바꿔 앞 0이 빠진 번호(1012345678)는 되살리고, 한 칸에 번호가 여럿이면 나눈다(`phonesIn`).
@@ -244,6 +247,8 @@
 | 통화 기록, 통화 시간 | 기기 로컬만 (서버 업로드 금지) | 삭제 |
 | 번호 → 업무/개인 분류표 | 기기 로컬 | 삭제 |
 | 개인 연락처 | 폰 기본 연락처 (앱은 읽기만) | 그대로 |
+| 🔒 개인 번호 메모 | 기기 로컬만 (localStorage) | 삭제 |
+| 🔒 고객 개인 메모 | Firestore `users/{uid}/customerNotes` (본인만) | 계정 삭제 시 삭제 |
 | 고객 연락처, 상담 메모, 채팅 | Firestore | 기기에서 삭제, 팀에는 유지 |
 | 채팅 사진 | Cloud Storage `teams/{teamId}/chat/{msgId}/` (압축본 + 썸네일, 메시지 문서에는 경로만) | 기기 캐시 삭제, 팀에는 유지 |
 | "휴대폰 연락처에 표시"로 동기화한 고객 | 폰의 CardDAV 연락처 계정 (읽기 전용) | 팀 제외/끄기 시 빈 주소록이 되어 자동 삭제 |
@@ -260,6 +265,7 @@ users/{uid}                      name, position(관리자가 정함), avatar, em
                                  active, disabledReason, disabledAt, disabledBy, mustChangePassword, passwordChangedAt
                                  (Functions가 생성, 본인은 name/avatar/platform/settings/lastSeenAt/appVersion만 수정, position은 setMemberProfile)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
+users/{uid}/customerNotes/{id}   customerId, kind, body, createdAt, editedAt   (🔒 고객 개인 메모, 본인만)
 pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), kinds{chat,mention,notice,front}, pc, seenAt, updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
 meta/kakaoSearch                 key, updatedAt, updatedBy   (채팅 #검색 카카오 키, 앱에서 접근 불가)

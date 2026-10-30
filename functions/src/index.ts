@@ -107,6 +107,13 @@ export const onScheduleWritten = onDocumentWritten('teams/{teamId}/schedule/{doc
 export const onCustomerDeleted = onDocumentDeleted('customers/{customerId}', async (event) => {
   const db = getFirestore()
   await db.recursiveDelete(db.doc(`customers/${event.params.customerId}`))
+  // 🔒 팀원들이 이 고객에 남긴 개인 메모도 지운다 (users/{uid}/customerNotes)
+  const mine = await db.collectionGroup('customerNotes').where('customerId', '==', event.params.customerId).get()
+  for (let i = 0; i < mine.docs.length; i += 400) {
+    const batch = db.batch()
+    mine.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref))
+    await batch.commit()
+  }
 })
 
 // 메모를 지우면 수정 기록도 함께 지운다.
@@ -425,7 +432,7 @@ export const deleteTeam = onCall({ timeoutSeconds: 540, memory: '512MiB' }, asyn
   await getStorage().bucket().deleteFiles({ prefix: `teams/${teamId}/` })
   // 5) 다른 팀이 없는 사람은 계정도 지운다
   for (const { uid } of loseAccount) {
-    await db.doc(`users/${uid}`).delete()
+    await db.recursiveDelete(db.doc(`users/${uid}`))
     await disableTokens(uid).catch(() => {})
     try {
       await getAuth().deleteUser(uid)
@@ -458,7 +465,7 @@ export const removeMember = onCall(async (req) => {
   const remaining = ((await userRef.get()).get('teamIds') ?? []) as string[]
   if (remaining.length > 0 || targetSuper) return { accountDeleted: false }
 
-  await userRef.delete()
+  await db.recursiveDelete(userRef) // 🔒 개인 메모(customerNotes)까지
   try {
     await getAuth().deleteUser(uid)
   } catch (error) {

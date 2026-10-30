@@ -280,7 +280,7 @@ export function markSmsSeen(threadId: string) {
 export function wipePhoneData() {
   // 🌙 휴무일 자동 응답도 끈다 (다음 사람 폰에서 내 문구가 나가지 않게)
   if (hasPhoneNative) void PhoneNative.offDayConfig({ enabled: false, dates: [], numbers: [], message: '' }).catch(() => {})
-  for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED]) {
+  for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED, 'private-phone-notes']) {
     try {
       localStorage.removeItem(k)
     } catch {
