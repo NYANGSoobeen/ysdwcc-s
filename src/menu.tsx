@@ -191,9 +191,18 @@ function MenuList(props: MenuListProps) {
         <span>
           {props.teamName} · v{__APP_VERSION__}
         </span>
+        {document.documentElement.classList.contains('android-app') && <span className="screen-diag">{screenDiag()}</span>}
       </div>
     </>
   )
+}
+
+// 갤럭시 앱 화면 진단 (아래 탭 밑 여백 문제 확인용): 안드로이드 아래 줄 높이 · 탭 밑 여백 · 웹뷰 높이/화면 높이
+function screenDiag() {
+  const st = document.documentElement.style
+  const inset = parseFloat(st.getPropertyValue('--safe-area-inset-bottom')) || 0
+  const pad = parseFloat(st.getPropertyValue('--tabs-bottom-pad')) || 0
+  return `화면 ${Math.round(inset)}·${Math.round(pad)}·${window.innerHeight}/${screen.height}`
 }
 
 async function confirmLogout() {
