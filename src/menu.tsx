@@ -74,7 +74,12 @@ export function MenuButton() {
       onClick={open}
       aria-label={badge > 0 ? `메뉴 열기 (안 읽은 메시지 ${badge}개)` : '메뉴 열기'}
     >
-      ☰{badge > 0 && <span className="badge on-icon">{badgeText(badge)}</span>}
+      <span className="menu-bars" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      {badge > 0 && <span className="badge on-icon">{badgeText(badge)}</span>}
     </button>
   )
 }

@@ -3493,11 +3493,37 @@ button.menu-logout {
   text-decoration: underline;
 }
 
-/* 휴대폰 ☰ 버튼 (프론트 앱처럼 둥근 네모) */
+/* 휴대폰 ☰ 버튼 (프론트 앱처럼 둥근 네모). ☰ 글자는 글꼴마다 아래로 쏠려서 막대 세 줄을 직접 그려 가로·세로 정가운데에 둔다 */
 .menu-button,
 .ghost.menu-button {
   border-radius: 12px;
   font-size: 16px;
+  line-height: 0;
+}
+.menu-bars {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 16px;
+  height: 12px;
+}
+.menu-bars i {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+/* 휴대폰 머리줄: 왼쪽(☰ 앞)·오른쪽(마지막 버튼 뒤) 여백을 똑같이 12px */
+.shell:not(.desktop) .page-header:has(> .menu-button),
+.shell:not(.desktop) .page-header.chat-header {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.shell:not(.desktop) .page-header > .menu-button {
+  margin-left: 0;
+}
+.shell:not(.desktop) .page-header:has(> .menu-button) > :last-child {
+  margin-right: 0;
 }
 
 /* 위쪽 제목줄: 화면 이름은 왼쪽, 명조, 주색 (PC 64px = 프로필 칸 높이) */
