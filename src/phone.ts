@@ -20,6 +20,7 @@ export type CallEntry = {
   date: number
   duration: number // 초
   approx?: boolean // 아이폰·PC: 실제 통화 시간을 알 수 없어, 앱에서 걸고 돌아오기까지 걸린 시간(어림값)
+  isNew?: boolean // 갤럭시 앱 1.6.1: 부재중을 아직 안 봄 (삼성 전화 앱에서 보면 false)
 }
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number; rcs?: boolean }
 export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number; rcs?: boolean }
@@ -503,7 +504,8 @@ export function usePhoneBadges(enabled: boolean, teamId: string | null, countPer
     const since = missedSeenAt()
     const seen = smsSeen()
     return {
-      missed: on && calls ? calls.filter((c) => c.type === 3 && c.date > since).length : 0,
+      // 삼성 전화 앱에서 이미 본 부재중(isNew false)은 빼고 센다 (한 곳에서만 봐도 숫자가 사라지게, 1.6.1)
+      missed: on && calls ? calls.filter((c) => c.type === 3 && c.date > since && c.isNew !== false).length : 0,
       sms: on && threads && teamId ? threads.filter((t) => unreadThread(t, seen) && (countPersonal || find(t.address))).length : 0,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

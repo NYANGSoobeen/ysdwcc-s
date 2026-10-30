@@ -59,6 +59,8 @@ class PhonePlugin : Plugin() {
                 handler.postDelayed({
                     pending = false
                     notifyListeners("changed", JSObject().put("what", what))
+                    // 삼성 앱에서 읽었으면 우리 알림도 지운다 (1.6.1)
+                    Thread { PhoneAlerts.syncWithPhone(context) }.start()
                 }, 400)
             }
         }
@@ -86,6 +88,7 @@ class PhonePlugin : Plugin() {
         super.handleOnResume()
         handleOnDestroy()
         load()
+        Thread { PhoneAlerts.syncWithPhone(context) }.start()
     }
 
     private fun granted(alias: String) = getPermissionState(alias) == PermissionState.GRANTED
@@ -306,7 +309,7 @@ class PhonePlugin : Plugin() {
                 val out = JSArray()
                 val cols = arrayOf(
                     CallLog.Calls._ID, CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME,
-                    CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION,
+                    CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION, CallLog.Calls.NEW,
                 )
                 context.contentResolver.query(
                     CallLog.Calls.CONTENT_URI, cols, "${CallLog.Calls.DATE} > ?", arrayOf(since.toString()),
@@ -320,7 +323,9 @@ class PhonePlugin : Plugin() {
                                 .put("name", c.getString(2) ?: "")
                                 .put("type", c.getInt(3))
                                 .put("date", c.getLong(4))
-                                .put("duration", c.getLong(5)),
+                                .put("duration", c.getLong(5))
+                                // 부재중을 아직 안 봄 (삼성 전화 앱에서 보면 0이 된다)
+                                .put("isNew", c.getInt(6) == 1),
                         )
                     }
                 }

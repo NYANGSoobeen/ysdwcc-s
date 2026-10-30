@@ -331,8 +331,38 @@ object PhoneAlerts {
 
     fun clearAfterCall(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_AFTER)
 
+    // 알림 접근이 없어도: 앱이 열리거나 문자함·통화 기록이 바뀌면, 삼성 앱에서 이미 읽은 것의 우리 알림을 지운다
+    // (문자: 그 번호의 안 읽은 문자가 없음 / 부재중: 아직 "새 부재중"으로 남은 통화가 없음)
+    fun syncWithPhone(ctx: Context) {
+        val p = prefs(ctx)
+        try {
+            if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) {
+                val unread = HashSet<String>()
+                ctx.contentResolver.query(
+                    Telephony.Sms.Inbox.CONTENT_URI, arrayOf(Telephony.Sms.ADDRESS), "${Telephony.Sms.READ} = 0", null, null,
+                )?.use { c -> while (c.moveToNext()) unread.add(OffDay.local(c.getString(0) ?: "")) }
+                val chats = ChatStore.all(ctx)
+                for (i in 0 until chats.length()) chats.getJSONObject(i).takeIf { it.optBoolean("u") }?.let { unread.add(it.optString("a")) }
+                p.all.keys.filter { it.startsWith("sms_") }.map { it.removePrefix("sms_") }.filter { it !in unread }.forEach { clear(ctx, "sms", it, false) }
+            }
+            if (p.getInt("missed_count", 0) > 0 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED) {
+                val stillNew = ctx.contentResolver.query(
+                    CallLog.Calls.CONTENT_URI, arrayOf(CallLog.Calls._ID),
+                    "${CallLog.Calls.TYPE} = ? AND ${CallLog.Calls.NEW} = 1", arrayOf(CallLog.Calls.MISSED_TYPE.toString()), null,
+                )?.use { it.count > 0 } ?: true
+                if (!stillNew) clear(ctx, "missed", null, false)
+            }
+        } catch (_: Exception) {
+            // 못 읽으면 그대로 둔다
+        }
+    }
+
     // 앱에서 그 화면을 보면 알림을 지운다
-    fun clear(ctx: Context, kind: String, number: String?) {
+    // 1.6.1 (사용자 요청 "둘 중 한 곳에서만 확인해도 알림이 사라져야"):
+    // 우리 앱에서 보면 → 우리 알림 + 삼성 메시지·전화 앱의 그 알림도 지운다(알림 접근을 켰을 때, ChatListener.cancelOthers).
+    // 삼성 앱에서 보면 → ChatListener.onNotificationRemoved가 우리 알림을 지운다(others = false).
+    fun clear(ctx: Context, kind: String, number: String?, others: Boolean = true) {
+        if (others) ChatListener.cancelOthers(kind, number)
         val nm = NotificationManagerCompat.from(ctx)
         val p = prefs(ctx)
         when (kind) {

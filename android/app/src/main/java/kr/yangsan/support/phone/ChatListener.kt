@@ -88,7 +88,54 @@ object ChatStore {
 }
 
 class ChatListener : NotificationListenerService() {
-    private val apps = setOf("com.samsung.android.messaging", "com.google.android.apps.messaging")
+    private val apps = MESSAGING_APPS
+
+    companion object {
+        val MESSAGING_APPS = setOf("com.samsung.android.messaging", "com.google.android.apps.messaging")
+        // 알림 접근이 켜져 있을 때만 살아 있다
+        @Volatile private var instance: ChatListener? = null
+
+        // 우리 앱에서 확인함 → 삼성 메시지(그 번호)·전화 앱(부재중)의 알림도 지운다 (1.6.1)
+        fun cancelOthers(kind: String, number: String?) {
+            val me = instance ?: return
+            try {
+                val active = me.activeNotifications ?: return
+                when (kind) {
+                    "sms" -> {
+                        if (number.isNullOrBlank()) return
+                        val key = OffDay.local(number)
+                        val mine = active.filter { it.packageName in MESSAGING_APPS && it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
+                        val hit = mine.filter { sbn ->
+                            val n = sbn.notification
+                            val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+                            val person = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)?.messages?.lastOrNull()?.person
+                            me.numberOf(person?.uri, person?.name?.toString() ?: title)?.let { OffDay.local(it) == key } == true
+                        }
+                        hit.forEach { me.cancelNotification(it.key) }
+                        // 그 앱의 남은 알림이 없으면 묶음(요약) 알림도
+                        hit.map { it.packageName }.toSet().forEach { pkg ->
+                            if (mine.none { it.packageName == pkg && it !in hit }) {
+                                active.filter { it.packageName == pkg && it.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0 }.forEach { me.cancelNotification(it.key) }
+                            }
+                        }
+                    }
+                    "missed" -> active
+                        .filter { it.packageName != me.packageName && it.notification.category == Notification.CATEGORY_MISSED_CALL }
+                        .forEach { me.cancelNotification(it.key) }
+                }
+            } catch (_: Exception) {
+                // 못 지우면 그 앱 알림은 남는다
+            }
+        }
+    }
+
+    override fun onListenerConnected() {
+        instance = this
+    }
+
+    override fun onListenerDisconnected() {
+        instance = null
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName !in apps) return
@@ -116,11 +163,20 @@ class ChatListener : NotificationListenerService() {
     }
 
     // 삼성 메시지 알림을 지우면(삼성 앱에서 읽음) 우리 알림도 지운다
+    // 삼성 메시지·전화 앱에서 확인해 그 앱 알림이 사라지면 우리 알림도 지운다
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        val n = sbn.notification ?: return
+        if (sbn.packageName != packageName && n.category == Notification.CATEGORY_MISSED_CALL) {
+            PhoneAlerts.clear(this, "missed", null, others = false)
+            return
+        }
         if (sbn.packageName !in apps) return
-        val title = sbn.notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val title = n.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val number = numberOf(null, title) ?: return
-        PhoneAlerts.clear(this, "sms", number)
+        // 삼성 앱에서 읽음 → 우리 목록의 채팅+ 안 읽은 표시도 지운다
+        ChatStore.markRead(this, number)
+        ChatStore.onChange?.invoke()
+        PhoneAlerts.clear(this, "sms", number, others = false)
     }
 
     private fun take(number: String, text: String, date: Long) {
@@ -148,7 +204,7 @@ class ChatListener : NotificationListenerService() {
     }
 
     // 보낸 사람 번호 찾기: 알림 속 사람 주소(tel:) → 제목이 번호면 그대로 → "[업무] 이름"이면 우리 고객 이름 → 폰 연락처 이름
-    private fun numberOf(uri: String?, name: String): String? {
+    fun numberOf(uri: String?, name: String): String? {
         uri?.takeIf { it.startsWith("tel:") }?.let { return Uri.decode(it.removePrefix("tel:")) }
         val digits = name.filter { it.isDigit() }
         if (digits.length >= 7 && name.count { it.isLetter() } == 0) return digits
