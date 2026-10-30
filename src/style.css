@@ -5974,3 +5974,13 @@ a.button:not(.primary) {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+/* 관리자 설정 → 모든 팀 목록: 이 팀 관리 → · 🗑️ 팀 삭제 */
+.team-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.modal-actions .danger-button {
+  width: auto;
+}

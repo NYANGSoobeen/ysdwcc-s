@@ -364,3 +364,38 @@ test('💾 용량 관리: 파일을 쓰이는 곳별로 나누고, 사용하지 
   assert.equal(only.bytes, 200)
   delete process.env.USAGE_RECENT_MS
 })
+
+test('🗑️ 팀 삭제: 최고 관리자만, 이름 확인, 팀 데이터·파일을 지우고 그 팀만 있던 계정도 지운다', async () => {
+  const { teamId: front } = await fn.createTeam.run(as(adminUid, { name: '프론트' }))
+  const { uid: only } = await fn.addMember.run(as(adminUid, { teamId: front, name: '프론트직원', email: 'fonly@workphone.local', password: 'pass123', role: 'admin' }))
+  const { uid: kim } = await fn.addMember.run(as(adminUid, { teamId, name: '둘다', email: 'both@workphone.local', password: 'pass123', role: 'editor' }))
+  await fn.addMember.run(as(adminUid, { teamId: front, name: '둘다', email: 'both@workphone.local', password: 'x', role: 'editor' }))
+  await db.doc(`teams/${front}/messages/m1`).set({ authorUid: only, body: '안녕', createdAt: Timestamp.now() })
+  await db.doc(`teams/${front}/notices/n1`).set({ title: '', body: '공지', authorUid: only })
+  await db.doc('customers/fc1').set({ teamId: front, name: '고객', phones: [] })
+  await db.doc('customers/fc1/notes/x').set({ body: '메모' })
+  await bucket.file(`teams/${front}/chat/m1/0.jpg`).save(Buffer.from('x'))
+
+  await expectError(fn.deleteTeam.run(as(only, { teamId: front })), 'permission-denied')
+  const preview = await fn.deleteTeam.run(as(adminUid, { teamId: front, dryRun: true }))
+  assert.equal(preview.deleted, false)
+  assert.equal(preview.customers, 1)
+  assert.equal(preview.messages, 1)
+  assert.deepEqual(preview.loseAccount.map((u) => u.uid), [only])
+  await expectError(fn.deleteTeam.run(as(adminUid, { teamId: front, confirmName: '틀림' })), 'invalid-argument')
+
+  const done = await fn.deleteTeam.run(as(adminUid, { teamId: front, confirmName: '프론트' }))
+  assert.equal(done.deleted, true)
+  assert.equal((await db.doc(`teams/${front}`).get()).exists, false)
+  assert.equal((await db.doc(`teams/${front}/messages/m1`).get()).exists, false)
+  assert.equal((await db.doc(`teams/${front}/notices/n1`).get()).exists, false)
+  assert.equal((await db.doc('customers/fc1').get()).exists, false)
+  assert.equal((await db.doc('customers/fc1/notes/x').get()).exists, false)
+  assert.equal((await bucket.getFiles({ prefix: `teams/${front}/` }))[0].length, 0)
+  await assert.rejects(getAuth().getUser(only))
+  assert.equal((await db.doc(`users/${only}`).get()).exists, false)
+  // 다른 팀에도 있는 사람은 계정이 남고 그 팀만 빠진다
+  assert.deepEqual((await db.doc(`users/${kim}`).get()).get('teamIds'), [teamId])
+  // 원래 팀은 그대로
+  assert.equal((await db.doc(`teams/${teamId}`).get()).exists, true)
+})

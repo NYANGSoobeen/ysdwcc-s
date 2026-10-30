@@ -377,6 +377,65 @@ export const setMemberProfile = onCall(async (req) => {
   return { ok: true }
 })
 
+// 🗑️ 팀 삭제 (최고 관리자만, 2026-10-30): 팀과 그 팀의 모든 데이터(채팅·공지·근무표·스케줄·고객·메모·파일)를 지운다.
+// 팀원은 그 팀에서 빠지고, 다른 팀이 없는 사람은 계정도 지운다 (removeMember와 같음, 최고 관리자 계정은 남김).
+// dryRun이면 지우지 않고 무엇이 지워지는지만 알려 준다. 실수 방지로 팀 이름을 똑같이 넣어야 지운다. 마지막 팀은 못 지운다.
+// (🏌️ 프론트 채팅은 프론트 앱 쪽 데이터라 상관없다.)
+export const deleteTeam = onCall({ timeoutSeconds: 540, memory: '512MiB' }, async (req) => {
+  await requireSuperAdmin(req)
+  const teamId = text(req.data?.teamId, '팀')
+  const db = getFirestore()
+  const teamRef = db.doc(`teams/${teamId}`)
+  const team = await teamRef.get()
+  if (!team.exists) throw new HttpsError('not-found', '팀이 없습니다.')
+  const name = (team.get('name') as string) ?? ''
+  const members = Object.keys((team.get('members') ?? {}) as Record<string, Role>)
+  const teamCount = (await db.collection('teams').count().get()).data().count
+  if (teamCount <= 1) throw new HttpsError('failed-precondition', '마지막 팀은 지울 수 없습니다.')
+
+  const users = members.length ? await db.getAll(...members.map((u) => db.doc(`users/${u}`))) : []
+  const loseAccount = users
+    .filter((u) => u.exists && u.get('superAdmin') !== true && ((u.get('teamIds') ?? []) as string[]).every((t) => t === teamId))
+    .map((u) => ({ uid: u.id, name: (u.get('name') as string) ?? '' }))
+  const customers = db.collection('customers').where('teamId', '==', teamId)
+  const collections = await messageCollections(teamId)
+  const [customerCount, ...messageCounts] = await Promise.all([
+    customers.count().get(),
+    ...collections.map((c) => c.count().get()),
+  ])
+  const summary = {
+    name,
+    members: members.length,
+    loseAccount,
+    customers: customerCount.data().count,
+    messages: messageCounts.reduce((n, c) => n + c.data().count, 0),
+  }
+  if (req.data?.dryRun) return { ...summary, deleted: false }
+  if (req.data?.confirmName !== name) throw new HttpsError('invalid-argument', '팀 이름이 맞지 않습니다.')
+
+  // 1) 팀원 소속 빼기 (먼저 빼야 열린 앱들이 다른 팀으로 넘어가거나 로그아웃한다)
+  for (const u of users) {
+    if (!u.exists) continue
+    await u.ref.set({ teamIds: FieldValue.arrayRemove(teamId) }, { merge: true })
+  }
+  await teamRef.update({ members: {} })
+  // 2) 고객(메모·수정 기록 포함) → 3) 팀 문서와 그 아래 전부 → 4) 파일
+  for (const c of (await customers.select().get()).docs) await db.recursiveDelete(c.ref)
+  await db.recursiveDelete(teamRef)
+  await getStorage().bucket().deleteFiles({ prefix: `teams/${teamId}/` })
+  // 5) 다른 팀이 없는 사람은 계정도 지운다
+  for (const { uid } of loseAccount) {
+    await db.doc(`users/${uid}`).delete()
+    await disableTokens(uid).catch(() => {})
+    try {
+      await getAuth().deleteUser(uid)
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'auth/user-not-found') throw error
+    }
+  }
+  return { ...summary, deleted: true }
+})
+
 // 팀에서 빼면 보안 규칙상 즉시 팀 데이터에 접근할 수 없다.
 // 더 이상 속한 팀이 없으면 계정도 지워 다시 로그인할 수 없게 한다.
 export const removeMember = onCall(async (req) => {
