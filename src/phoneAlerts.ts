@@ -9,7 +9,8 @@ import { hasPhoneNative, PhoneNative, type AlertCustomer, type AlertsStatus } fr
 //   ✉️ 문자 → 그 대화 · 📞 부재중 전화 → 최근기록 · 고객 전화가 울릴 때 → "[업무] 이름 · 회사 · 다음 연락" 띠 → 그 고객
 // 웹앱은 내 모든 팀의 고객(번호 → 이름·회사·다음 연락)과 켜 둔 종류를 폰에 넣어 둔다. 앱이 꺼져 있어도 폰이 혼자 알린다.
 // personal: 개인 문자도 알리고 숫자로 세기 (기본 꺼짐, 2026-10-30 사용자 요청 "선택적으로")
-export type AlertKinds = { sms: boolean; missed: boolean; caller: boolean; personal: boolean }
+// memo: 받은 전화를 끊으면 바로 메모 (고객이면 메모 창, 모르는 번호면 어떻게 저장할지, 1.6.0)
+export type AlertKinds = { sms: boolean; missed: boolean; caller: boolean; personal: boolean; memo: boolean }
 const KINDS_KEY = 'phone-alerts'
 const ASKED_KEY = 'phone-alerts-asked'
 const CHANGED = 'phone-alerts-changed'
@@ -26,9 +27,9 @@ export async function alertsSupported() {
 
 export function alertKinds(): AlertKinds {
   try {
-    return { sms: true, missed: true, caller: true, personal: false, ...(JSON.parse(localStorage.getItem(KINDS_KEY) ?? '{}') as Partial<AlertKinds>) }
+    return { sms: true, missed: true, caller: true, personal: false, memo: true, ...(JSON.parse(localStorage.getItem(KINDS_KEY) ?? '{}') as Partial<AlertKinds>) }
   } catch {
-    return { sms: true, missed: true, caller: true, personal: false }
+    return { sms: true, missed: true, caller: true, personal: false, memo: true }
   }
 }
 export function setAlertKinds(kinds: AlertKinds) {

@@ -20,6 +20,8 @@ import {
   useTeamCustomers,
 } from '../phone.ts'
 import { Modal, toast } from '../ui/dialogs.tsx'
+import { alertKinds } from '../phoneAlerts.ts'
+import { addAsCustomer } from './PhoneCommon.tsx'
 
 // 📞 통화 후 메모 창 (화면 3·6). 어느 화면에 있든 통화가 끝나고 앱으로 돌아오면 뜬다.
 // - 갤럭시 앱: 통화 기록에서 방금 끝난 통화(연결된 것)가 지금 팀 고객 번호면 → "수신/발신 통화" 메모 창
@@ -40,6 +42,11 @@ export type CallMemoTarget = {
 }
 
 const listeners = new Set<(t: CallMemoTarget) => void>()
+// 📝 받은 전화가 끝나 폰이 우리 앱을 열어 줌 (갤럭시 앱 1.6.0) → 통화 기록이 적히길 기다리며 몇 번 확인
+const callEndListeners = new Set<() => void>()
+export function checkCallEnd() {
+  callEndListeners.forEach((l) => l())
+}
 // 전화 화면의 "방금 받은 전화 메모하기"처럼 직접 띄울 때
 export function openCallMemo(t: CallMemoTarget) {
   listeners.forEach((l) => l(t))
@@ -56,6 +63,8 @@ async function customerTarget(teamId: string, number: string, kind: string, extr
 
 export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
   const [target, setTarget] = useState<CallMemoTarget | null>(null)
+  // 모르는 번호로 받은 전화가 끝남 → 어떻게 저장할지 묻기
+  const [unknown, setUnknown] = useState<{ number: string; at: number; duration: number } | null>(null)
   // 보기 권한은 👥 공용 메모를 못 쓰고 🔒 내 메모만
   const canWrite = team.myRole !== 'viewer'
   const { calls } = usePhonePerms()
@@ -131,15 +140,39 @@ export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
     // 가장 최근의 연결된 통화(받은·건 전화) 하나만 묻는다
     const last = list.find((c) => (c.type === 1 || c.type === 2) && c.duration > 0)
     if (!last) return
+    void PhoneNative.clearAfterCall().catch(() => {})
     const t = await customerTarget(team.id, last.number, last.type === 1 ? '수신 통화' : '발신 통화', { at: last.date, duration: last.duration })
-    if (t) setTarget(t)
+    if (t) return setTarget(t)
+    // 받은 전화인데 고객도 아니고 폰 연락처에도 없는 번호 → 어떻게 저장할지 (2026-10-30 사용자 요청)
+    if (last.type === 1 && !last.name && last.number && alertKinds().memo) setUnknown({ number: last.number, at: last.date, duration: last.duration })
   }
+  useEffect(() => {
+    const onEnd = () => {
+      // 통화 기록이 적히는 데 몇 초 걸릴 수 있어 0·2·5초에 다시 본다 (이미 본 통화는 다시 안 물음)
+      for (const ms of [0, 2000, 5000]) setTimeout(() => void checkLog(), ms)
+    }
+    callEndListeners.add(onEnd)
+    return () => void callEndListeners.delete(onEnd)
+  })
   usePhoneChanged('calls', () => void checkLog())
   useEffect(() => {
     void checkLog()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calls, team.id])
 
+  if (unknown && !target)
+    return (
+      <UnknownCallSheet
+        teamId={team.id}
+        call={unknown}
+        canWrite={canWrite}
+        onMemo={(t) => {
+          setUnknown(null)
+          setTarget(t)
+        }}
+        onClose={() => setUnknown(null)}
+      />
+    )
   if (!target) return null
   return <CallMemoSheet key={`${target.customerId}-${target.at ?? 0}`} teamId={team.id} target={target} canShare={canWrite} onClose={() => setTarget(null)} />
 }
@@ -311,5 +344,48 @@ function CustomerPick({ teamId, onPick }: { teamId: string; onPick: (p: Picked) 
         ))}
       </ul>
     </div>
+  )
+}
+
+// 📞 모르는 번호로 받은 전화가 끝났을 때: 어떻게 저장할지 (＋ 고객으로 저장 → 메모 / 🔒 내 메모만 / 닫기)
+function UnknownCallSheet(props: {
+  teamId: string
+  call: { number: string; at: number; duration: number }
+  canWrite: boolean
+  onMemo: (t: CallMemoTarget) => void
+  onClose: () => void
+}) {
+  const { call } = props
+  const pretty = formatPhone(normalizePhone(call.number) || call.number)
+  return (
+    <Modal onClose={props.onClose} labelledBy="unknown-call-title">
+      <h3 id="unknown-call-title">📞 모르는 번호 · {pretty}</h3>
+      <p className="muted small">
+        방금 받은 전화예요 ({timeText(call.at)}
+        {call.duration > 0 && ` · ${durationText(call.duration)}`}). 어떻게 남길까요?
+      </p>
+      <div className="unknown-call-actions">
+        {props.canWrite && (
+          <button
+            type="button"
+            className="primary"
+            onClick={async () => {
+              const id = await addAsCustomer(props.teamId, call.number)
+              if (!id) return
+              const snap = await getDoc(doc(db, 'customers', id)).catch(() => null)
+              props.onMemo({ customerId: id, name: (snap?.get('name') as string) ?? '', company: (snap?.get('company') as string) ?? '', number: call.number, kind: '수신 통화', at: call.at, duration: call.duration })
+            }}
+          >
+            ＋ 업무 고객으로 저장하고 메모
+          </button>
+        )}
+        <button type="button" onClick={() => props.onMemo({ customerId: '', personal: true, name: pretty, number: call.number, kind: '수신 통화', at: call.at, duration: call.duration })}>
+          🔒 개인 번호로 두고 내 메모만 (이 폰에만)
+        </button>
+        <button type="button" className="ghost" onClick={props.onClose}>
+          그냥 닫기
+        </button>
+      </div>
+    </Modal>
   )
 }

@@ -118,6 +118,8 @@
     <!-- 🔔 전화·문자 알림 (1.4.0): 문자 받기 방송, 알림 띄우기(안드로이드 13+) -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 📝 받은 전화 끝나면 우리 앱을 바로 열기 (1.6.0, 사용자가 "다른 앱 위에 표시"를 허용했을 때만) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 🌙 휴무일 자동 응답: 걸려 온 전화 알기, 무음 모드로 바꾸기(방해 금지 접근은 설정에서 따로 허용) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />

@@ -129,6 +129,31 @@ class PhonePlugin : Plugin() {
         call.resolve()
     }
 
+    // 📝 받은 전화 끝나면 우리 앱을 바로 열기: "다른 앱 위에 표시" 권한 (1.6.0)
+    @PluginMethod
+    fun overlayStatus(call: PluginCall) {
+        call.resolve(JSObject().put("granted", Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(context)))
+    }
+
+    @PluginMethod
+    fun openOverlaySettings(call: PluginCall) {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null))
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            openSettings(call)
+            return
+        }
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun clearAfterCall(call: PluginCall) {
+        PhoneAlerts.clearAfterCall(context)
+        call.resolve()
+    }
+
     // 지금 보고 있는 문자 대화 (그 대화의 우리 알림은 안 띄움)
     @PluginMethod
     fun alertsViewing(call: PluginCall) {
@@ -188,6 +213,7 @@ class PhonePlugin : Plugin() {
             call.getBoolean("missed", true)!!,
             call.getBoolean("caller", true)!!,
             call.getBoolean("personal", false)!!,
+            call.getBoolean("memo", true)!!,
         )
         call.resolve()
     }

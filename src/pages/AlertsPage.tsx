@@ -33,6 +33,7 @@ const CHAT_KINDS: { key: keyof PushKinds; icon: string; label: string; desc: str
 ]
 const PHONE_KINDS: { key: keyof AlertKinds; icon: string; label: string; desc: string }[] = [
   { key: 'sms', icon: '✉️', label: '업무 문자', desc: '고객이 보낸 문자·채팅+. 앱 아이콘·✉️ 탭 빨간 숫자로도 세요' },
+  { key: 'memo', icon: '📝', label: '받은 전화 끝나면 바로 메모', desc: '고객 전화면 메모 창, 모르는 번호면 "고객으로 저장 / 내 메모만"을 물어요. 앱을 바로 띄우려면 아래 "다른 앱 위에 표시"를 허용해 주세요(안 하면 눌러서 여는 알림)' },
   { key: 'personal', icon: '👤', label: '개인 문자도 세기', desc: '켜면 개인(고객이 아닌) 문자도 우리 앱 알림을 띄우고 빨간 숫자에 같이 세요. 끄면 개인 문자는 삼성 메시지 알림만' },
   { key: 'missed', icon: '📞', label: '부재중 전화', desc: '못 받은 전화가 있으면 (누르면 최근기록)' },
   { key: 'caller', icon: '📇', label: '고객 전화 정보', desc: '고객 번호로 전화가 울릴 때 이름·회사·다음 연락을 띠로 (누르면 고객 화면)' },
@@ -237,8 +238,13 @@ function WebAlerts({ unread }: { unread: number }) {
 function GalaxyAlerts({ workSms }: { workSms: number }) {
   const { supported, status, kinds } = useAlertsStatus()
   const [chat, setChat] = useState<boolean | null>(null)
+  const [overlay, setOverlay] = useState<boolean | null>(null)
   useEffect(() => {
-    const check = () => void PhoneNative.status().then((s) => setChat(s.chat ?? false)).catch(() => setChat(false))
+    const check = () => {
+      void PhoneNative.status().then((s) => setChat(s.chat ?? false)).catch(() => setChat(false))
+      // 1.6.0 전 앱에는 없다 (null = 모름)
+      void PhoneNative.overlayStatus().then((o) => setOverlay(o.granted)).catch(() => setOverlay(null))
+    }
     check()
     const onVisible = () => document.visibilityState === 'visible' && check()
     document.addEventListener('visibilitychange', onVisible)
@@ -289,6 +295,9 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
           <Check ok={!!status?.sms}>문자 받기: {status?.sms ? '허용됨' : '꺼짐'}</Check>
           <Check ok={!!status?.phonestate}>전화 상태(부재중·고객 전화): {status?.phonestate ? '허용됨' : '꺼짐'}</Check>
           <Check ok={!!chat}>💬 채팅+ 문자 받기(알림 접근): {chat ? '켜짐' : '꺼짐 — 채팅+로 온 문자가 안 보여요'}</Check>
+          {overlay !== null && (
+            <Check ok={overlay}>📝 받은 전화 끝나면 앱 바로 띄우기(다른 앱 위에 표시): {overlay ? '허용됨' : '꺼짐 — 알림을 눌러야 메모 창이 열려요'}</Check>
+          )}
           <Check ok>
             앱 아이콘 숫자: {kinds.personal ? `문자 ${workSms} (업무 + 개인)` : `업무 문자 ${workSms} (개인 문자는 안 셈)`}
           </Check>
@@ -297,6 +306,11 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
           {!ready && (
             <button type="button" className="primary" onClick={() => void allow()}>
               권한 허용하기
+            </button>
+          )}
+          {overlay === false && (
+            <button type="button" className="ghost" onClick={() => void PhoneNative.openOverlaySettings().catch(() => {})}>
+              📝 다른 앱 위에 표시 허용
             </button>
           )}
           {!chat && (

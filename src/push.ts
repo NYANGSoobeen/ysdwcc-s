@@ -223,6 +223,7 @@ export type OpenRequest =
   | { kind: 'sms'; number: string }
   | { kind: 'calls' }
   | { kind: 'caller'; number: string }
+  | { kind: 'callend'; number: string } // 받은 전화가 끝남 → 메모 (src/pages/CallMemo.tsx)
 export function parseOpenUrl(url: string): OpenRequest | null {
   const params = new URL(url, location.origin).searchParams
   const room = params.get('room')
@@ -237,6 +238,8 @@ export function parseOpenUrl(url: string): OpenRequest | null {
   const sms = params.get('sms')
   if (sms) return { kind: 'sms', number: sms }
   if (params.get('calls')) return { kind: 'calls' }
+  const callend = params.get('callend')
+  if (callend) return { kind: 'callend', number: callend }
   const caller = params.get('customer')
   if (caller) return { kind: 'caller', number: caller }
   return null

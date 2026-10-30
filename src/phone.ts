@@ -46,7 +46,11 @@ type PhonePlugin = {
   contacts(): Promise<{ contacts: DeviceContact[] }>
   addListener(event: 'changed', fn: (e: { what: 'calls' | 'sms' }) => void): Promise<PluginListenerHandle>
   // 🔔 전화·문자 알림 (갤럭시 앱 1.4.0, android/.../phone/PhoneAlerts.kt)
-  alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean; personal: boolean }): Promise<void>
+  alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean; personal: boolean; memo: boolean }): Promise<void>
+  // 📝 받은 전화 끝나면 바로 메모 (1.6.0): "다른 앱 위에 표시" 권한, 뜬 알림 지우기
+  overlayStatus(): Promise<{ granted: boolean }>
+  openOverlaySettings(): Promise<void>
+  clearAfterCall(): Promise<void>
   alertsStatus(): Promise<AlertsStatus>
   requestAlerts(): Promise<AlertsStatus>
   clearAlerts(o: { kind: 'sms' | 'missed'; number?: string }): Promise<void>

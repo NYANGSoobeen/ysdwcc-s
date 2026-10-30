@@ -23,7 +23,7 @@ import { StaffPage } from './pages/StaffPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
-import { CallMemoWatcher } from './pages/CallMemo.tsx'
+import { CallMemoWatcher, checkCallEnd } from './pages/CallMemo.tsx'
 import { MessagesPage, openSmsTo } from './pages/MessagesPage.tsx'
 import { PhonePage } from './pages/PhonePage.tsx'
 import { NoticesPage } from './pages/NoticesPage.tsx'
@@ -264,6 +264,7 @@ function SignedIn({ user }: { user: User }) {
       return setTab('phone')
     }
     if (req.kind === 'caller') return void openCallerCustomer(req.number)
+    if (req.kind === 'callend') return checkCallEnd()
     if (!teamIds.includes(req.teamId)) return
     if (req.teamId !== team?.id) selectTeam(req.teamId)
     if (req.kind === 'notice') return setTab('notices')

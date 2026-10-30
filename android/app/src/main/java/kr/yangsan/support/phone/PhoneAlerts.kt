@@ -39,6 +39,7 @@ object PhoneAlerts {
     private val OLD_CHANNELS = listOf("sms", "missed", "caller")
     private const val ID_CALLER = 1001
     private const val ID_MISSED = 1002
+    private const val ID_AFTER = 1003
 
     // 우리 앱 화면이 앞에 있으면 문자·부재중 알림은 띄우지 않는다 (앱 안 빨간 숫자로 보임)
     @Volatile var foreground = false
@@ -48,13 +49,14 @@ object PhoneAlerts {
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     // { customers: { "01012345678": { n: 이름, c: 회사, x: 다음 연락 } }, sms, missed, caller }
-    fun save(ctx: Context, customers: JSONObject, sms: Boolean, missed: Boolean, caller: Boolean, personal: Boolean) {
+    fun save(ctx: Context, customers: JSONObject, sms: Boolean, missed: Boolean, caller: Boolean, personal: Boolean, memo: Boolean) {
         prefs(ctx).edit()
             .putString("customers", customers.toString())
             .putBoolean("sms", sms)
             .putBoolean("missed", missed)
             .putBoolean("caller", caller)
             .putBoolean("personal", personal)
+            .putBoolean("memo", memo)
             .apply()
     }
 
@@ -215,7 +217,13 @@ object PhoneAlerts {
         val p = prefs(ctx)
         val ringAt = p.getLong("ring_at", 0)
         val answered = p.getBoolean("offhook", false)
+        val ringNumber = p.getString("ring_number", null)
         p.edit().remove("ring_at").remove("ring_number").remove("offhook").apply()
+        // 받은 전화를 끊으면 바로 메모 (1.6.0): 고객이거나 모르는 번호일 때 우리 앱을 앞으로 (폰 연락처에 있는 개인 번호는 그대로)
+        if (ringAt != 0L && answered) {
+            if (!ringNumber.isNullOrBlank() && on(ctx, "memo")) afterCall(ctx, ringNumber)
+            return done()
+        }
         if (ringAt == 0L || answered || !on(ctx, "missed")) return done()
         // 통화 기록에 적히기까지 조금 걸린다 (폰마다 달라 2.5초 → 5초 → 9초에 다시 본다)
         Thread {
@@ -272,6 +280,56 @@ object PhoneAlerts {
         )
         return true
     }
+
+    // 받은 전화가 끝남 → "다른 앱 위에 표시"를 허용했으면 우리 앱을 바로 열고(메모 창은 웹앱이 통화 기록을 보고 띄움),
+    // 아니면 눌러서 여는 알림(소리 없이 위에 잠깐 뜸). 우리 앱이 이미 앞에 있으면 웹앱이 알아서 띄우므로 아무것도 안 한다.
+    private fun afterCall(ctx: Context, number: String) {
+        if (foreground) return
+        val work = isCustomer(ctx, number)
+        if (!work && hasContactName(ctx, number)) return
+        val path = "/?callend=" + Uri.encode(number)
+        if (Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(ctx)) {
+            try {
+                ctx.startActivity(
+                    Intent(ctx, MainActivity::class.java)
+                        .setAction("kr.yangsan.support.CALLEND")
+                        .putExtra("open", path)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                )
+                return
+            } catch (_: Exception) {
+                // 막히면 아래 알림으로
+            }
+        }
+        val title = if (work) "📝 ${nameFor(ctx, number)} 통화 메모" else "📝 모르는 번호 · ${format(number)}"
+        post(
+            ctx, ID_AFTER,
+            NotificationCompat.Builder(ctx, CH_CALLER)
+                .setSmallIcon(R.drawable.ic_stat_app)
+                .setContentTitle(title)
+                .setContentText(if (work) "방금 받은 전화 · 눌러서 메모 남기기" else "고객으로 저장할까요? 눌러서 정하기")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setSilent(true)
+                .setAutoCancel(true)
+                .setTimeoutAfter(10 * 60_000)
+                .setContentIntent(open(ctx, path, ID_AFTER)),
+        )
+    }
+
+    private fun hasContactName(ctx: Context, number: String): Boolean {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return false
+        return try {
+            ctx.contentResolver.query(
+                Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number)),
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null,
+            )?.use { it.moveToFirst() } ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun clearAfterCall(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_AFTER)
 
     // 앱에서 그 화면을 보면 알림을 지운다
     fun clear(ctx: Context, kind: String, number: String?) {
