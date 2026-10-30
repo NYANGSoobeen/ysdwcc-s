@@ -19,6 +19,7 @@ export type CallEntry = {
   type: number // 1 받은 전화, 2 건 전화, 3 부재중, 5 거절, 6 차단
   date: number
   duration: number // 초
+  approx?: boolean // 아이폰·PC: 실제 통화 시간을 알 수 없어, 앱에서 걸고 돌아오기까지 걸린 시간(어림값)
 }
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number }
 export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number }
@@ -162,8 +163,10 @@ export function useDeviceContacts(enabled: boolean) {
 // ── 전화 걸기 ──
 // 아이폰·브라우저는 앱에서 건 전화를 이 기기에만 기록한다 (최근 기록 화면용, 서버에 안 올림).
 const APP_CALLS_KEY = 'phone-app-calls'
+// 앱 전화 기록이 바뀌면 (통화 시간 어림값을 적었을 때) 최근기록 화면이 다시 읽는다
+export const APP_CALLS_EVENT = 'app-calls-changed'
 const PENDING_KEY = 'phone-call-pending'
-export type PendingCall = { number: string; customerId?: string; at: number }
+export type PendingCall = { number: string; customerId?: string; at: number; id?: string; approxSec?: number }
 
 export function appCalls(): CallEntry[] {
   try {
@@ -217,10 +220,11 @@ export async function startCall(number: string, customerId?: string, name?: stri
 // tel: 로 걸기 (아이폰·브라우저, 휴대폰과 연결한 PC). 돌아오면 통화 메모 창이 뜨게 기억해 둔다.
 export function dialByLink(number: string, customerId?: string) {
   try {
-    const list = [{ id: String(Date.now()), number, name: '', type: 2, date: Date.now(), duration: 0 }, ...appCalls()].slice(0, 200)
+    const id = String(Date.now())
+    const list = [{ id, number, name: '', type: 2, date: Date.now(), duration: 0 }, ...appCalls()].slice(0, 200)
     localStorage.setItem(APP_CALLS_KEY, JSON.stringify(list))
-    // 돌아오면 메모 창 (화면 6)
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ number, customerId, at: Date.now() } satisfies PendingCall))
+    // 돌아오면 메모 창 (화면 6), 앱 밖에 있던 시간을 통화 시간 어림값으로
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ number, customerId, at: Date.now(), id } satisfies PendingCall))
   } catch {
     // 기억하지 못하면 메모 창만 안 뜬다.
   }
@@ -235,7 +239,15 @@ export function takePendingCall(): PendingCall | null {
     // 전화 앱으로 넘어갔다 돌아온 경우만 (바로 돌아오면 아직 통화 전일 수 있어 기다린다)
     if (Date.now() - p.at < 3000) return null
     sessionStorage.removeItem(PENDING_KEY)
-    return Date.now() - p.at < 3 * 3600 * 1000 ? p : null
+    if (Date.now() - p.at >= 3 * 3600 * 1000) return null
+    // 통화 시간 어림값 = 앱에서 건 뒤 돌아오기까지 (신호 가는 시간·통화 뒤 다른 일을 한 시간도 들어감)
+    const approxSec = Math.round((Date.now() - p.at) / 1000)
+    if (p.id) {
+      const list = appCalls().map((c) => (c.id === p.id ? { ...c, duration: approxSec, approx: true } : c))
+      localStorage.setItem(APP_CALLS_KEY, JSON.stringify(list))
+      window.dispatchEvent(new Event(APP_CALLS_EVENT))
+    }
+    return { ...p, approxSec }
   } catch {
     return null
   }
@@ -293,6 +305,14 @@ export function callTypeLabel(type: number) {
   if (type === 5) return { icon: '⊘', label: '거절한 전화', kind: 'missed' }
   if (type === 6) return { icon: '⊘', label: '차단한 전화', kind: 'missed' }
   return { icon: '•', label: '통화', kind: 'out' }
+}
+
+// 어림값은 분 단위로만: "약 4분", 1분이 안 되면 "약 1분 미만"
+export function approxDurationText(sec: number) {
+  if (sec <= 0) return ''
+  if (sec < 60) return '약 1분 미만'
+  const m = Math.round(sec / 60)
+  return m >= 60 ? `약 ${Math.floor(m / 60)}시간 ${m % 60}분` : `약 ${m}분`
 }
 
 export function durationText(sec: number) {

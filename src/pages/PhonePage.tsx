@@ -7,6 +7,8 @@ import {
   appCalls,
   callTypeLabel,
   dayLabel,
+  approxDurationText,
+  APP_CALLS_EVENT,
   durationText,
   hasPhoneNative,
   isPcDevice,
@@ -277,6 +279,13 @@ function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: bool
   }
   useEffect(load, [native])
   usePhoneChanged('calls', load)
+  // 아이폰·PC: 돌아와서 통화 시간 어림값을 적으면 다시 읽는다
+  useEffect(() => {
+    if (native) return
+    const reload = () => setCalls(appCalls())
+    window.addEventListener(APP_CALLS_EVENT, reload)
+    return () => window.removeEventListener(APP_CALLS_EVENT, reload)
+  }, [native])
 
   const groups = useMemo(() => {
     const words = query.trim().toLowerCase()
@@ -363,7 +372,7 @@ function CallRow({ group, ctx, day }: { group: Group; ctx: RowCtx; day: string |
             icon: '📝',
             label: '통화 메모 남기기',
             onSelect: () =>
-              openCallMemo({ customerId: customer.id, name: customer.name, company: customer.company, number: c.number, kind: c.type === 2 ? '발신 통화' : '수신 통화', at: c.date, duration: c.duration }),
+              openCallMemo({ customerId: customer.id, name: customer.name, company: customer.company, number: c.number, kind: c.type === 2 ? '발신 통화' : '수신 통화', at: c.date, duration: c.duration, approx: c.approx }),
           },
         ]
       : []
@@ -396,7 +405,7 @@ function CallRow({ group, ctx, day }: { group: Group; ctx: RowCtx; day: string |
               </span>{' '}
               {name ? prettyNumber(c.number) : t.label}
               {customer?.company && ` · ${customer.company}`}
-              {c.duration > 0 && ` · ${durationText(c.duration)}`}
+              {c.duration > 0 && ` · ${c.approx ? approxDurationText(c.duration) : durationText(c.duration)}`}
             </div>
           </div>
           <span className="call-time muted">{timeText(c.date)}</span>

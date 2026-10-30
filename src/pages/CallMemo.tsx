@@ -7,6 +7,7 @@ import { phonesIn } from '../importCustomers.ts'
 import { guessKind, MEMO_MAX, onSharedMemo, readClipboard, takeSharedMemo } from '../sharedMemo.ts'
 import type { Team } from '../hooks.ts'
 import {
+  approxDurationText,
   CALL_MEMO_CHECKED,
   durationText,
   hasPhoneNative,
@@ -31,6 +32,7 @@ export type CallMemoTarget = {
   kind: string // '발신 통화' | '수신 통화'
   at?: number
   duration?: number
+  approx?: boolean // 통화 시간이 어림값 (아이폰·PC: 앱 밖에 있던 시간)
   body?: string // 미리 채울 내용 (통신사 앱 통화 요약)
   summary?: boolean
 }
@@ -71,11 +73,11 @@ export function CallMemoWatcher({ team }: { team: Team; uid: string }) {
       if (p.customerId) {
         const snap = await getDoc(doc(db, 'customers', p.customerId)).catch(() => null)
         if (snap?.exists()) {
-          setTarget({ customerId: p.customerId, name: snap.get('name'), company: snap.get('company'), number: p.number, kind: '발신 통화', at: p.at })
+          setTarget({ customerId: p.customerId, name: snap.get('name'), company: snap.get('company'), number: p.number, kind: '발신 통화', at: p.at, duration: p.approxSec, approx: true })
           return
         }
       }
-      const t = await customerTarget(team.id, p.number, '발신 통화', { at: p.at })
+      const t = await customerTarget(team.id, p.number, '발신 통화', { at: p.at, duration: p.approxSec, approx: true })
       if (t) setTarget(t)
     }
     document.addEventListener('visibilitychange', check)
@@ -168,7 +170,7 @@ function CallMemoSheet({ teamId, target, onClose }: { teamId: string; target: Ca
     }
   }
 
-  const info = [target.number && formatPhone(target.number), target.at && timeText(target.at), target.duration && durationText(target.duration)]
+  const info = [target.number && formatPhone(target.number), target.at && timeText(target.at), target.duration && (target.approx ? approxDurationText(target.duration) : durationText(target.duration))]
     .filter(Boolean)
     .join(' · ')
   return (
