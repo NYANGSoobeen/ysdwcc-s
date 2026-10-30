@@ -4230,6 +4230,8 @@ a.st-link-btn {
   font-weight: 700;
 }
 .notice-handle-row {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   height: 0;
@@ -4243,6 +4245,12 @@ a.st-link-btn {
   line-height: 1;
   user-select: none;
   touch-action: none;
+}
+.notice-handle-row .notice-handle {
+  margin-top: 6px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.6);
 }
 .notice-pin-band .notice-handle {
   color: var(--accent-text);
@@ -4271,9 +4279,43 @@ a.st-link-btn {
   line-height: 1.65;
   font-size: 15px;
 }
-.notice-card .photos {
+/* 카드 맨 위 사진 칸 (프론트 앱 공지처럼): 높이 220px, 사진은 가운데에 잘리지 않게, 남는 곳은 연한 바탕 */
+.notice-cover {
+  position: relative;
+  background: color-mix(in srgb, var(--chat-bg) 45%, var(--surface));
+}
+.notice-cover-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.notice-cover-track::-webkit-scrollbar {
+  display: none;
+}
+.notice-cover-img {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 220px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  scroll-snap-align: center;
+  cursor: zoom-in;
+}
+.shell.desktop .notice-cover-img {
+  height: 260px;
+}
+.notice-cover-count {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  padding: 2px 9px;
   border-radius: 10px;
-  overflow: hidden;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  font-size: 11.5px;
+  pointer-events: none;
 }
 .notice-foot {
   display: flex;

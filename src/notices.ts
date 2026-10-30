@@ -6,7 +6,7 @@ import { auth, db, storage } from './firebase.ts'
 
 // 📢 공지 게시판 (7번): 팀마다 teams/{teamId}/notices/{id}
 // {title(없어도 됨), body, photos[{path, thumbPath, width, height, size, thumbSize}], authorUid, createdAt, editedAt, editedBy, stk, stkLast, pinned, order}
-// 사진은 채팅처럼 줄여서(긴 쪽 1600px + 썸네일 400px) Storage teams/{teamId}/notices/{id}/ 에 둔다.
+// 사진은 줄여서(긴 쪽 1600px + 카드용 800px, 반씩 나눠 줄여 깨지지 않게) Storage teams/{teamId}/notices/{id}/ 에 둔다.
 // 공지를 고치거나 지우면 Functions(onNoticeWritten)가 안 쓰는 사진을 지운다.
 // 보는 화면에서만 최근 50개를 실시간으로 받는다.
 
@@ -100,7 +100,7 @@ export async function saveNotice(
   try {
     for (const [i, file] of data.files.entries()) {
       const photo = await resizeToJpeg(file, 1600)
-      const thumb = await resizeToJpeg(file, 400)
+      const thumb = await resizeToJpeg(file, 800) // 카드 맨 위 220px 칸에 또렷하게(휴대폰 3배 화면)
       const path = `${folder}/${stamp}_${i}.jpg`
       const thumbPath = `${folder}/${stamp}_${i}_thumb.jpg`
       await uploadBytes(ref(storage, path), photo.blob, meta)

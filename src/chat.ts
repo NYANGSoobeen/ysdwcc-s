@@ -409,15 +409,36 @@ export async function setReaction(teamId: string, channelId: string, messageId: 
 }
 
 export async function resizeToJpeg(file: File | Blob, maxSide: number, quality = JPEG_QUALITY) {
-  const bitmap = await createImageBitmap(file)
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
-  const width = Math.round(bitmap.width * scale)
-  const height = Math.round(bitmap.height * scale)
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
 
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height)
+  // 큰 사진을 한 번에 확 줄이면(특히 아이폰 Safari) 글자·선이 깨져 보인다 → 반씩 여러 번 줄인다 (프론트 앱과 같은 방식)
+  const draw = (src: CanvasImageSource, w: number, h: number) => {
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')!
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.fillStyle = '#fff' // 투명한 PNG가 검게 나오지 않게
+    ctx.fillRect(0, 0, w, h)
+    ctx.drawImage(src, 0, 0, w, h)
+    return c
+  }
+  let cur: CanvasImageSource = bitmap
+  let cw = bitmap.width
+  let ch = bitmap.height
+  while (cw / 2 >= width * 1.3 && ch / 2 >= height * 1.3) {
+    const next = draw(cur, Math.round(cw / 2), Math.round(ch / 2))
+    if (cur instanceof HTMLCanvasElement) cur.width = cur.height = 0
+    cur = next
+    cw = next.width
+    ch = next.height
+  }
+  const canvas = draw(cur, width, height)
+  if (cur instanceof HTMLCanvasElement) cur.width = cur.height = 0
   bitmap.close()
 
   const blob = await new Promise<Blob>((resolve, reject) =>

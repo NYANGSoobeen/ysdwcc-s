@@ -11,7 +11,6 @@ import { MAX_STUCK, stick, stuckList, unstick, type StickerChoice } from '../stu
 import { ask, Modal, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 import { showStickerInfo, StickerPicker, StuckLayer } from '../ui/Stuck.tsx'
-import { photoCols } from './ChatPage.tsx'
 import { useIsDesktop } from '../useMedia.ts'
 
 // 📢 공지 게시판 (7번): 쓰기·수정·삭제(편집 이상, 고치기·지우기는 쓴 사람이나 관리자), 사진 첨부, 🏷️ 스티커(팀원 모두).
@@ -129,16 +128,10 @@ export function NoticesPage({ team, uid }: { team: Team; uid: string }) {
           ) : (
             handle && <div className="notice-handle-row">{handle}</div>
           )}
+          {n.photos.length > 0 && <NoticePhotos photos={n.photos} onOpen={(i) => setViewer({ photos, index: i })} />}
           <div className="notice-inner">
             {n.title && <h3 className="notice-title">{n.title}</h3>}
             {n.body && <p className="notice-text">{linkifyText(n.body)}</p>}
-            {n.photos.length > 0 && (
-              <div className={`photos cols-${photoCols(n.photos.length)}`}>
-                {n.photos.map((a, i) => (
-                  <StorageImage key={a.thumbPath} path={a.thumbPath} className="photo" onClick={() => setViewer({ photos, index: i })} />
-                ))}
-              </div>
-            )}
             <footer className="notice-foot">
               <span className="muted">
                 {names[n.authorUid] ?? '나간 팀원'} · {when(n.createdAt)}
@@ -405,5 +398,24 @@ function NoticeEditor({ teamId, notice, onClose }: { teamId: string; notice: Not
         </div>
       </form>
     </Modal>
+  )
+}
+
+// 카드 맨 위 사진 칸 (프론트 앱 공지처럼): 칸 높이는 같고 사진은 가운데에 잘리지 않게. 여러 장이면 옆으로 밀어 넘김.
+function NoticePhotos({ photos, onOpen }: { photos: Attachment[]; onOpen: (i: number) => void }) {
+  const [at, setAt] = useState(0)
+  return (
+    <div className="notice-cover">
+      <div className="notice-cover-track" onScroll={(e) => setAt(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))}>
+        {photos.map((a, i) => (
+          <StorageImage key={a.thumbPath} path={a.thumbPath} className="notice-cover-img" onClick={() => onOpen(i)} />
+        ))}
+      </div>
+      {photos.length > 1 && (
+        <span className="notice-cover-count">
+          📷 {at + 1} / {photos.length}
+        </span>
+      )}
+    </div>
   )
 }
