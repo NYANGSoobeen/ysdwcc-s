@@ -46,7 +46,7 @@ type PhonePlugin = {
   contacts(): Promise<{ contacts: DeviceContact[] }>
   addListener(event: 'changed', fn: (e: { what: 'calls' | 'sms' }) => void): Promise<PluginListenerHandle>
   // 🔔 전화·문자 알림 (갤럭시 앱 1.4.0, android/.../phone/PhoneAlerts.kt)
-  alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean }): Promise<void>
+  alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean; personal: boolean }): Promise<void>
   alertsStatus(): Promise<AlertsStatus>
   requestAlerts(): Promise<AlertsStatus>
   clearAlerts(o: { kind: 'sms' | 'missed'; number?: string }): Promise<void>
@@ -485,8 +485,9 @@ function missedSeenAt() {
 export function unreadThread(t: SmsThread, seen: Record<string, number>) {
   return t.unread > 0 && !t.mine && t.date > (seen[t.threadId] ?? 0)
 }
-// ✉️ 숫자는 업무(지금 팀 고객) 문자 대화만 센다 (2026-10-30 사용자 요청: 개인 연락은 빼고)
-export function usePhoneBadges(enabled: boolean, teamId: string | null) {
+// ✉️ 숫자는 업무(지금 팀 고객) 문자 대화만 센다 (2026-10-30 사용자 요청: 개인 연락은 빼고).
+// 🔔 알림 설정에서 "개인 문자도 세기"를 켜면(countPersonal) 개인 문자 대화도 센다.
+export function usePhoneBadges(enabled: boolean, teamId: string | null, countPersonal = false) {
   const perms = usePhonePerms()
   const on = enabled && hasPhoneNative
   const calls = useCallLog(on && perms.calls, () => {})
@@ -499,10 +500,10 @@ export function usePhoneBadges(enabled: boolean, teamId: string | null) {
     const seen = smsSeen()
     return {
       missed: on && calls ? calls.filter((c) => c.type === 3 && c.date > since).length : 0,
-      sms: on && threads && teamId ? threads.filter((t) => unreadThread(t, seen) && find(t.address)).length : 0,
+      sms: on && threads && teamId ? threads.filter((t) => unreadThread(t, seen) && (countPersonal || find(t.address))).length : 0,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, calls, threads, tick, find, teamId])
+  }, [on, calls, threads, tick, find, teamId, countPersonal])
 }
 
 // 로그아웃하면 이 기기의 전화·문자 기록(앱에서 건 전화, 본 시각)을 지운다.

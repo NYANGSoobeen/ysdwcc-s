@@ -32,6 +32,8 @@ object PhoneAlerts {
     private const val PREFS = "phone_alerts"
     // 1.5.0: 앱 아이콘 빨간 숫자는 업무(고객) 문자만 세도록 채널을 새로 만든다 (채널 설정은 만든 뒤 못 바꿈)
     private const val CH_SMS = "sms_work"
+    // 1.5.1: "개인 문자도 세기"를 켰을 때 개인 문자 알림 (앱 아이콘 숫자에 들어감)
+    private const val CH_SMS_PERSONAL = "sms_personal"
     private const val CH_MISSED = "missed2"
     private const val CH_CALLER = "caller2"
     private val OLD_CHANNELS = listOf("sms", "missed", "caller")
@@ -46,12 +48,13 @@ object PhoneAlerts {
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     // { customers: { "01012345678": { n: 이름, c: 회사, x: 다음 연락 } }, sms, missed, caller }
-    fun save(ctx: Context, customers: JSONObject, sms: Boolean, missed: Boolean, caller: Boolean) {
+    fun save(ctx: Context, customers: JSONObject, sms: Boolean, missed: Boolean, caller: Boolean, personal: Boolean) {
         prefs(ctx).edit()
             .putString("customers", customers.toString())
             .putBoolean("sms", sms)
             .putBoolean("missed", missed)
             .putBoolean("caller", caller)
+            .putBoolean("personal", personal)
             .apply()
     }
 
@@ -115,6 +118,7 @@ object PhoneAlerts {
             NotificationChannel(id, name, importance).apply { setSound(null, null); enableVibration(false); setShowBadge(badge) }
         OLD_CHANNELS.forEach { nm.deleteNotificationChannel(it) }
         nm.createNotificationChannel(ch(CH_SMS, "업무 문자", NotificationManager.IMPORTANCE_DEFAULT, true))
+        nm.createNotificationChannel(ch(CH_SMS_PERSONAL, "개인 문자", NotificationManager.IMPORTANCE_DEFAULT, true))
         nm.createNotificationChannel(ch(CH_MISSED, "부재중 전화", NotificationManager.IMPORTANCE_DEFAULT, false))
         nm.createNotificationChannel(ch(CH_CALLER, "고객 전화 정보", NotificationManager.IMPORTANCE_HIGH, false))
     }
@@ -144,7 +148,9 @@ object PhoneAlerts {
     // 업무(고객) 문자만 알린다 (2026-10-30 사용자 요청: 개인 연락은 빼고 업무 연락만 앱 아이콘 숫자로).
     // 개인 문자는 삼성 메시지 알림이 그대로 온다. 앱을 보고 있어도 띄워 숫자를 올리되, 그 대화를 보고 있으면 안 띄운다.
     fun onSms(ctx: Context, address: String, body: String) {
-        if (!on(ctx, "sms") || address.isBlank() || !isCustomer(ctx, address)) return
+        val work = isCustomer(ctx, address)
+        // 개인 문자는 "개인 문자도 세기"를 켰을 때만 (사용자 요청: 선택적으로)
+        if (!on(ctx, "sms") || address.isBlank() || (!work && !on(ctx, "personal"))) return
         if (foreground && viewing?.let { OffDay.local(it) == OffDay.local(address) } == true) return
         val key = "sms_" + OffDay.local(address)
         val lines = try { JSONArray(prefs(ctx).getString(key, "[]")) } catch (_: Exception) { JSONArray() }
@@ -157,7 +163,7 @@ object PhoneAlerts {
         for (i in 0 until lines.length()) style.addLine(lines.getString(i))
         post(
             ctx, smsId(address),
-            NotificationCompat.Builder(ctx, CH_SMS)
+            NotificationCompat.Builder(ctx, if (work) CH_SMS else CH_SMS_PERSONAL)
                 .setSmallIcon(R.drawable.ic_stat_app)
                 .setContentTitle(name)
                 .setContentText(body)

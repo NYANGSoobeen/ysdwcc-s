@@ -8,7 +8,8 @@ import { hasPhoneNative, PhoneNative, type AlertCustomer, type AlertsStatus } fr
 // 삼성 기본 앱 알림은 그대로 두고 우리 앱도 조용한 알림을 띄워, 누르면 우리 앱의 그 화면이 열린다.
 //   ✉️ 문자 → 그 대화 · 📞 부재중 전화 → 최근기록 · 고객 전화가 울릴 때 → "[업무] 이름 · 회사 · 다음 연락" 띠 → 그 고객
 // 웹앱은 내 모든 팀의 고객(번호 → 이름·회사·다음 연락)과 켜 둔 종류를 폰에 넣어 둔다. 앱이 꺼져 있어도 폰이 혼자 알린다.
-export type AlertKinds = { sms: boolean; missed: boolean; caller: boolean }
+// personal: 개인 문자도 알리고 숫자로 세기 (기본 꺼짐, 2026-10-30 사용자 요청 "선택적으로")
+export type AlertKinds = { sms: boolean; missed: boolean; caller: boolean; personal: boolean }
 const KINDS_KEY = 'phone-alerts'
 const ASKED_KEY = 'phone-alerts-asked'
 const CHANGED = 'phone-alerts-changed'
@@ -25,9 +26,9 @@ export async function alertsSupported() {
 
 export function alertKinds(): AlertKinds {
   try {
-    return { sms: true, missed: true, caller: true, ...(JSON.parse(localStorage.getItem(KINDS_KEY) ?? '{}') as Partial<AlertKinds>) }
+    return { sms: true, missed: true, caller: true, personal: false, ...(JSON.parse(localStorage.getItem(KINDS_KEY) ?? '{}') as Partial<AlertKinds>) }
   } catch {
-    return { sms: true, missed: true, caller: true }
+    return { sms: true, missed: true, caller: true, personal: false }
   }
 }
 export function setAlertKinds(kinds: AlertKinds) {
@@ -37,6 +38,17 @@ export function setAlertKinds(kinds: AlertKinds) {
     // 기억 못 하면 다음에 앱을 열 때 모두 켜짐
   }
   window.dispatchEvent(new Event(CHANGED))
+}
+
+// 화면(아래 탭 숫자)이 "개인 문자도 세기"를 따라가게
+export function useAlertKinds() {
+  const [kinds, setKinds] = useState(alertKinds)
+  useEffect(() => {
+    const onChange = () => setKinds(alertKinds())
+    window.addEventListener(CHANGED, onChange)
+    return () => window.removeEventListener(CHANGED, onChange)
+  }, [])
+  return kinds
 }
 
 export async function requestAlerts(): Promise<AlertsStatus | null> {

@@ -32,7 +32,8 @@ const CHAT_KINDS: { key: keyof PushKinds; icon: string; label: string; desc: str
   { key: 'front', icon: '🏌️', label: '프론트 채팅', desc: '들어가 있는 프론트 채팅방에 새 메시지가 오면' },
 ]
 const PHONE_KINDS: { key: keyof AlertKinds; icon: string; label: string; desc: string }[] = [
-  { key: 'sms', icon: '✉️', label: '업무 문자', desc: '고객이 보낸 문자·채팅+ (개인 문자는 삼성 메시지 알림만). 앱 아이콘 빨간 숫자도 업무 문자만 세요' },
+  { key: 'sms', icon: '✉️', label: '업무 문자', desc: '고객이 보낸 문자·채팅+. 앱 아이콘·✉️ 탭 빨간 숫자로도 세요' },
+  { key: 'personal', icon: '👤', label: '개인 문자도 세기', desc: '켜면 개인(고객이 아닌) 문자도 우리 앱 알림을 띄우고 빨간 숫자에 같이 세요. 끄면 개인 문자는 삼성 메시지 알림만' },
   { key: 'missed', icon: '📞', label: '부재중 전화', desc: '못 받은 전화가 있으면 (누르면 최근기록)' },
   { key: 'caller', icon: '📇', label: '고객 전화 정보', desc: '고객 번호로 전화가 울릴 때 이름·회사·다음 연락을 띠로 (누르면 고객 화면)' },
 ]
@@ -43,6 +44,7 @@ const SOUNDS: { id: PushSound; icon: string; label: string; desc: string }[] = [
 ]
 
 export function AlertsPage({ unread, workSms }: { unread: number; workSms: number }) {
+  // workSms: 아래 탭 ✉️ 숫자 (개인 문자도 세기를 켜면 개인 포함)
   return (
     <div className="page alerts-page">
       <header className="page-header">
@@ -287,7 +289,9 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
           <Check ok={!!status?.sms}>문자 받기: {status?.sms ? '허용됨' : '꺼짐'}</Check>
           <Check ok={!!status?.phonestate}>전화 상태(부재중·고객 전화): {status?.phonestate ? '허용됨' : '꺼짐'}</Check>
           <Check ok={!!chat}>💬 채팅+ 문자 받기(알림 접근): {chat ? '켜짐' : '꺼짐 — 채팅+로 온 문자가 안 보여요'}</Check>
-          <Check ok>앱 아이콘 숫자: 업무 문자 {workSms} (개인 문자는 안 셈)</Check>
+          <Check ok>
+            앱 아이콘 숫자: {kinds.personal ? `문자 ${workSms} (업무 + 개인)` : `업무 문자 ${workSms} (개인 문자는 안 셈)`}
+          </Check>
         </div>
         <div className="button-row">
           {!ready && (

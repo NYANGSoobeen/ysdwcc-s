@@ -14,7 +14,7 @@ import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPush
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsAutoOn, useNativeContactsSync } from './native.ts'
 import { isPcDevice, usePhoneBadges, usePrefetchPhoneNames } from './phone.ts'
-import { useAlertsSync } from './phoneAlerts.ts'
+import { useAlertKinds, useAlertsSync } from './phoneAlerts.ts'
 import { normalizePhone } from './customers.ts'
 import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
@@ -138,7 +138,8 @@ function SignedIn({ user }: { user: User }) {
   // 📞·✉️ 화면을 알림에서 다시 열 때 새로 그리기 (보던 칸·대화를 알림 내용으로)
   const [phoneNonce, setPhoneNonce] = useState(0)
   // 갤럭시 앱: 앱을 열면 통화 기록·문자 목록을 미리 읽고(화면이 빨리 뜨게) 아래 탭 빨간 숫자를 센다
-  const phoneBadges = usePhoneBadges(!desktop, team?.id ?? null)
+  const alertKindsNow = useAlertKinds()
+  const phoneBadges = usePhoneBadges(!desktop, team?.id ?? null, alertKindsNow.personal)
   // 휴대폰: 지금 팀 고객·폰 연락처 이름을 미리 읽어 📞·✉️ 화면의 번호가 바로 이름으로 보이게
   usePrefetchPhoneNames(team?.id ?? null, !desktop)
 

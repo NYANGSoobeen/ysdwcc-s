@@ -187,6 +187,7 @@ class PhonePlugin : Plugin() {
             call.getBoolean("sms", true)!!,
             call.getBoolean("missed", true)!!,
             call.getBoolean("caller", true)!!,
+            call.getBoolean("personal", false)!!,
         )
         call.resolve()
     }
