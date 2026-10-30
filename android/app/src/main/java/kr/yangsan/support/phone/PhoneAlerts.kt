@@ -217,11 +217,13 @@ object PhoneAlerts {
         val answered = p.getBoolean("offhook", false)
         p.edit().remove("ring_at").remove("ring_number").remove("offhook").apply()
         if (ringAt == 0L || answered || !on(ctx, "missed")) return done()
-        // 통화 기록에 적히기까지 조금 걸린다
+        // 통화 기록에 적히기까지 조금 걸린다 (폰마다 달라 2.5초 → 5초 → 9초에 다시 본다)
         Thread {
             try {
-                Thread.sleep(2500)
-                checkMissed(ctx, ringAt - 10_000)
+                for (wait in listOf(2500L, 2500L, 4000L)) {
+                    Thread.sleep(wait)
+                    if (checkMissed(ctx, ringAt - 10_000)) break
+                }
             } catch (_: Exception) {
             } finally {
                 done()
@@ -229,15 +231,23 @@ object PhoneAlerts {
         }.start()
     }
 
-    private fun checkMissed(ctx: Context, since: Long) {
-        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) return
+    // 통화 기록에 이번 통화가 적혀 있으면 true (부재중이면 알림). 아직 안 적혔으면 false → 조금 뒤 다시.
+    // 1.5.2: 예전엔 우리 앱이 앞에 있으면 안 띄웠는데, 부재중 뒤 통화 화면이 닫히면서 우리 앱이 다시 앞으로 오는 경우가 많아
+    // 알림이 거의 안 떴다 → 늘 띄운다 (📞 최근기록을 보면 지워짐).
+    private fun checkMissed(ctx: Context, since: Long): Boolean {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) return true
+        var found = false
         var number: String? = null
         ctx.contentResolver.query(
             CallLog.Calls.CONTENT_URI, arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.TYPE),
             "${CallLog.Calls.DATE} > ?", arrayOf(since.toString()), "${CallLog.Calls.DATE} DESC",
-        )?.use { c -> if (c.moveToFirst() && c.getInt(1) == CallLog.Calls.MISSED_TYPE) number = c.getString(0) ?: "" }
-        val n = number ?: return
-        if (foreground) return
+        )?.use { c ->
+            if (c.moveToFirst()) {
+                found = true
+                if (c.getInt(1) == CallLog.Calls.MISSED_TYPE) number = c.getString(0) ?: ""
+            }
+        }
+        val n = number ?: return found
         val p = prefs(ctx)
         val names = try { JSONArray(p.getString("missed_names", "[]")) } catch (_: Exception) { JSONArray() }
         val name = if (n.isBlank()) "발신자 정보 없음" else nameFor(ctx, n)
@@ -260,6 +270,7 @@ object PhoneAlerts {
                 .setAutoCancel(true)
                 .setContentIntent(open(ctx, "/?calls=missed", ID_MISSED)),
         )
+        return true
     }
 
     // 앱에서 그 화면을 보면 알림을 지운다
