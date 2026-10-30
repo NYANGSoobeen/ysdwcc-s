@@ -6113,7 +6113,7 @@ a.button:not(.primary) {
   color: var(--merino);
   opacity: 0.8;
 }
-.apk-update-banner a.button,
+.apk-update-banner .button,
 .apk-update-banner a.button:visited {
   display: inline-flex;
   align-items: center;

@@ -7,6 +7,7 @@ import com.getcapacitor.BridgeActivity
 import kr.yangsan.support.contacts.ContactsSyncPlugin
 import kr.yangsan.support.files.FileSaverPlugin
 import kr.yangsan.support.phone.PhonePlugin
+import kr.yangsan.support.update.UpdaterPlugin
 
 class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -14,6 +15,7 @@ class MainActivity : BridgeActivity() {
         registerPlugin(ContactsSyncPlugin::class.java)
         registerPlugin(FileSaverPlugin::class.java)
         registerPlugin(PhonePlugin::class.java)
+        registerPlugin(UpdaterPlugin::class.java)
         super.onCreate(savedInstanceState)
         openSharedText(intent)
     }
