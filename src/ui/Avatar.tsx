@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { tell } from './dialogs.tsx'
+import { CenteredGlyph } from './inkCenter.tsx'
 
 // 프로필 사진 (8번). users/{uid}.avatar = '' (이름 첫 글자 동그라미) | 'preset:아이디' (기본 그림) | 'avatars/{uid}/파일.jpg' (사진)
 // 팀원 프로필을 불러오는 곳(useProfile, useMemberProfiles)이 여기 저장소에 넣어 두면, 어디서든 uid만으로 그린다.
@@ -62,7 +63,7 @@ export function AvatarFace({ uid, name, avatar, className }: { uid: string; name
   if (preset)
     return (
       <span className={`avatar preset ${className ?? ''}`} style={{ background: preset.bg }} aria-hidden="true">
-        {preset.emoji}
+        <CenteredGlyph text={preset.emoji} />
       </span>
     )
   if (avatar?.startsWith('avatars/'))
@@ -75,7 +76,7 @@ export function AvatarFace({ uid, name, avatar, className }: { uid: string; name
   for (const ch of uid) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   return (
     <span className={`avatar ${className ?? ''}`} style={{ background: AVATAR_COLORS[hash % AVATAR_COLORS.length] }} aria-hidden="true">
-      {name.slice(0, 1)}
+      <CenteredGlyph text={name.slice(0, 1)} />
     </span>
   )
 }

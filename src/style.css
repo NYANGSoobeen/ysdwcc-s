@@ -4249,7 +4249,8 @@ a.st-link-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 14px;
+  padding: 3px 10px 3px 14px;
+  min-height: 28px;
   background: var(--accent);
   color: var(--accent-text);
   font-size: 12.5px;
@@ -4263,24 +4264,45 @@ a.st-link-btn {
   height: 0;
   padding: 0 12px;
 }
+/* ⠿ 끌어서 순서 바꾸기: 글자 대신 점 6개를 그려 26px 네모 정가운데에 (글자는 글꼴마다 쏠림) */
 .notice-handle {
-  cursor: grab;
-  padding: 6px 2px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1;
+  cursor: grab;
   user-select: none;
   touch-action: none;
 }
+.notice-handle:hover {
+  background: rgb(var(--shadow) / 0.08);
+}
+.grip-dots {
+  display: grid;
+  grid-template-columns: repeat(2, 3px);
+  gap: 3px;
+}
+.grip-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
 .notice-handle-row .notice-handle {
-  margin-top: 6px;
-  padding: 3px 4px;
-  border-radius: 6px;
-  background: rgb(255 255 255 / 0.6);
+  margin-top: 8px;
+}
+/* 사진 위에 놓일 때만 밝은 바탕 (같은 26px 네모) */
+.notice-handle-row:has(+ .notice-cover) .notice-handle {
+  background: rgb(255 255 255 / 0.8);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
 }
 .notice-pin-band .notice-handle {
+  width: 22px;
+  height: 22px;
   color: var(--accent-text);
-  padding: 0;
 }
 .notice-inner {
   display: flex;
@@ -4444,6 +4466,13 @@ a.st-link-btn {
 .avatar {
   flex-shrink: 0;
   overflow: hidden;
+  line-height: 1;
+}
+/* 글자·그림은 CenteredGlyph가 잉크를 재서 정가운데로 옮긴다 */
+.avatar .glyph,
+.person-dot .glyph {
+  display: block;
+  line-height: 1;
 }
 .avatar.photo img,
 .avatar.photo .photo-loading,
@@ -4541,6 +4570,9 @@ a.st-link-btn {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+}
+.modal.profile-editor p.small {
+  margin: 0 0 -6px;
 }
 .modal.profile-editor {
   width: min(460px, calc(100vw - 24px));

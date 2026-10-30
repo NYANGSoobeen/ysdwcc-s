@@ -3,6 +3,7 @@ import { createCustomer, findCustomerByPhone, formatPhone, normalizePhone, type 
 import { APK_URL } from '../native.ts'
 import { askPermission, phoneKey, PhoneNative, prettyNumber, type DeviceContact } from '../phone.ts'
 import { askText, tell, toast } from '../ui/dialogs.tsx'
+import { CenteredGlyph } from '../ui/inkCenter.tsx'
 
 // 전화·문자 화면이 같이 쓰는 것들
 
@@ -69,7 +70,7 @@ export async function copyNumber(number: string) {
 export function PersonDot({ name, work }: { name?: string; work: boolean }) {
   return (
     <span className={work ? 'person-dot work' : 'person-dot'} aria-hidden="true">
-      {name ? name.slice(0, 1) : '👤'}
+      <CenteredGlyph text={name ? name.slice(0, 1) : '👤'} />
     </span>
   )
 }

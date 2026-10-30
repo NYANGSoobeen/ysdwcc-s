@@ -110,7 +110,14 @@ export function NoticesPage({ team, uid }: { team: Team; uid: string }) {
       t?.toDate().toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) ?? '방금'
     const handle = canWrite && !q && (
       <span className="notice-handle" onPointerDown={(e) => dragStart(e, n.id)} aria-label="끌어서 순서 바꾸기" title="끌어서 순서 바꾸기">
-        ⠿
+        <span className="grip-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
       </span>
     )
     return (
