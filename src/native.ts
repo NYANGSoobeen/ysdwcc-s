@@ -17,19 +17,54 @@ export const isAndroidApp = Capacitor.isNativePlatform() && Capacitor.getPlatfor
 // 갤럭시 앱에서만 다르게 할 화면 모양(아래 탭 여백 등)을 위해
 if (isAndroidApp) document.documentElement.classList.add('android-app')
 
-// 갤럭시 앱 아래 탭 밑 여백 (2026-10-30, 사용자 요청 "APK에서 탭 아래가 비어 보임"):
-// Capacitor가 넣는 --safe-area-inset-bottom은 안드로이드 아래 줄(제스처 막대 또는 ◁ ○ ▢ 버튼) 높이다.
-// 제스처 막대(얇음, 32px 미만)면 그 칸은 비어 보이기만 해서 여백을 0으로 → 탭이 화면 맨 아래에 붙는다.
-// ◁ ○ ▢ 버튼 줄이면 버튼이 탭을 가리지 않게 그 높이만큼 비운다(그 칸에는 버튼이 보여 비어 보이지 않음).
+// 갤럭시 앱 위·아래 여백 (2026-10-30, 사용자 요청 "APK에서 탭 아래가 비어 보임"):
+// Capacitor는 --safe-area-inset-top/bottom에 상태 표시줄·안드로이드 아래 줄 높이를 늘 넣는데,
+// 안드로이드 14 이하 갤럭시(화면이 상태 표시줄과 ◁ ○ ▢ 줄 "사이"에만 그려짐)에서는 안드로이드가 이미 비켜 줬으므로
+// 그 값만큼 또 비우면 머리줄 위와 아래 탭 밑이 빈 칸이 된다(실제 화면으로 확인). 그래서 웹뷰가 실제로 막대 밑까지
+// 그려지는지(웹뷰 높이 ≈ 화면 전체 높이) 보고, 아니면 두 값을 0으로 되돌린다.
+// 막대 밑까지 그려지는 폰(안드로이드 15+)은: 아래 탭 밑 여백 = 제스처 막대(32px 미만)면 0, ◁ ○ ▢ 버튼 줄이면 그 높이.
 if (isAndroidApp) {
   const root = document.documentElement
+  const raw = { top: 0, bottom: 0 }
+  let tallest = 0
+  let screenH = 0
+  let zeroed = false
+  const read = (name: string) => parseFloat(root.style.getPropertyValue(name)) || 0
+  const set = (name: string, v: string) => {
+    if (root.style.getPropertyValue(name) !== v) root.style.setProperty(name, v)
+  }
   const apply = () => {
-    const inset = parseFloat(root.style.getPropertyValue('--safe-area-inset-bottom')) || 0
-    const pad = inset < 32 ? '0px' : `${inset}px`
-    if (root.style.getPropertyValue('--tabs-bottom-pad') !== pad) root.style.setProperty('--tabs-bottom-pad', pad)
+    // Capacitor가 새로 넣은 값은 기억해 둔다 (우리가 0으로 되돌린 값은 빼고)
+    for (const side of ['top', 'bottom'] as const) {
+      const v = root.style.getPropertyValue(`--safe-area-inset-${side}`)
+      if (v && v.trim() !== '0px') raw[side] = read(`--safe-area-inset-${side}`)
+    }
+    if (screen.height !== screenH) {
+      screenH = screen.height // 화면을 돌리면 새로 잰다
+      tallest = 0
+    }
+    // 키보드가 열리면 높이가 줄어서, 지금까지 본 가장 큰 높이로 판단한다
+    tallest = Math.max(tallest, window.innerHeight)
+    const margin = Math.max(raw.top, raw.bottom, 24) / 2
+    const edgeToEdge = tallest > screenH - margin
+    if (!edgeToEdge) {
+      set('--safe-area-inset-top', '0px')
+      set('--safe-area-inset-bottom', '0px')
+      set('--tabs-bottom-pad', '0px')
+      zeroed = true
+      return
+    }
+    // 막대 밑까지 그려지면 값은 Capacitor에 맡긴다 (키보드가 열리면 아래 값을 0으로 바꿔 줌)
+    if (zeroed) {
+      zeroed = false
+      set('--safe-area-inset-top', `${raw.top}px`)
+      set('--safe-area-inset-bottom', `${raw.bottom}px`)
+    }
+    set('--tabs-bottom-pad', raw.bottom < 32 ? '0px' : `${raw.bottom}px`)
   }
   apply()
   new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['style'] })
+  window.addEventListener('resize', apply)
 }
 export const isAndroidBrowser = !isAndroidApp && /Android/i.test(navigator.userAgent)
 export const NativeContacts = registerPlugin<ContactsSyncPlugin>('ContactsSync')
