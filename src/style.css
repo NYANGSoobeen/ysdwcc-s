@@ -5505,3 +5505,20 @@ a.button.disabled {
 .pc-guide-link {
   color: var(--muted);
 }
+.pc-link-card h3 {
+  margin: 0 0 6px;
+}
+.pc-link-test {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.pc-link-test input {
+  flex: 1;
+  min-width: 0;
+}
+a.button:not(.primary) {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+}

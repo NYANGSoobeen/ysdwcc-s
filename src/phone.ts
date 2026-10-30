@@ -179,11 +179,31 @@ export const isPcDevice = () =>
   matchMedia('(hover: hover) and (pointer: fine)').matches &&
   !/iPhone|iPad|iPod|Android/.test(navigator.userAgent)
 
+// 💻 이 PC를 휴대폰과 연결했는지 (윈도우 "휴대폰과 연결", 맥 "iPhone에서 통화"). 켜 두면 PC에서도 📞가 바로 걸린다.
+const PC_LINK_KEY = 'pc-phone-linked'
+export const PC_LINK_CHANGED = 'pc-phone-linked-changed'
+export function pcPhoneLinked() {
+  try {
+    return localStorage.getItem(PC_LINK_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+export function setPcPhoneLinked(on: boolean) {
+  try {
+    if (on) localStorage.setItem(PC_LINK_KEY, '1')
+    else localStorage.removeItem(PC_LINK_KEY)
+  } catch {
+    // 기억 못 하면 매번 안내 창
+  }
+  window.dispatchEvent(new Event(PC_LINK_CHANGED))
+}
+
 export async function startCall(number: string, customerId?: string, name?: string) {
-  if (isPcDevice()) {
+  if (isPcDevice() && !pcPhoneLinked()) {
     // PC: "휴대폰으로 걸어주세요" 안내 (src/pcGuide.tsx)
     const { showCallGuide } = await import('./pcGuide.tsx')
-    showCallGuide(number, name)
+    showCallGuide(number, name, customerId)
     return
   }
   if (hasPhoneNative) {
@@ -191,6 +211,11 @@ export async function startCall(number: string, customerId?: string, name?: stri
     await PhoneNative.dial({ number })
     return
   }
+  dialByLink(number, customerId)
+}
+
+// tel: 로 걸기 (아이폰·브라우저, 휴대폰과 연결한 PC). 돌아오면 통화 메모 창이 뜨게 기억해 둔다.
+export function dialByLink(number: string, customerId?: string) {
   try {
     const list = [{ id: String(Date.now()), number, name: '', type: 2, date: Date.now(), duration: 0 }, ...appCalls()].slice(0, 200)
     localStorage.setItem(APP_CALLS_KEY, JSON.stringify(list))
