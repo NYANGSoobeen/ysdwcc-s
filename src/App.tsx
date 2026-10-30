@@ -16,6 +16,7 @@ import { useNativeContactsSync } from './native.ts'
 import { isPcDevice } from './phone.ts'
 import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
+import { ApkUpdateBanner } from './ApkUpdateBanner.tsx'
 import { StaffPage } from './pages/StaffPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
@@ -406,6 +407,7 @@ function SignedIn({ user }: { user: User }) {
           )}
         </div>
         <CallMemoWatcher team={team} uid={user.uid} />
+        <ApkUpdateBanner />
         {!desktop && (
           <MenuDrawer {...menuProps} open={menuOpen} onClose={() => setMenuOpen(false)}>
             {teamSelect}

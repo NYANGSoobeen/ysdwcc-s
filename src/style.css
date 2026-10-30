@@ -6081,3 +6081,58 @@ a.button:not(.primary) {
   padding-top: calc(6px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   padding-bottom: 6px;
 }
+
+/* 📱 갤럭시 앱 새 버전 띠 (아래 탭 위) */
+.apk-update-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(66px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 12px;
+  background: var(--venice-deep);
+  color: var(--merino);
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
+.apk-update-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.apk-update-banner .later {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--merino);
+  opacity: 0.8;
+}
+.apk-update-banner a.button,
+.apk-update-banner a.button:visited {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--rock) !important;
+  color: var(--venice-deep) !important;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* 휴대폰 아래 탭: 위아래 빈칸을 줄여 화면 아래에 붙게 (2026-10-30).
+   갤럭시 앱은 아래 탭 밑이 안드로이드 ◁ ○ ||| 버튼 줄이라, 그 줄 윗부분(버튼 없는 곳)까지 8px 내려 붙인다 */
+.bottom-tabs button {
+  min-height: 50px;
+  padding: 4px 0 2px;
+}
+.android-app .bottom-tabs {
+  padding-bottom: max(0px, calc(var(--safe-area-inset-bottom, 0px) - 8px));
+}

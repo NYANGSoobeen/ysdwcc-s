@@ -76,6 +76,15 @@ class PhonePlugin : Plugin() {
 
     private fun granted(alias: String) = getPermissionState(alias) == PermissionState.GRANTED
 
+    // 설치된 갤럭시 앱 버전 (웹앱이 "새 버전이 있어요" 띠를 띄울지 정한다, 1.3.1부터)
+    @PluginMethod
+    fun appInfo(call: PluginCall) {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        @Suppress("DEPRECATION")
+        val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
+        call.resolve(JSObject().put("versionCode", code).put("versionName", info.versionName ?: ""))
+    }
+
     @PluginMethod
     fun status(call: PluginCall) {
         call.resolve(

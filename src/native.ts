@@ -14,11 +14,31 @@ type ContactsSyncPlugin = {
 type NativeContact = { id: string; name: string; company: string; phones: string[] }
 
 export const isAndroidApp = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
+// 갤럭시 앱에서만 다르게 할 화면 모양(아래 탭 여백 등)을 위해
+if (isAndroidApp) document.documentElement.classList.add('android-app')
 export const isAndroidBrowser = !isAndroidApp && /Android/i.test(navigator.userAgent)
 export const NativeContacts = registerPlugin<ContactsSyncPlugin>('ContactsSync')
 
 // 갤럭시 앱 설치 파일 주소. Firebase Hosting은 APK 파일을 올리지 못해(배포 실패) GitHub 저장소에서 받는다.
 export const APK_URL = 'https://github.com/NYANGSoobeen/ysdwcc-s/raw/main/release/yangsan-support.apk'
+// 저장소에 올린 최신 갤럭시 앱 (release/yangsan-support.apk). APK를 새로 만들면 android/app/build.gradle과 같이 올린다.
+export const LATEST_APK = { code: 6, name: '1.3.1' }
+
+// 이 폰에 깔린 갤럭시 앱 버전. 1.3.1부터는 Phone.appInfo로 정확히, 그 전 앱은 들어 있는 기능으로 짐작한다
+// (Phone 플러그인 = 1.3.0, FileSaver = 1.2.x, 그 밖 = 1.1 이하).
+export async function installedApkCode(): Promise<number> {
+  if (!isAndroidApp) return 0
+  try {
+    const Phone = registerPlugin<{ appInfo(): Promise<{ versionCode: number }> }>('Phone')
+    if (Capacitor.isPluginAvailable('Phone')) {
+      const info = await Phone.appInfo().catch(() => null)
+      return info?.versionCode ?? 5
+    }
+  } catch {
+    // 아래 짐작으로
+  }
+  return Capacitor.isPluginAvailable('FileSaver') ? 4 : 3
+}
 
 const ENABLED_KEY = 'native-contacts-enabled'
 const CHANGED = 'native-contacts-changed'
