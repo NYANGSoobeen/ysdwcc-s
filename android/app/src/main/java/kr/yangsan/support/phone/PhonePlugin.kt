@@ -429,7 +429,7 @@ class PhonePlugin : Plugin() {
                 val out = JSArray()
                 val shown = latest.values.sortedByDescending { it.getLong("date") }.take(limit)
                 // 보일 사진 문자들의 글을 한 번에 읽는다
-                val texts = Mms.texts(context, shown.mapNotNull { mmsOf[it.getString("threadId")!!.toLong()]?.first })
+                val texts = Mms.texts(context, shown.mapNotNull { mmsOf[it.getString("threadId")!!.toLongOrNull() ?: -1L]?.first })
                 shown.forEach {
                     val t = it.getString("threadId")!!.toLongOrNull() ?: -1L
                     if (it.optBoolean("rcs")) mmsOf.remove(t)
