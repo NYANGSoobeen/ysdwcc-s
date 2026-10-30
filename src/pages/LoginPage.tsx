@@ -67,7 +67,7 @@ function LoginForm() {
     setError('')
     try {
       await logIn(loginId, password, keep)
-      saveLoginId(remember ? loginId.trim() : null)
+      saveLoginId(remember || (isNativeApp && keep) ? loginId.trim() : null)
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)
@@ -97,25 +97,28 @@ function LoginForm() {
         required
       />
       <div className="login-checks">
-        {!isNativeApp && (
+        <label className="check">
+          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+          로그인 유지
+        </label>
+        {/* 갤럭시 앱은 로그인 유지가 켜져 있으면 아이디를 저절로 기억해서 칸이 필요 없다 */}
+        {!(isNativeApp && keep) && (
           <label className="check">
-            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
-            로그인 유지
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            아이디 저장
           </label>
         )}
-        <label className="check">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          아이디 저장
-        </label>
       </div>
-      {!isNativeApp && (
-        <p className="login-hint">
-          <span aria-hidden="true">🔒</span>{' '}
-          {keep
+      <p className={isNativeApp && !keep ? 'login-hint warn' : 'login-hint'}>
+        <span aria-hidden="true">{isNativeApp && !keep ? '⚠️' : '🔒'}</span>{' '}
+        {isNativeApp
+          ? keep
+            ? '로그아웃할 때까지 로그인이 유지돼요.'
+            : '끄면 앱을 닫거나 15분 넘게 안 쓸 때 로그아웃돼요. 로그아웃된 동안에는 휴무일 자동 응답, 걸려 온 전화에 고객 이름 표시, 통화 후 메모 창이 연동되지 않아요.'
+          : keep
             ? '로그아웃할 때까지 로그인이 유지돼요. 여러 사람이 쓰는 컴퓨터에서는 꺼 주세요.'
             : '브라우저를 닫거나 15분 넘게 앱을 닫아 두면 자동으로 로그아웃돼요.'}
-        </p>
-      )}
+      </p>
       {error && <p className="error">{error}</p>}
       <button className="primary login-submit" disabled={busy}>
         {busy ? '로그인 중…' : '로그인'}

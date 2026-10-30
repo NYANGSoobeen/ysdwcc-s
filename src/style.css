@@ -6065,3 +6065,11 @@ a.button:not(.primary) {
   white-space: pre-wrap;
   font-size: 14px;
 }
+/* 갤럭시 앱에서 로그인 유지를 끄면: 연동이 멈춘다는 안내 */
+.login-hint.warn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff4d6;
+  color: #7a5200;
+  line-height: 1.5;
+}

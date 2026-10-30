@@ -34,7 +34,8 @@ export const app = initializeApp(
       },
 )
 
-// 로그인 유지: 로그인 화면의 "로그인 유지" 체크칸. 기본값은 휴대폰 켬, PC 끔. 갤럭시 앱은 항상 켬.
+// 로그인 유지: 로그인 화면의 "로그인 유지" 체크칸. 기본값은 휴대폰·갤럭시 앱 켬, PC 끔.
+// (갤럭시 앱도 2026-10-30부터 끌 수 있다. 끄면 로그아웃된 동안 휴무일 자동 응답·연락처 표시·통화 후 메모가 멈춘다고 안내)
 // 켬: 로그인을 계속 유지하고 오프라인 캐시를 쓴다.
 // 끔(여러 사람이 쓰는 컴퓨터): 브라우저를 닫으면 로그아웃(세션 저장), 고객 정보를 디스크에 남기지 않음
 // (메모리 캐시), 15분 넘게 앱을 닫아 두었으면 다시 로그인 (src/session.ts).
@@ -45,7 +46,6 @@ const isPc = !isNativeApp && matchMedia('(hover: hover) and (pointer: fine)').ma
 const KEEP_KEY = 'keep-signed-in'
 
 export function keepSignedIn() {
-  if (isNativeApp) return true
   try {
     const saved = localStorage.getItem(KEEP_KEY)
     if (saved !== null) return saved === '1'
