@@ -24,6 +24,7 @@ import {
   type SmsMessage,
 } from '../phone.ts'
 import { clearSmsAlert } from '../phoneAlerts.ts'
+import { isAndroidBrowser } from '../native.ts'
 import { useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, Modal, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
@@ -139,7 +140,9 @@ export function MessagesPage({ team, onOpenCustomer }: Props) {
                 ? '권한을 허용하면 이 폰의 문자를 여기서 바로 보고 보낼 수 있어요.'
                 : isPcDevice()
                   ? '컴퓨터에서는 문자를 읽거나 보낼 수 없어요. "새 문자"로 받는 사람과 내용을 정하면 휴대폰으로 보낼 수 있게 번호와 내용을 크게 보여 드려요.'
-                  : '아이폰·브라우저는 폰의 문자를 읽을 수 없어요. "새 문자"로 받는 사람과 내용을 정하면 기본 문자 앱이 열려요. 고객 화면·전화 화면의 ✉️ 버튼도 같아요.'}
+                  : isAndroidBrowser
+                    ? '브라우저에서는 폰의 문자를 읽을 수 없어요(갤럭시 앱을 설치하면 여기서 바로 보고 보내요). "새 문자"로 받는 사람과 내용을 정하면 기본 문자 앱이 열려요.'
+                    : '아이폰은 폰의 문자를 읽을 수 없어요. "새 문자"로 받는 사람과 내용을 정하면 기본 문자 앱이 열려요. 고객 화면·전화 화면의 ✉️ 버튼도 같아요.'}
             </p>
             <button type="button" className="primary" onClick={() => setComposing('')}>
               ✏️ 새 문자 쓰기

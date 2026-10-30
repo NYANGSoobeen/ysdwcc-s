@@ -5,6 +5,8 @@ import type { Profile } from '../hooks.ts'
 import { defaultOffDayMessage, saveOffDayReply, useMyOffDates, type OffDayReply } from '../offday.ts'
 import { askPermission, hasPhoneNative, oldAndroidApp, PhoneNative, timeText, type OffDayLog } from '../phone.ts'
 import { dateKey } from '../schedule/roster.ts'
+import { isIOS } from '../download.ts'
+import { isAndroidBrowser } from '../native.ts'
 import { tell, toast } from '../ui/dialogs.tsx'
 
 // 내 정보: 🌙 휴무일 자동 응답 카드
@@ -102,7 +104,11 @@ export function OffDayCard({ uid, profile }: { uid: string; profile: Profile }) 
         <p className="muted small">
           {oldAndroidApp
             ? '갤럭시 앱 새 버전(1.3.0)에서 쓸 수 있어요.'
-            : '전화를 무음으로 하고 문자를 자동으로 보내는 건 갤럭시 앱에서만 돼요. 아이폰은 휴무일에 설정 → 집중 모드 → 업무 시간 외를 켜 주세요. 문구는 여기서 정해 두면 갤럭시로 바꿨을 때 그대로 써요.'}
+            : isIOS
+              ? '아이폰은 전화를 무음으로 하거나 문자를 자동으로 보낼 수 없어요. 휴무일에는 설정 → 집중 모드 → 업무 시간 외를 켜 주세요.'
+              : isAndroidBrowser
+                ? '전화를 무음으로 하고 문자를 자동으로 보내는 건 갤럭시 앱에서 돼요. 설정 맨 위에서 갤럭시 앱을 설치해 주세요.'
+                : '전화를 무음으로 하고 문자를 자동으로 보내는 건 휴대폰(갤럭시 앱)에서 켜요. 문구는 여기서 정해 두면 그대로 써요.'}
         </p>
       ) : (
         <label className="check-row">

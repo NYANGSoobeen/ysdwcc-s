@@ -25,6 +25,7 @@ function serverUrl() {
 }
 
 const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent)
+const isAndroidPhone = /Android/i.test(navigator.userAgent)
 
 export function ContactsSync({ uid }: { uid: string }) {
   return isAndroidApp ? <NativeContactsSync /> : <CardDavSync uid={uid} />
@@ -187,6 +188,7 @@ function CardDavSync({ uid }: { uid: string }) {
         )}
       </div>
 
+      {!isIPhone && !isAndroidPhone && (
       <div className="chips" role="tablist" aria-label="폰 종류">
         <button type="button" role="tab" aria-selected={guide === 'iphone'} className={guide === 'iphone' ? 'chip selected' : 'chip'} onClick={() => setGuide('iphone')}>
           아이폰 설정 방법
@@ -195,6 +197,7 @@ function CardDavSync({ uid }: { uid: string }) {
           갤럭시 설정 방법
         </button>
       </div>
+      )}
 
       {guide === 'iphone' ? (
         <ol className="steps">

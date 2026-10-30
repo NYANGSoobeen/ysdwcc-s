@@ -76,6 +76,7 @@
   - 저장(`src/download.ts`의 `saveFile`): 갤럭시 앱은 Kotlin `FileSaver` 플러그인(`android/.../files/FileSaverPlugin.kt`, 갤럭시 앱 1.2.0부터)으로 Download 폴더에 바로 저장(사진은 갤러리 Download 앨범), 아이폰은 공유 창(이미지 저장/파일에 저장, 보이는 사진을 미리 받아 둠), PC·갤럭시 브라우저는 일반 다운로드. 예전 갤럭시 앱이면 업데이트 안내. 붙은 곳: 사진 크게 보기 💾, 근무표 크게 보기 💾, 근무표 파일 메뉴.
   - 가로 스크롤 없음·스크롤 막대 숨김(휴대폰): 버튼은 기본이 한 줄(nowrap)이라 카드 안 긴 버튼 글자가 화면 밖으로 나가 가로 스크롤이 생겼다(관리자 화면 용량 관리 버튼, 2026-10-28) → 카드 안 버튼은 줄바꿈(`keep-all`), 휴대폰 `.page-body`는 `overflow-x: hidden`, `@media (hover: none)`에서 모든 스크롤 막대를 숨긴다(밀어서 움직이는 건 그대로).
   - 노치·홈 바: `env(safe-area-inset-*)`는 모두 `var(--safe-area-inset-*, env(...))`로 쓴다 (갤럭시 앱은 Capacitor가 변수를 넣어 줌).
+  - **안내는 그 기기 것만(2026-10-30, 사용자 요청):** 아이폰에서는 아이폰 안내만, 갤럭시(앱·크롬)에서는 갤럭시 안내만 보인다(설정의 연락처 구독 방법·통화 요약·휴무일 자동 응답, 📞·✉️ 화면 안내, 고객 가져오기의 .vcf 내보내기·폰 연락처 고르기). PC는 둘 다(어느 폰을 쓰는지 몰라서). 기기 판단은 `download.ts`의 `isIOS`, `native.ts`의 `isAndroidApp`/`isAndroidBrowser`(또는 UA의 Android). 새 안내를 넣을 때도 이렇게 나눈다.
   - 홈 화면 추가: 내 정보 맨 위 `InstallCard`(이미 홈 화면 앱이거나 갤럭시 앱이면 안 보임). 크롬은 "앱 설치" 버튼(beforeinstallprompt), 아이폰은 Safari 공유 → 홈 화면에 추가 안내.
 - **단체 채팅방 (공통 기능 4-1):**
   - 기본 방(`main`, 이름 기본 "전체 채팅"): 메시지는 처음부터 쓰던 `teams/{teamId}/messages`. 지울 수 없고 이름은 관리자만 바꾼다(`channels/main` 문서가 그때 생김).

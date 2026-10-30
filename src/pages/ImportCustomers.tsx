@@ -1,3 +1,4 @@
+import { isIOS } from '../download.ts'
 import { useMemo, useRef, useState } from 'react'
 import { errorMessage } from '../auth.ts'
 import { formatPhone, type Customer } from '../customers.ts'
@@ -31,6 +32,8 @@ const STATUS_LABEL: Record<Candidate['status'], string> = {
   'no-name': '이름 없음',
 }
 const SHOW_MAX = 300
+
+const isAndroidDevice = /Android/i.test(navigator.userAgent)
 
 export function ImportCustomers({ teamId, customers, onClose }: { teamId: string; customers: Customer[]; onClose: () => void }) {
   const [source, setSource] = useState<Source | null>(null)
@@ -178,7 +181,13 @@ export function ImportCustomers({ teamId, customers, onClose }: { teamId: string
           <button type="button" onClick={() => fileInput.current?.click()} disabled={!!busy}>
             <span aria-hidden="true">📇</span>
             <strong>연락처 파일 (.vcf)</strong>
-            <small>아이폰: 연락처 앱 → 목록을 길게 누르기 → 내보내기. 구글 연락처 → 내보내기 → vCard.</small>
+            <small>
+              {isIOS
+                ? '연락처 앱 → 목록을 길게 누르기 → 내보내기.'
+                : isAndroidDevice
+                  ? '삼성 연락처 → ⋮ → 연락처 관리 → 연락처 가져오기/내보내기 → 내보내기. 또는 구글 연락처 → 내보내기 → vCard.'
+                  : '아이폰: 연락처 앱 → 목록을 길게 누르기 → 내보내기. 구글 연락처 → 내보내기 → vCard.'}
+            </small>
           </button>
           {hasPhoneNative ? (
             <button type="button" onClick={() => void openPhoneContacts()} disabled={!!busy}>
@@ -186,7 +195,7 @@ export function ImportCustomers({ teamId, customers, onClose }: { teamId: string
               <strong>이 폰 연락처에서 고르기</strong>
               <small>폰에 저장된 연락처 중 업무 고객만 체크해서 가져와요.</small>
             </button>
-          ) : (
+          ) : isIOS ? null : (
             <div className="import-source-note muted small">
               📱 폰 연락처에서 바로 고르기는 {oldAndroidApp ? '갤럭시 앱 새 버전(1.3.0)' : '갤럭시 앱'}에서 할 수 있어요.
             </div>

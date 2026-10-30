@@ -5,6 +5,8 @@ import { toast } from '../ui/dialogs.tsx'
 // 설정: 📝 통신사 앱(에이닷 등) 통화 요약 → 상담 메모 안내. 녹음 파일은 올리지 않고 요약 글만.
 const SHORTCUT_URL = 'https://ysdwcc-s.web.app/?memo='
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+// 갤럭시(앱·크롬)에서는 아이폰 단축어 안내를 숨긴다
+const isAndroid = /Android/i.test(navigator.userAgent)
 
 export function SummaryGuideCard() {
   const [open, setOpen] = useState(isIOS)
@@ -31,14 +33,18 @@ export function SummaryGuideCard() {
             <strong>갤럭시:</strong> 요약에서 <strong>공유</strong> → <strong>양산동원로얄CC지원팀</strong> (갤럭시 앱 1.3.0, 또는 크롬에서 "앱 설치"한 홈 화면 앱)
           </li>
         )}
-        <li>
-          <strong>아이폰:</strong> 요약에서 <strong>공유</strong> → <strong>지원팀 메모</strong> (아래 단축어를 한 번 만들어 두면 나와요)
-        </li>
+        {!isAndroid && (
+          <li>
+            <strong>아이폰:</strong> 요약에서 <strong>공유</strong> → <strong>지원팀 메모</strong> (아래 단축어를 한 번 만들어 두면 나와요)
+          </li>
+        )}
       </ul>
+      {!isAndroid && (
       <button type="button" className="ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
         {open ? '▾' : '▸'} 아이폰 "지원팀 메모" 단축어 만들기 (한 번만)
       </button>
-      {open && (
+      )}
+      {open && !isAndroid && (
         <ol className="summary-steps small">
           <li>아이폰 기본 앱 <strong>단축어</strong>를 열고 오른쪽 위 <strong>＋</strong>.</li>
           <li>

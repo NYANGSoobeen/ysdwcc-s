@@ -1,3 +1,4 @@
+import { isIOS } from '../download.ts'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
@@ -137,7 +138,9 @@ export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; u
                 <p>
                   <strong>처음이라면 고객을 한꺼번에 가져오세요</strong>
                 </p>
-                <p className="muted small">거래처 엑셀·CSV, 연락처 파일(.vcf), 갤럭시 앱은 폰 연락처에서 골라 올 수 있어요. 고객 번호의 통화·문자는 "업무"로 나뉘어요.</p>
+                <p className="muted small">
+                  거래처 엑셀·CSV, 연락처 파일(.vcf){isIOS ? '' : ', 갤럭시 앱은 폰 연락처'}에서 골라 올 수 있어요. 고객 번호의 통화·문자는 "업무"로 나뉘어요.
+                </p>
                 <button type="button" className="primary" onClick={() => setImporting(true)}>
                   📥 한꺼번에 가져오기
                 </button>

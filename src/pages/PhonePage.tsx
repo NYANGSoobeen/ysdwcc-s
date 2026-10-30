@@ -1,3 +1,4 @@
+import { isAndroidBrowser } from '../native.ts'
 import { DEVICE_NOTES_KEY, deviceNoteNumbers, noteKey } from '../privateNotes.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Customer } from '../customers.ts'
@@ -353,7 +354,9 @@ function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: bool
               ? '권한을 허용하기 전에는 이 앱에서 건 전화만 보여요.'
               : isPcDevice()
                 ? '컴퓨터에는 전화 회선이 없어요. 📞를 누르면 휴대폰으로 걸 수 있게 번호를 크게 보여 드려요.'
-                : '아이폰·브라우저는 폰의 통화 기록을 읽을 수 없어서, 이 앱에서 건 전화만 보여요. 받은 전화는 아래 버튼으로 메모해 주세요.'}
+                : isAndroidBrowser
+                  ? '브라우저에서는 폰의 통화 기록을 읽을 수 없어서, 이 앱에서 건 전화만 보여요(갤럭시 앱을 설치하면 모든 통화가 보여요). 받은 전화는 아래 버튼으로 메모해 주세요.'
+                  : '아이폰은 폰의 통화 기록을 읽을 수 없어서, 이 앱에서 건 전화만 보여요. 받은 전화는 아래 버튼으로 메모해 주세요.'}
           </p>
           {ctx.canWrite && (
             <button type="button" onClick={ctx.pickMemo}>
