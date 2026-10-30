@@ -1,4 +1,8 @@
 import { isAndroidBrowser } from '../native.ts'
+import { RecentMemos } from './RecentMemos.tsx'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../firebase.ts'
+import { isIOS } from '../download.ts'
 import { DEVICE_NOTES_KEY, deviceNoteNumbers, noteKey } from '../privateNotes.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Customer } from '../customers.ts'
@@ -20,6 +24,7 @@ import {
   timeText,
   useDeviceContacts,
   markMissedSeen,
+  recordReceivedCall,
   useCallLog,
   usePhonePerms,
   useTeamCustomers,
@@ -38,9 +43,9 @@ type Sub = 'keypad' | 'recent' | 'contacts'
 const SUB_KEY = 'phone-sub'
 type Filter = 'all' | 'work' | 'personal' | 'missed'
 
-type Props = { team: Team; uid: string; onOpenCustomer: (id: string) => void; onOpenSms: (number: string, name?: string) => void }
+type Props = { team: Team; uid: string; onOpenCustomer: (id: string) => void; onOpenSms: (number: string, name?: string) => void; onOpenSettings?: () => void }
 
-export function PhonePage({ team, onOpenCustomer, onOpenSms }: Props) {
+export function PhonePage({ team, uid, onOpenCustomer, onOpenSms, onOpenSettings }: Props) {
   const [sub, setSubState] = useState<Sub>(() => {
     try {
       return (sessionStorage.getItem(SUB_KEY) as Sub) || 'recent'
@@ -98,6 +103,7 @@ export function PhonePage({ team, onOpenCustomer, onOpenSms }: Props) {
       </nav>
       <div className="page-body phone-body">
         {oldAndroidApp && <OldAppCard />}
+        {isIOS && <IPhoneCallerIdCard uid={uid} onOpenSettings={onOpenSettings} />}
         {sub === 'keypad' && <Keypad customers={customers ?? []} contacts={contacts} ctx={ctx} />}
         {sub === 'recent' && <Recent ctx={ctx} callsGranted={perms.calls} loaded={perms.loaded} />}
         {sub === 'contacts' && <Contacts customers={customers} contacts={contacts} contactsGranted={perms.contacts} ctx={ctx} />}
@@ -439,6 +445,7 @@ function CallRow({ group, ctx, day, hasNote }: { group: Group; ctx: RowCtx; day:
           <span className="call-time muted">{timeText(c.date)}</span>
         </div>
         {open && <RowActions actions={actions()} />}
+        {open && <RecentMemos number={c.number} customer={customer} />}
       </li>
     </>
   )
@@ -544,6 +551,7 @@ function ContactRow({ name, sub, number, customer, ctx }: { name: string; sub: s
         )}
       </div>
       {open && <RowActions actions={actions()} />}
+      {open && number && <RecentMemos number={number} customer={customer} />}
     </li>
   )
 }
@@ -553,6 +561,50 @@ async function pasteSummary() {
   const text = await readClipboard()
   if (!text) return toast('복사한 글이 없어요. 통신사 앱(에이닷 등)에서 통화 요약을 먼저 복사해 주세요.', { error: true, long: true })
   pushSharedMemo(text)
+}
+
+// 📲 아이폰: 걸려 온 전화에 고객 이름이 보이게(연락처 구독) 아직 설정 안 했으면 한 번 안내 (갤럭시 앱은 저절로 켜짐)
+const CALLER_ID_HIDE = 'iphone-callerid-hide'
+function IPhoneCallerIdCard({ uid, onOpenSettings }: { uid: string; onOpenSettings?: () => void }) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(CALLER_ID_HIDE)) return
+    } catch {
+      return
+    }
+    void getDoc(doc(db, 'users', uid, 'private', 'contactsSync'))
+      .then((snap) => setShow(snap.get('enabled') !== true))
+      .catch(() => {})
+  }, [uid])
+  if (!show) return null
+  const hide = () => {
+    try {
+      localStorage.setItem(CALLER_ID_HIDE, '1')
+    } catch {
+      // 다음에 또 보일 뿐
+    }
+    setShow(false)
+  }
+  return (
+    <div className="card phone-hint">
+      <p className="small">
+        <strong>📇 고객 전화가 오면 "[업무] 이름"으로 보이게 할까요?</strong>
+        <br />
+        <span className="muted">설정에서 한 번만 켜면 돼요 (아이폰에 한 번에 설정하기 버튼).</span>
+      </p>
+      <div className="button-row">
+        {onOpenSettings && (
+          <button type="button" className="primary" onClick={onOpenSettings}>
+            설정하러 가기
+          </button>
+        )}
+        <button type="button" className="ghost" onClick={hide}>
+          안 볼게요
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // "방금 받은 전화 메모하기": 고객을 골라 메모 창 열기
@@ -573,6 +625,7 @@ function MemoCustomerPicker({ customers, onClose }: { customers: Customer[]; onC
               className="call-row"
               onClick={() => {
                 onClose()
+                recordReceivedCall(p.number)
                 openCallMemo({ customerId: p.customer!.id, name: p.customer!.name, company: p.customer!.company, number: p.number, kind: '수신 통화', at: Date.now() })
               }}
             >

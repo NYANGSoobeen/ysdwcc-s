@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { useEffect, useMemo, useState } from 'react'
 import { normalizePhone, toCustomer, type Customer } from './customers.ts'
-import { db } from './firebase.ts'
+import { db, keepSignedIn } from './firebase.ts'
 import { isAndroidApp } from './native.ts'
 
 // 📞 전화 · ✉️ 문자 (삼성 전화·메시지 앱과 비슷하게).
@@ -128,44 +128,144 @@ export function usePhoneChanged(what: 'calls' | 'sms', fn: () => void) {
 // 번호 비교는 숫자만 남겨 국내 형식(+82…)으로 맞춘다.
 export const phoneKey = (n: string) => normalizePhone(n)
 
-// 전화·문자 화면을 보는 동안만 지금 팀 고객을 실시간으로 본다 (무료 사용량: 보는 화면만 구독).
-export function useTeamCustomers(teamId: string) {
-  const [customers, setCustomers] = useState<Customer[] | null>(null)
-  useEffect(
-    () =>
-      onSnapshot(query(collection(db, 'customers'), where('teamId', '==', teamId)), (snap) =>
-        setCustomers(snap.docs.map((d) => toCustomer(d.id, d.data()))),
-      ),
-    [teamId],
+// ── 번호 → 이름 빨리 바꾸기 (2026-10-30, "이름으로 바뀌는 게 느려요") ──
+// 1) 지금 팀 고객은 한 곳(store)에서만 실시간으로 보고 여러 화면이 나눠 쓴다. 휴대폰은 앱을 열 때부터 지켜보므로(App의
+//    prefetchPhoneNames) 📞·✉️ 화면을 열면 이미 이름이 있다. 화면을 다 닫아도 10분은 계속 지켜본다(다시 열 때 바로).
+// 2) 로그인 유지를 켠 기기는 "번호 → 고객 이름" 이름표를 기기에 기억해 두고(localStorage, 로그아웃하면 지움) 앱을 열자마자
+//    서버 응답을 기다리지 않고 그것부터 쓴다.
+type CustomerStore = { customers: Customer[] | null; users: number; unsub: (() => void) | null; timer?: ReturnType<typeof setTimeout> }
+const customerStores = new Map<string, CustomerStore>()
+const CUSTOMERS_EVENT = 'team-customers'
+const NAMES_KEY = 'customer-names:'
+type NameRow = [id: string, name: string, company: string, phones: string[]]
+
+function savedNames(teamId: string): Customer[] | null {
+  if (!keepSignedIn()) return null
+  try {
+    const rows = JSON.parse(localStorage.getItem(NAMES_KEY + teamId) ?? 'null') as NameRow[] | null
+    return rows?.map(([id, name, company, phones]) => toCustomer(id, { teamId, name, company, phones })) ?? null
+  } catch {
+    return null
+  }
+}
+function saveNames(teamId: string, customers: Customer[]) {
+  if (!keepSignedIn()) return
+  try {
+    const rows: NameRow[] = customers.map((c) => [c.id, c.name, c.company, c.phones])
+    localStorage.setItem(NAMES_KEY + teamId, JSON.stringify(rows))
+  } catch {
+    // 기억 못 하면 서버 응답을 기다릴 뿐
+  }
+}
+
+function customerStore(teamId: string) {
+  let st = customerStores.get(teamId)
+  if (!st) {
+    st = { customers: savedNames(teamId), users: 0, unsub: null }
+    customerStores.set(teamId, st)
+  }
+  return st
+}
+function holdCustomers(teamId: string) {
+  const st = customerStore(teamId)
+  st.users += 1
+  clearTimeout(st.timer)
+  st.unsub ??= onSnapshot(
+    query(collection(db, 'customers'), where('teamId', '==', teamId)),
+    (snap) => {
+      st.customers = snap.docs.map((d) => toCustomer(d.id, d.data()))
+      if (!snap.metadata.fromCache) saveNames(teamId, st.customers)
+      window.dispatchEvent(new CustomEvent(CUSTOMERS_EVENT, { detail: teamId }))
+    },
+    () => {},
   )
+  return () => {
+    st.users -= 1
+    if (st.users > 0) return
+    st.timer = setTimeout(() => {
+      st.unsub?.()
+      st.unsub = null
+    }, 10 * 60_000)
+  }
+}
+
+// 휴대폰: 앱을 열면 지금 팀 고객·폰 연락처 이름을 미리 읽어 둔다 (App에서 부름)
+export function usePrefetchPhoneNames(teamId: string | null, enabled: boolean) {
+  useEffect(() => (enabled && teamId ? holdCustomers(teamId) : undefined), [teamId, enabled])
+  const perms = usePhonePerms()
+  useEffect(() => {
+    if (enabled && perms.contacts) void loadDeviceContacts()
+  }, [enabled, perms.contacts])
+}
+
+export function useTeamCustomers(teamId: string) {
+  const [customers, setCustomers] = useState<Customer[] | null>(() => customerStore(teamId).customers)
+  useEffect(() => {
+    const update = (e?: Event) => {
+      if (!e || (e as CustomEvent).detail === teamId) setCustomers(customerStore(teamId).customers)
+    }
+    update()
+    window.addEventListener(CUSTOMERS_EVENT, update)
+    const release = holdCustomers(teamId)
+    return () => {
+      window.removeEventListener(CUSTOMERS_EVENT, update)
+      release()
+    }
+  }, [teamId])
   const byPhone = useMemo(() => {
     const map = new Map<string, Customer>()
     for (const c of customers ?? []) for (const p of c.phones) map.set(p, c)
     return map
   }, [customers])
-  return { customers, byPhone, find: (n: string) => byPhone.get(phoneKey(n)) }
+  // 같은 번호를 여러 줄에서 찾으니 번호 → 결과를 기억한다
+  const find = useMemo(() => {
+    const memo = new Map<string, Customer | undefined>()
+    return (n: string) => {
+      if (!memo.has(n)) memo.set(n, byPhone.get(phoneKey(n)))
+      return memo.get(n)
+    }
+  }, [byPhone])
+  return { customers, byPhone, find }
 }
 
-// 폰 연락처(개인) 이름: 갤럭시 앱에서만, 한 번 읽어 메모리에만 둔다.
+// 폰 연락처(개인) 이름: 갤럭시 앱에서만, 한 번 읽어 메모리에만 둔다 (앱을 열 때 미리 읽음).
 let contactsCache: DeviceContact[] | null = null
+let contactsLoading: Promise<void> | null = null
+const CONTACTS_EVENT = 'device-contacts'
+function loadDeviceContacts() {
+  if (!hasPhoneNative || contactsCache) return Promise.resolve()
+  contactsLoading ??= PhoneNative.contacts()
+    .then(({ contacts }) => {
+      contactsCache = contacts
+      window.dispatchEvent(new Event(CONTACTS_EVENT))
+    })
+    .catch(() => {})
+    .finally(() => (contactsLoading = null))
+  return contactsLoading
+}
 export function useDeviceContacts(enabled: boolean) {
   const [list, setList] = useState<DeviceContact[]>(contactsCache ?? [])
   useEffect(() => {
     if (!hasPhoneNative || !enabled) return
-    if (contactsCache) return setList(contactsCache)
-    void PhoneNative.contacts()
-      .then(({ contacts }) => {
-        contactsCache = contacts
-        setList(contacts)
-      })
-      .catch(() => {})
+    const update = () => contactsCache && setList(contactsCache)
+    update()
+    window.addEventListener(CONTACTS_EVENT, update)
+    void loadDeviceContacts()
+    return () => window.removeEventListener(CONTACTS_EVENT, update)
   }, [enabled])
   const byPhone = useMemo(() => {
     const map = new Map<string, string>()
     for (const c of list) map.set(phoneKey(c.number), c.name)
     return map
   }, [list])
-  return { contacts: list, nameOf: (n: string) => byPhone.get(phoneKey(n)) }
+  const nameOf = useMemo(() => {
+    const memo = new Map<string, string | undefined>()
+    return (n: string) => {
+      if (!memo.has(n)) memo.set(n, byPhone.get(phoneKey(n)))
+      return memo.get(n)
+    }
+  }, [byPhone])
+  return { contacts: list, nameOf }
 }
 
 // ── 전화 걸기 ──
@@ -223,6 +323,18 @@ export async function startCall(number: string, customerId?: string, name?: stri
     return
   }
   dialByLink(number, customerId)
+}
+
+// 아이폰·브라우저: "방금 받은 전화 메모하기"로 고른 받은 전화도 이 기기 최근기록에 남긴다 (갤럭시 앱은 폰 통화 기록이 있음)
+export function recordReceivedCall(number: string) {
+  if (hasPhoneNative || isPcDevice() || !number) return
+  try {
+    const list = [{ id: String(Date.now()), number, name: '', type: 1, date: Date.now(), duration: 0 }, ...appCalls()].slice(0, 200)
+    localStorage.setItem(APP_CALLS_KEY, JSON.stringify(list))
+    window.dispatchEvent(new Event(APP_CALLS_EVENT))
+  } catch {
+    // 기억 못 하면 최근기록에만 안 보인다
+  }
 }
 
 // tel: 로 걸기 (아이폰·브라우저, 휴대폰과 연결한 PC). 돌아오면 통화 메모 창이 뜨게 기억해 둔다.
@@ -395,6 +507,14 @@ export function wipePhoneData() {
   if (hasPhoneNative) void PhoneNative.alertsOff().catch(() => {})
   callsCache = null
   threadsCache = null
+  contactsCache = null
+  customerStores.forEach((st) => st.unsub?.())
+  customerStores.clear()
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith(NAMES_KEY)) localStorage.removeItem(k)
+  } catch {
+    // 지우지 못하는 환경
+  }
   for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED, MISSED_SEEN, 'private-phone-notes']) {
     try {
       localStorage.removeItem(k)

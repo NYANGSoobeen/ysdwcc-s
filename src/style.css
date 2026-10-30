@@ -6168,3 +6168,33 @@ a.button:not(.primary) {
   gap: 8px;
   align-items: flex-start;
 }
+
+/* 📞 펼친 줄 아래 최근 메모 5개 */
+.recent-memos {
+  list-style: none;
+  margin: 0 12px 10px 56px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+p.recent-memos {
+  margin: 0 12px 10px 56px;
+}
+.recent-memos li {
+  background: var(--surface-2, rgba(132, 179, 206, 0.12));
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.recent-memo-head {
+  font-size: 12px;
+}
+.recent-memo-body {
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

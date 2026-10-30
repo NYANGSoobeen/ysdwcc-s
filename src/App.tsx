@@ -13,7 +13,7 @@ import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
 import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellViewing, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsAutoOn, useNativeContactsSync } from './native.ts'
-import { isPcDevice, usePhoneBadges } from './phone.ts'
+import { isPcDevice, usePhoneBadges, usePrefetchPhoneNames } from './phone.ts'
 import { useAlertsSync } from './phoneAlerts.ts'
 import { normalizePhone } from './customers.ts'
 import { useOffDaySync } from './offday.ts'
@@ -138,6 +138,8 @@ function SignedIn({ user }: { user: User }) {
   const [phoneNonce, setPhoneNonce] = useState(0)
   // 갤럭시 앱: 앱을 열면 통화 기록·문자 목록을 미리 읽고(화면이 빨리 뜨게) 아래 탭 빨간 숫자를 센다
   const phoneBadges = usePhoneBadges(!desktop)
+  // 휴대폰: 지금 팀 고객·폰 연락처 이름을 미리 읽어 📞·✉️ 화면의 번호가 바로 이름으로 보이게
+  usePrefetchPhoneNames(team?.id ?? null, !desktop)
 
   function setTab(next: Tab) {
     setTabState(next)
@@ -404,7 +406,7 @@ function SignedIn({ user }: { user: User }) {
           <div className="shell-body">
             {current === 'notices' && <NoticesPage team={team} uid={user.uid} />}
             {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} onOpenSms={openSms} />}
-            {current === 'phone' && <PhonePage key={phoneNonce} team={team} uid={user.uid} onOpenCustomer={openCustomer} onOpenSms={openSms} />}
+            {current === 'phone' && <PhonePage key={phoneNonce} team={team} uid={user.uid} onOpenCustomer={openCustomer} onOpenSms={openSms} onOpenSettings={() => setTab('profile')} />}
             {current === 'messages' && <MessagesPage key={phoneNonce} team={team} uid={user.uid} onOpenCustomer={openCustomer} />}
             {current === 'chat' && (
               <ChatPage

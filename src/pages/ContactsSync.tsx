@@ -100,6 +100,53 @@ function NativeContactsSync() {
   )
 }
 
+// 📲 아이폰: CardDAV 계정 설정 프로필(.mobileconfig)을 만들어 한 번에 설치 (서버·아이디·암호를 직접 넣지 않아도 됨).
+// 이 기기에서 바로 만들어 열 뿐, 어디에도 올리거나 저장하지 않는다.
+function installIPhoneProfile(server: string, username: string, password: string) {
+  const u = new URL(server)
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const id = () => crypto.randomUUID().toUpperCase()
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>CardDAVAccountDescription</key><string>지원팀 고객</string>
+      <key>CardDAVHostName</key><string>${esc(u.hostname)}</string>
+      <key>CardDAVPort</key><integer>${u.port ? Number(u.port) : 443}</integer>
+      <key>CardDAVPrincipalURL</key><string>${esc(u.pathname || '/')}</string>
+      <key>CardDAVUseSSL</key><true/>
+      <key>CardDAVUsername</key><string>${esc(username)}</string>
+      <key>CardDAVPassword</key><string>${esc(password)}</string>
+      <key>PayloadDisplayName</key><string>지원팀 고객 연락처</string>
+      <key>PayloadIdentifier</key><string>kr.yangsan.support.carddav</string>
+      <key>PayloadType</key><string>com.apple.carddav.account</string>
+      <key>PayloadUUID</key><string>${id()}</string>
+      <key>PayloadVersion</key><integer>1</integer>
+    </dict>
+  </array>
+  <key>PayloadDescription</key><string>걸려 온 전화에 고객 이름("[업무] 이름")을 보여 주는 지원팀 연락처 계정</string>
+  <key>PayloadDisplayName</key><string>양산동원지원팀 고객 연락처</string>
+  <key>PayloadIdentifier</key><string>kr.yangsan.support.profile</string>
+  <key>PayloadRemovalDisallowed</key><false/>
+  <key>PayloadType</key><string>Configuration</string>
+  <key>PayloadUUID</key><string>${id()}</string>
+  <key>PayloadVersion</key><integer>1</integer>
+</dict>
+</plist>`
+  const blob = new Blob([xml], { type: 'application/x-apple-aspen-config' })
+  const href = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = href
+  a.download = '지원팀-고객연락처.mobileconfig'
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(href), 60_000)
+}
+
 function CardDavSync({ uid }: { uid: string }) {
   const [status, setStatus] = useState<Status | null>(null)
   const [creds, setCreds] = useState<{ username: string; password: string } | null>(null)
@@ -174,6 +221,17 @@ function CardDavSync({ uid }: { uid: string }) {
           <CopyField label="서버" value={guide === 'iphone' ? host : url} />
           <CopyField label="사용자 이름" value={creds.username} />
           <CopyField label="암호" value={creds.password} />
+          {isIPhone && (
+            <>
+              <button type="button" className="primary" onClick={() => installIPhoneProfile(url, creds.username, creds.password)}>
+                📲 아이폰에 한 번에 설정하기
+              </button>
+              <p className="muted small">
+                누르면 "구성 프로파일을 다운로드"한다고 물어요 → <strong>허용</strong> → 아이폰 <strong>설정</strong> 앱 맨 위 <strong>"프로파일이 다운로드됨"</strong> →{' '}
+                <strong>설치</strong>(기기 암호 입력, "서명되지 않음" 안내는 그대로 설치). 아래 순서대로 직접 넣어도 돼요. 홈 화면 앱에서 안 되면 Safari로 열어 주세요.
+              </p>
+            </>
+          )}
         </div>
       )}
 
