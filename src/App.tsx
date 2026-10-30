@@ -5,7 +5,7 @@ import { api, ROLE_LABELS } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
 import { MAIN_CHANNEL, useChannels } from './chat.ts'
 import { db } from './firebase.ts'
-import { useAuthUser, useMemberProfiles, useProfile, useTeam, useTeamNames } from './hooks.ts'
+import { useAuthUser, useMemberProfiles, useProfile, useSeenStamp, useTeam, useTeamNames } from './hooks.ts'
 import { useMentionAlerts } from './useMentionAlerts.ts'
 import { useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
@@ -16,6 +16,7 @@ import { useNativeContactsSync } from './native.ts'
 import { isPcDevice } from './phone.ts'
 import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
+import { StaffPage } from './pages/StaffPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
@@ -44,7 +45,7 @@ function savedTeam() {
 
 // F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
 const TAB_KEY = 'current-tab'
-const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'members', 'admin', 'usage', 'profile']
+const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'members', 'staff', 'admin', 'usage', 'profile']
 
 function savedTab(): Tab {
   try {
@@ -91,6 +92,7 @@ function disabledNotice(reason: string | undefined) {
 
 function SignedIn({ user }: { user: User }) {
   const { profile, missing } = useProfile(user.uid)
+  useSeenStamp(user.uid, profile)
   // 고른 팀: 이 화면에서 고른 것 → 계정에 기억한 것(다른 기기에서 고른 것도) → 이 기기에 기억한 것 → 첫 팀
   const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>()
   const teamIds = profile?.teamIds ?? []
@@ -257,7 +259,7 @@ function SignedIn({ user }: { user: User }) {
   const superAdmin = profile.superAdmin === true
   // 관리자 화면은 이 팀의 관리자만 (팀을 바꿨는데 그 팀 관리자가 아니면 고객 화면으로)
   const isAdmin = team.members[user.uid] === 'admin'
-  const current = (tab === 'usage' && !superAdmin) || (tab === 'admin' && !isAdmin) ? 'notices' : tab
+  const current = (tab === 'usage' && !superAdmin) || ((tab === 'admin' || tab === 'staff') && !isAdmin) ? 'notices' : tab
 
   const teamSelect =
     teamIds.length > 1 ? (
@@ -347,7 +349,8 @@ function SignedIn({ user }: { user: User }) {
               />
             )}
             {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
-            {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('admin')} />}
+            {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('staff')} />}
+            {current === 'staff' && <StaffPage team={team} uid={user.uid} teamIds={teamIds} />}
             {current === 'admin' && (
               <AdminPage
                 team={team}
@@ -356,6 +359,7 @@ function SignedIn({ user }: { user: User }) {
                 teamIds={teamIds}
                 onSelectTeam={selectTeam}
                 onOpenUsage={() => setTab('usage')}
+                onOpenStaff={() => setTab('staff')}
               />
             )}
             {current === 'usage' && <UsagePage team={team} />}

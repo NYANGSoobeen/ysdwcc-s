@@ -344,6 +344,30 @@ export const updateMemberRole = onCall(async (req) => {
   return { ok: true }
 })
 
+// 직원 관리: 관리자가 팀원의 이름·직급을 정한다. 직급은 정해진 목록(POSITIONS)이나 빈 값.
+// 최고 관리자의 이름·직급은 최고 관리자 본인만 (다른 관리자가 못 바꾸게).
+export const POSITIONS = ['사원', '주임', '계장', '대리', '과장', '차장', '부장', '팀장']
+export const setMemberProfile = onCall(async (req) => {
+  const { uid: actor, members } = await requireAdmin(req, req.data?.teamId)
+  const uid = requireMember(members, req.data?.uid)
+  if (uid !== actor) {
+    const actorSuper = (await getFirestore().doc(`users/${actor}`).get()).get('superAdmin') === true
+    if (!actorSuper) await protectSuperAdmin(uid)
+  }
+  const update: Record<string, string> = {}
+  if (req.data?.name !== undefined) update.name = text(req.data.name, '이름', 30)
+  if (req.data?.position !== undefined) {
+    const position = req.data.position
+    if (typeof position !== 'string' || (position !== '' && !POSITIONS.includes(position))) {
+      throw new HttpsError('invalid-argument', '직급을 목록에서 골라 주세요.')
+    }
+    update.position = position
+  }
+  if (Object.keys(update).length === 0) throw new HttpsError('invalid-argument', '바꿀 내용이 없습니다.')
+  await getFirestore().doc(`users/${uid}`).update(update)
+  return { ok: true }
+})
+
 // 팀에서 빼면 보안 규칙상 즉시 팀 데이터에 접근할 수 없다.
 // 더 이상 속한 팀이 없으면 계정도 지워 다시 로그인할 수 없게 한다.
 export const removeMember = onCall(async (req) => {

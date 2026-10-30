@@ -22,7 +22,6 @@ async function shrink(file: File) {
 
 export function ProfileEditor({ uid, profile, onClose }: { uid: string; profile: Profile; onClose: () => void }) {
   const [name, setName] = useState(profile.name)
-  const [position, setPosition] = useState(profile.position ?? '')
   const [avatar, setAvatar] = useState(profile.avatar ?? '')
   const [busy, setBusy] = useState<string | null>(null)
   const uploaded = useRef<string[]>([]) // 이 창에서 올린 사진
@@ -57,7 +56,7 @@ export function ProfileEditor({ uid, profile, onClose }: { uid: string; profile:
     if (!name.trim()) return toast('이름을 넣어 주세요.', { error: true })
     setBusy('저장하는 중…')
     try {
-      await updateDoc(doc(db, 'users', uid), { name: name.trim().slice(0, 30), position: position.trim().slice(0, 20), avatar })
+      await updateDoc(doc(db, 'users', uid), { name: name.trim().slice(0, 30), avatar })
       saved.current = true
       // 안 고른 새 사진과 예전 사진 지우기
       const old = profile.avatar ?? ''
@@ -107,10 +106,7 @@ export function ProfileEditor({ uid, profile, onClose }: { uid: string; profile:
           이름
           <input value={name} maxLength={30} onChange={(e) => setName(e.target.value)} required />
         </label>
-        <label>
-          직급
-          <input value={position} maxLength={20} onChange={(e) => setPosition(e.target.value)} placeholder="예: 주임" />
-        </label>
+        <p className="muted small">직급: {profile.position || '없음'} · 직급은 관리자가 👥 직원 관리에서 정해요.</p>
         <input
           ref={input}
           type="file"

@@ -55,6 +55,7 @@ export const api = {
     { teamId: string; name: string; email: string; password: string; role: Role },
     { uid: string; existed: boolean }
   >('addMember'),
+  setMemberProfile: call<{ teamId: string; uid: string; name?: string; position?: string }, { ok: true }>('setMemberProfile'),
   updateMemberRole: call<{ teamId: string; uid: string; role: Role }, { ok: true }>('updateMemberRole'),
   moveMember: call<
     { fromTeamId: string; toTeamId: string; uid: string; role?: Role; newOwnerUid?: string },

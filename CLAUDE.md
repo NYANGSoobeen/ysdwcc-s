@@ -37,6 +37,11 @@
   - 계정 사용 중지(`setMemberActive`, 이유 필수): `users.active=false` + 이유, Auth 계정 disabled + 토큰 폐기. 열린 앱은 바로 로그아웃하고 로그인 화면에 이유를 보여 준다. Firestore/Storage 규칙(`isActive`)과 CardDAV도 막는다. 팀 소속과 데이터는 그대로이며 "다시 사용"으로 푼다. 자기 자신, 최고 관리자, 마지막 관리자는 중지할 수 없다. (요청서의 `uids/{uid}` 문서 대신 기존 `users/{uid}`를 쓴다.)
   - 로그인 화면 "아이디 저장": 체크하면 아이디만 이 기기에 기억한다 (비밀번호는 저장 안 함, localStorage `saved-login-id`).
   - 로그아웃 버튼 없이 로그인이 풀리면(만료, 중지) 기기에 남은 팀 데이터를 지운다.
+- **👥 직원 관리 · 🛡️ 관리자 설정 (2026-10-30, 메뉴 관리자 전용 묶음에서 둘로 나눔):**
+  - 👥 직원 관리(`src/pages/StaffPage.tsx`, 탭 `staff`, 그 팀 관리자): 프론트 앱 "직원 관리"와 같은 모양(색은 우리 앱). 위 안내 + "＋ 직원 등록"(창, 직급도 고름), 줄마다 사진 · **이름 · 직급** · 권한 칩(관리자 주색) · 나/사용 중지/임시 비밀번호 / "아이디 · 최근 로그인 · 앱 v버전 ✅(내 앱과 같은 빌드) 또는 ⚠️ 예전 버전" · 오른쪽 "관리 ▾"(✏️ 이름·직급 수정, ⭐ 관리자로 지정, 🔑 권한, 🔀 부서 이동, 🔒 비밀번호 초기화, ⛔ 사용 중지, 🗑️ 팀에서 삭제). 머리줄 오른쪽 🔍 검색.
+  - **직급은 관리자만** 정한다: 목록 사원·주임·계장·대리·과장·차장·부장·팀장(`POSITIONS`, 앱 `StaffPage.tsx`·함수 `functions/src/index.ts` 두 곳) 또는 없음. 함수 `setMemberProfile {teamId, uid, name?, position?}`(그 팀 관리자, 최고 관리자의 이름·직급은 최고 관리자만). 규칙상 본인은 직급을 못 바꾼다(프로필 수정 창은 직급을 보여 주기만).
+  - 최근 로그인·앱 버전: 앱을 열 때 `useSeenStamp`가 `users.lastSeenAt`(= request.time만 허용)·`appVersion`(`__APP_VERSION__`)을 적는다(버전이 바뀌었거나 10분 지났을 때만).
+  - 🛡️ 관리자 설정(`AdminPage.tsx`, 탭 `admin`): 팀 이름, 직원 관리 바로가기, (최고 관리자) 모든 팀·새 팀·🔎 #검색 키·🏌️ 프론트 알림·😊 이모티콘·💾 용량 관리.
 - **팀원 관리:** 팀 생성, 팀원 추가, 권한 변경, 삭제, 비밀번호 초기화, **부서(팀) 이동**은 모두 Functions(callable)로만 한다.
   - 부서 이동(`moveMember`, 관리자 화면 팀원 ⋯ → 🔀 부서 이동, `MoveMemberDialog`): 두 부서 모두의 관리자 또는 최고 관리자만. 원래 부서에서 빼고 옮길 부서에 넣는 것을 한 번에(트랜잭션, 소속이 0개인 순간 없음 → 그 사람 앱은 로그아웃 없이 새 부서로). 옮길 부서에서의 권한을 고르고(기본은 원래 권한), 원래 부서에서 담당하던 고객은 원래 부서에 남는 사람에게 넘긴다(고객은 원래 부서에 그대로). 최고 관리자, 자기 자신, 원래 부서의 마지막 관리자는 옮길 수 없다. 옮길 수 있는 부서 목록은 내가 속한 다른 팀. 테스트 `tests/move.test.mjs`.
   마지막 관리자는 강등하거나 삭제할 수 없다. 팀에서 삭제하면 보안 규칙상 즉시 접근이 막히고, 그 사람 앱은 로그아웃하면서 기기 캐시를 지운다. 속한 팀이 없어지면 Auth 계정도 지운다.
@@ -177,10 +182,11 @@
   - 규칙: 제목·내용·사진 중 하나는 있어야, pinned bool, order number. 쓰기는 편집 이상, 내용 고치기는 쓴 사람이나 관리자, **pinned·order만 바꾸기는 편집 이상 누구나**, 스티커는 팀원 모두.
   - 사진은 긴 쪽 1600px(크게 보기) + 카드용 800px JPEG(2026-10-30, 예전 공지는 400px), Storage `teams/{teamId}/notices/{id}/{시각}_{n}.jpg`(규칙: 편집 이상, 2MB 미만 JPEG). 고치면 빠진 사진, 지우면 폴더째 `onNoticeWritten`이 지운다(10분 안에 올린 건 저장 중일 수 있어 남김). 용량 관리 종류 "공지 사진".
   - 실시간 구독은 공지 화면을 볼 때만: 최근 50개 + 고정 공지(`pinned == true`, 오래돼도). 정렬은 고정 먼저, 그다음 order.
-- **👤 프로필 (8번, 2026-10-28, `src/ui/Avatar.tsx`, `src/pages/ProfileEditor.tsx`):** `users/{uid}.position`(직급 20자), `avatar` = `''`(이름 첫 글자 동그라미) | `preset:아이디`(기본 그림 16개, 파일 없이 그림 문자+바탕색 `AVATAR_PRESETS`) | `avatars/{uid}/{시각}.jpg`(사진). 규칙: 본인만, avatar는 기본 그림이나 내 폴더만. Storage `avatars/{uid}/`는 본인만 올리고 지움(JPEG 300KB까지).
-  - 내 정보 → 👤 카드 ✏️ 프로필 수정 창: 📷 사진 고르기(480px JPEG, 60KB 넘으면 화질 낮춰 다시 → 30~60KB, 고르는 즉시 올림) · 기본 그림 · 사진 없애기 · 이름 · 직급. **저장 안 하고 닫으면 그 창에서 올린 사진을 지운다**, 저장하면 안 고른 새 사진과 예전 사진도 지운다.
+- **👤 프로필 (8번, 2026-10-28, `src/ui/Avatar.tsx`, `src/pages/ProfileEditor.tsx`):** `users/{uid}.position`(직급, 관리자가 👥 직원 관리에서 정함), `avatar` = `''`(이름 첫 글자 동그라미) | `preset:아이디`(기본 그림 16개, 파일 없이 그림 문자+바탕색 `AVATAR_PRESETS`) | `avatars/{uid}/{시각}.jpg`(사진). 규칙: 본인만(직급 빼고), avatar는 기본 그림이나 내 폴더만. Storage `avatars/{uid}/`는 본인만 올리고 지움(JPEG 300KB까지).
+  - 내 정보 → 👤 카드 ✏️ 프로필 수정 창: 📷 사진 고르기(480px JPEG, 60KB 넘으면 화질 낮춰 다시 → 30~60KB, 고르는 즉시 올림) · 기본 그림 · 사진 없애기 · 이름 (직급은 보기만). **저장 안 하고 닫으면 그 창에서 올린 사진을 지운다**, 저장하면 안 고른 새 사진과 예전 사진도 지운다.
   - 동그라미 안 글자·기본 그림은 `CenteredGlyph`(`src/ui/inkCenter.tsx`)가 실제 그려지는 모양을 재서 가로·세로 정가운데로 옮긴다(글꼴마다 쏠림, 전화 화면 `PersonDot`도). 사진은 `object-fit: cover` 가운데.
   - `Avatar`는 uid만으로 그린다: `useProfile`·`useMemberProfiles`가 읽은 프로필을 `rememberPeople` 저장소에 넣어 둔다. `card`를 주면 누를 때 프로필 카드(사진 크게·이름·직급, `showProfileCard`): 채팅 말풍선 옆, 팀원 화면.
+  - 머리줄 안 🔍 검색칸은 옆 ⋯ 버튼과 같은 높이 36px(PC의 위쪽 검색줄 여백을 받지 않게, 2026-10-30).
   - 메뉴: 내 프로필 아래 "직급 · 권한", 팀원 목록은 직급(없으면 권한). 팀원 화면은 동그라미 + "직급 · 아이디".
 - **스케줄(근무표):** 팀마다 하나(`teams/{teamId}/schedule/current`). 사진 또는 PDF만 받고(엑셀은 PDF/캡처 안내), PDF는 pdf.js 3.11.174로 쪽마다 그림(긴 쪽 2400px, 1400만 픽셀 이하, PNG/JPEG 작은 쪽, 최대 10쪽)으로 바꿔 저장한다. 원본 PDF는 1MB 이하만 보관. 새로 올리거나 지우면 Functions(`onScheduleWritten`)가 이전 파일 폴더(`teams/{teamId}/schedule/{uploadId}/`)를 지운다. 올리기/이름 변경/삭제는 편집 이상, **수정 표시 스티커는 팀원 모두**. 스티커 종류는 `src/schedule/stickers.ts`의 `STICKERS` 배열에서 바꾼다 (지원팀: **B0, 휴** 두 가지). 칸 찾기는 `src/schedule/cells.ts`(누른 곳에서 8% 안의 표 테두리선을 찾음 → 월 근무표처럼 칸이 좁은 표에 맞춤). 붙이기 모드에서 스티커를 누르면, 같은 종류면 떼고 다른 종류면 바꿔 붙인다 (스티커가 칸을 덮기 때문). 스티커 글자는 칸 가로·세로 정가운데: 한글 글꼴은 위아래 여백이 달라 그냥 가운데 맞춤하면 아래로 쏠리므로, 글자 모양을 재서(`inkOffsetEm`, 크게 보기 PNG는 `drawSticker`의 `measureText`) 맞춘다. 글꼴 `STICKER_FONT`(Noto Sans KR)를 받은 뒤 다시 그린다. 기본 크기(확대 1, "화면맞춤"): 휴대폰은 너비에 맞춤, PC는 쪽 전체가 스크롤 없이 보이게(너비·높이 중 작은 쪽, 여백은 `.sched-scroll` padding을 재서 뺌). ＋로 확대하면 스크롤이 생긴다.
 - **📋 근무표 (스케줄 → 📋 근무표 탭, 기본 보기, 2026-10-29, `src/schedule/roster.ts`, `src/pages/RosterView.tsx`):** 스케줄 화면 위 탭 📋 근무표 | 🖼️ 원본 그림(예전 사진·PDF + 스티커, sessionStorage `schedule-view`).
@@ -244,9 +250,9 @@
 ## Firestore 데이터 구조 초안
 
 ```
-users/{uid}                      name, position, avatar, email, teamIds[], superAdmin, platform, settings{},
+users/{uid}                      name, position(관리자가 정함), avatar, email, teamIds[], superAdmin, platform, settings{}, lastSeenAt, appVersion,
                                  active, disabledReason, disabledAt, disabledBy, mustChangePassword, passwordChangedAt
-                                 (Functions가 생성, 본인은 name/position/avatar/platform/settings만 수정)
+                                 (Functions가 생성, 본인은 name/avatar/platform/settings/lastSeenAt/appVersion만 수정, position은 setMemberProfile)
 users/{uid}/private/contactsSync enabled, username, createdAt   (본인만 읽기, Functions가 씀)
 pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), kinds{chat,mention,notice,front}, pc, seenAt, updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)

@@ -24,7 +24,7 @@ export function MembersPage({ team, uid, onOpenAdmin }: { team: Team; uid: strin
       <div className="page-body">
         {isAdmin && (
           <button type="button" className="primary" onClick={onOpenAdmin}>
-            🛡️ 팀원 관리하기 (관리자)
+            👥 직원 관리 (관리자)
           </button>
         )}
         {list.length === 0 && <p className="center muted">검색 결과가 없습니다.</p>}

@@ -83,6 +83,10 @@ test('프로필은 본인이 이름만 바꿀 수 있고 소속 팀은 못 바�
   await env.withSecurityRulesDisabled((ctx) =>
     setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', email: 'ed@x.com', teamIds: ['t1'] }))
   await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { name: '새 이름' }))
+  // 직급은 관리자만(함수), 최근 로그인은 지금 시각만
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { position: '부장' }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { lastSeenAt: serverTimestamp(), appVersion: '0.9.4' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { lastSeenAt: new Date(2020, 1, 1) }))
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { teamIds: ['t1', 't2'] }))
   await assertFails(updateDoc(doc(fs('ed2'), 'users/ed'), { name: '남의 이름' }))
   await assertFails(setDoc(doc(fs('new'), 'users/new'), { name: 'x', teamIds: ['t1'] }))
@@ -318,11 +322,11 @@ test('📢 공지: 편집 이상만 쓰고, 고치기·지우기는 쓴 사람�
   await assertSucceeds(deleteDoc(doc(fs('ed'), 'teams/t1/notices/n1')))
 })
 
-test('👤 프로필: 본인만 이름·직급·사진을 바꾸고, 사진은 기본 그림이나 내 폴더만', async () => {
+test('👤 프로필: 본인만 이름·사진을(직급은 관리자가) 바꾸고, 사진은 기본 그림이나 내 폴더만', async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', teamIds: ['t1'] })
   })
-  await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { name: '김편집', position: '주임', avatar: 'preset:dog' }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { name: '김편집', avatar: 'preset:dog' }))
   await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { avatar: 'avatars/ed/abc.jpg' }))
   await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { avatar: '' }))
   await assertFails(updateDoc(doc(fs('ed'), 'users/ed'), { avatar: 'avatars/admin/abc.jpg' }))

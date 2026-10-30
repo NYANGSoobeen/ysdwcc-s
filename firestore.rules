@@ -124,10 +124,13 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if signedIn();
       allow update: if signedIn() && request.auth.uid == uid && isActive()
-        && onlyChanges(['name', 'platform', 'settings', 'position', 'avatar'])
-        // 8번 프로필: 직급 20자, 사진은 기본 그림(preset:…) 또는 내 폴더 avatars/{uid}/ 의 사진만
-        && request.resource.data.get('position', '') is string
-        && request.resource.data.get('position', '').size() <= 20
+        // 직급(position)은 관리자가 직원 관리에서 정한다 (Functions setMemberProfile)
+        && onlyChanges(['name', 'platform', 'settings', 'avatar', 'lastSeenAt', 'appVersion'])
+        // 직원 관리 화면의 "최근 로그인 · 앱 버전": 앱이 지금 시각과 버전만 적는다
+        && (!('lastSeenAt' in request.resource.data) || request.resource.data.lastSeenAt == resource.data.get('lastSeenAt', null) || request.resource.data.lastSeenAt == request.time)
+        && request.resource.data.get('appVersion', '') is string
+        && request.resource.data.get('appVersion', '').size() <= 60
+        // 8번 프로필: 사진은 기본 그림(preset:…) 또는 내 폴더 avatars/{uid}/ 의 사진만
         && request.resource.data.get('avatar', '') is string
         && (request.resource.data.get('avatar', '') == ''
           || request.resource.data.get('avatar', '').matches('preset:[a-z0-9-]+')

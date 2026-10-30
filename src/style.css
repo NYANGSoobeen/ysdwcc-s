@@ -5821,3 +5821,156 @@ a.button:not(.primary) {
     min-height: 64px;
   }
 }
+
+/* 머리줄 안 🔍 검색칸: PC의 위쪽 검색줄 여백(.shell.desktop .search-bar)을 받지 않게, 옆 ⋯ 버튼과 같은 높이 36px */
+.page-header .search-bar.header-search,
+.shell.desktop .page-header .search-bar.header-search {
+  box-sizing: border-box;
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.page-header .header-search input {
+  height: 34px;
+  min-height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* ══ 👥 직원 관리 (프론트 앱 "직원 관리"와 같은 모양, 색은 우리 앱) ══ */
+.staff-body {
+  gap: 12px;
+}
+.staff-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.staff-top p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.staff-add {
+  border-radius: 999px;
+  padding: 8px 18px;
+}
+.staff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.staff-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.staff-row.inactive {
+  opacity: 0.6;
+}
+.staff-row .avatar.staff-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 17px;
+}
+.staff-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.staff-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.staff-name strong {
+  font-size: 15px;
+}
+.staff-position {
+  font-weight: 700;
+}
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.role-chip.admin {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.role-chip.editor {
+  background: color-mix(in srgb, var(--rock) 35%, var(--surface));
+  color: var(--accent);
+}
+.role-chip.off {
+  background: var(--danger);
+  color: #fff;
+}
+.staff-sub {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.staff-sub .ver-old {
+  color: var(--unread-yellow, #b97c00);
+}
+.staff-manage {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+.staff-manage span {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.modal.staff-add-modal {
+  width: min(460px, calc(100vw - 24px));
+}
+.modal.staff-add-modal .card {
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.position-chips {
+  flex-wrap: wrap;
+}
+.shell.desktop .staff-body {
+  padding: 22px 28px;
+}
+.form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

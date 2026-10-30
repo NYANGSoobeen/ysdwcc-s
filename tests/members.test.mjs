@@ -86,6 +86,16 @@ test('권한 변경과 비밀번호 초기화', async () => {
   await expectError(fn.resetMemberPassword.run(as(kim, { teamId, uid: adminUid, password: 'hacked1' })), 'permission-denied')
 })
 
+test('직원 관리: 관리자가 직급을 목록에서 정하고, 팀원은 못 한다', async () => {
+  const kim = (await getAuth().getUserByEmail('kim@workphone.local')).uid
+  await fn.setMemberProfile.run(as(adminUid, { teamId, uid: kim, position: '대리' }))
+  assert.equal((await db.doc(`users/${kim}`).get()).get('position'), '대리')
+  await fn.setMemberProfile.run(as(adminUid, { teamId, uid: kim, position: '' }))
+  assert.equal((await db.doc(`users/${kim}`).get()).get('position'), '')
+  await expectError(fn.setMemberProfile.run(as(adminUid, { teamId, uid: kim, position: '회장' })), 'invalid-argument')
+  await expectError(fn.setMemberProfile.run(as(kim, { teamId, uid: adminUid, position: '사원' })), 'permission-denied')
+})
+
 const fresh = () => ({ auth_time: Math.floor(Date.now() / 1000) })
 const asFresh = (uid, data) => ({ data, auth: { uid, token: fresh() }, rawRequest: {} })
 
@@ -231,6 +241,11 @@ test('최고 관리자: 첫 관리자는 최고 관리자이고, 새 팀을 만�
   assert.deepEqual(await fn.getMyAccess.run(as(otherAdmin, {})), { superAdmin: false })
   await expectError(fn.removeMember.run(as(otherAdmin, { teamId: newTeam, uid: adminUid })), 'failed-precondition')
   await expectError(fn.updateMemberRole.run(as(otherAdmin, { teamId: newTeam, uid: adminUid, role: 'viewer' })), 'failed-precondition')
+  // 직원 관리: 다른 관리자는 최고 관리자의 이름·직급을 못 바꾸고, 최고 관리자는 바꿀 수 있다
+  await expectError(fn.setMemberProfile.run(as(otherAdmin, { teamId: newTeam, uid: adminUid, position: '사원' })), 'failed-precondition')
+  await fn.setMemberProfile.run(as(adminUid, { teamId: newTeam, uid: otherAdmin, position: '팀장', name: '이팀장' }))
+  assert.equal((await db.doc(`users/${otherAdmin}`).get()).get('position'), '팀장')
+  assert.equal((await db.doc(`users/${otherAdmin}`).get()).get('name'), '이팀장')
 })
 
 test('최고 관리자 표시가 생기기 전에 만든 프로젝트: 첫 팀 관리자가 최고 관리자가 된다', async () => {

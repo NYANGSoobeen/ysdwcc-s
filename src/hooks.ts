@@ -1,5 +1,5 @@
 import { onAuthStateChanged, type User } from 'firebase/auth'
-import { collection, doc, documentId, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, documentId, onSnapshot, query, serverTimestamp, updateDoc, where, type Timestamp } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import type { Role } from './api.ts'
 import { auth, db } from './firebase.ts'
@@ -7,13 +7,15 @@ import { rememberPeople } from './ui/Avatar.tsx'
 
 export type Profile = {
   name: string
-  position?: string // 직급 (8번, 본인이 바꿈)
+  position?: string // 직급 (관리자가 직원 관리에서 정함: 사원~팀장)
   avatar?: string // '' | 'preset:아이디' | 'avatars/{uid}/파일.jpg' (src/ui/Avatar.tsx)
   email: string
   teamIds: string[]
   superAdmin?: boolean
   active?: boolean // false면 관리자가 사용 중지한 계정
   disabledReason?: string
+  lastSeenAt?: Timestamp // 최근 로그인(앱을 연 때, useSeenStamp)
+  appVersion?: string // 그때 앱 버전 (__APP_VERSION__)
   mustChangePassword?: boolean // 임시 비밀번호(새 계정, 초기화) → 처음 로그인하면 바꾼다
   settings?: { frontChat?: boolean; team?: string; offDayReply?: { enabled?: boolean; message?: string } } // team: 마지막으로 고른 팀(기기끼리 맞춤), frontChat: 프론트 채팅에 들어가 있음 (다른 기기·다시 로그인해도 코드 없이 연결)
 }
@@ -141,4 +143,18 @@ export function useTeamsSummary(teamIds: string[]) {
     return () => unsubscribes.forEach((u) => u())
   }, [key])
   return teams
+}
+
+// 직원 관리의 "최근 로그인 · 앱 버전": 앱을 열 때 적는다 (버전이 바뀌었거나 10분 넘게 지났을 때만, 쓰기 절약)
+export function useSeenStamp(uid: string, profile: Profile | null) {
+  const ready = Boolean(profile) && profile?.active !== false
+  const last = profile?.lastSeenAt?.toMillis() ?? 0
+  const version = profile?.appVersion ?? ''
+  useEffect(() => {
+    if (!ready) return
+    if (version === __APP_VERSION__ && Date.now() - last < 10 * 60 * 1000) return
+    void updateDoc(doc(db, 'users', uid), { lastSeenAt: serverTimestamp(), appVersion: __APP_VERSION__ }).catch(() => undefined)
+    // 앱을 연 뒤 한 번만 (적은 값이 돌아와도 다시 적지 않게)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, ready])
 }

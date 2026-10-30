@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type TouchEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
 import { isTouchUi } from './dialogs.tsx'
 
 // 항목 메뉴: PC는 오른쪽 클릭, 휴대폰은 길게 누르기, 둘 다 ⋯ 버튼으로 연다.
@@ -104,11 +104,23 @@ export function useItemMenu(getActions: () => MenuAction[], title?: string) {
 }
 
 // ⋯ 버튼
-export function MoreButton({ actions, label = '더 보기', title }: { actions: () => MenuAction[]; label?: string; title?: string }) {
+export function MoreButton({
+  actions,
+  label = '더 보기',
+  title,
+  className = 'ghost more-button',
+  children = '⋯',
+}: {
+  actions: () => MenuAction[]
+  label?: string
+  title?: string
+  className?: string
+  children?: ReactNode
+}) {
   return (
     <button
       type="button"
-      className="ghost more-button"
+      className={className}
       aria-label={label}
       aria-haspopup="menu"
       onClick={(e) => {
@@ -116,7 +128,7 @@ export function MoreButton({ actions, label = '더 보기', title }: { actions: 
         openMenu(actions(), r.right, r.bottom, title)
       }}
     >
-      ⋯
+      {children}
     </button>
   )
 }
