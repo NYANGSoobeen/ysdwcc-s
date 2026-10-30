@@ -5465,3 +5465,43 @@ a.button.disabled {
   background: var(--notice-bg);
   font-size: 12.5px;
 }
+
+/* 💻 PC: 휴대폰으로 걸어주세요 / 보내주세요 안내 */
+.pc-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  white-space: normal;
+}
+.pc-guide-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--notice-bg);
+}
+.pc-guide-number {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent);
+  user-select: all;
+}
+.pc-guide-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  white-space: pre-wrap;
+  user-select: text;
+}
+.pc-guide-body button {
+  align-self: flex-end;
+}
+.pc-guide-link {
+  color: var(--muted);
+}

@@ -173,7 +173,19 @@ export function appCalls(): CallEntry[] {
   }
 }
 
-export async function startCall(number: string, customerId?: string) {
+// 마우스로 쓰는 컴퓨터 (아이폰·패드 제외): 전화 회선이 없다
+export const isPcDevice = () =>
+  !Capacitor.isNativePlatform() &&
+  matchMedia('(hover: hover) and (pointer: fine)').matches &&
+  !/iPhone|iPad|iPod|Android/.test(navigator.userAgent)
+
+export async function startCall(number: string, customerId?: string, name?: string) {
+  if (isPcDevice()) {
+    // PC: "휴대폰으로 걸어주세요" 안내 (src/pcGuide.tsx)
+    const { showCallGuide } = await import('./pcGuide.tsx')
+    showCallGuide(number, name)
+    return
+  }
   if (hasPhoneNative) {
     // 갤럭시 앱은 통화가 끝난 뒤 통화 기록을 보고 메모 창을 띄운다 (CallMemoWatcher).
     await PhoneNative.dial({ number })

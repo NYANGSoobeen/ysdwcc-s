@@ -32,7 +32,7 @@ type Props = {
   embedded?: boolean // PC 2단 화면의 오른쪽 칸에 넣을 때
   onClose: () => void
   onOpenOther: (customerId: string) => void
-  onOpenSms?: (number: string) => void
+  onOpenSms?: (number: string, name?: string) => void
 }
 
 export function CustomerDetail({ customerId, team, uid, profiles, embedded = false, onClose, onOpenOther, onOpenSms }: Props) {
@@ -112,12 +112,12 @@ export function CustomerDetail({ customerId, team, uid, profiles, embedded = fal
                   <span>{formatPhone(p)}</span>
                   <span className="phone-actions">
                     {onOpenSms && (
-                      <button type="button" className="call-button sms" onClick={() => onOpenSms(p)}>
+                      <button type="button" className="call-button sms" onClick={() => onOpenSms(p, customer.name)}>
                         ✉️ 문자
                       </button>
                     )}
                     {/* 통화가 끝나고 돌아오면 통화 메모 창이 뜬다 (CallMemoWatcher, 화면 6) */}
-                    <button type="button" className="call-button" onClick={() => void startCall(p, customer.id).catch((e) => toast(String(e.message ?? e), { error: true }))}>
+                    <button type="button" className="call-button" onClick={() => void startCall(p, customer.id, customer.name).catch((e) => toast(String(e.message ?? e), { error: true }))}>
                       📞 전화
                     </button>
                   </span>

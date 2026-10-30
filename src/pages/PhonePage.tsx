@@ -9,6 +9,7 @@ import {
   dayLabel,
   durationText,
   hasPhoneNative,
+  isPcDevice,
   oldAndroidApp,
   PhoneNative,
   prettyNumber,
@@ -33,7 +34,7 @@ type Sub = 'keypad' | 'recent' | 'contacts'
 const SUB_KEY = 'phone-sub'
 type Filter = 'all' | 'work' | 'personal' | 'missed'
 
-type Props = { team: Team; uid: string; onOpenCustomer: (id: string) => void; onOpenSms: (number: string) => void }
+type Props = { team: Team; uid: string; onOpenCustomer: (id: string) => void; onOpenSms: (number: string, name?: string) => void }
 
 export function PhonePage({ team, uid, onOpenCustomer, onOpenSms }: Props) {
   const [sub, setSubState] = useState<Sub>(() => {
@@ -108,7 +109,7 @@ type RowCtx = {
   find: (n: string) => Customer | undefined
   nameOf: (n: string) => string | undefined
   onOpenCustomer: (id: string) => void
-  onOpenSms: (number: string) => void
+  onOpenSms: (number: string, name?: string) => void
   pickMemo: () => void
   openRow: string | null
   toggleRow: (key: string) => void
@@ -116,8 +117,8 @@ type RowCtx = {
 
 function personActions(ctx: RowCtx, number: string, customer: Customer | undefined, extra: MenuAction[] = []): MenuAction[] {
   return [
-    { icon: '📞', label: '전화 걸기', onSelect: () => void startCall(number, customer?.id).catch((e) => toast(String(e.message ?? e), { error: true })) },
-    { icon: '✉️', label: '문자 보내기', onSelect: () => ctx.onOpenSms(number) },
+    { icon: '📞', label: '전화 걸기', onSelect: () => void startCall(number, customer?.id, customer?.name ?? ctx.nameOf(number)).catch((e) => toast(String(e.message ?? e), { error: true })) },
+    { icon: '✉️', label: '문자 보내기', onSelect: () => ctx.onOpenSms(number, customer?.name ?? ctx.nameOf(number)) },
     ...extra,
     customer
       ? { icon: '📇', label: '고객 정보 보기', onSelect: () => ctx.onOpenCustomer(customer.id) }
@@ -170,7 +171,7 @@ function Keypad({ customers, contacts, ctx }: { customers: Customer[]; contacts:
 
   async function call(n: string, customer?: Customer) {
     try {
-      await startCall(n.replace(/[^\d*#+]/g, ''), customer?.id ?? ctx.find(n)?.id)
+      await startCall(n.replace(/[^\d*#+]/g, ''), customer?.id ?? ctx.find(n)?.id, (customer ?? ctx.find(n))?.name ?? ctx.nameOf(n))
     } catch (err) {
       toast((err as Error).message, { error: true })
     }
@@ -328,7 +329,9 @@ function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: bool
           <p className="muted small">
             {hasPhoneNative
               ? '권한을 허용하기 전에는 이 앱에서 건 전화만 보여요.'
-              : '아이폰·브라우저는 폰의 통화 기록을 읽을 수 없어서, 이 앱에서 건 전화만 보여요. 받은 전화는 아래 버튼으로 메모해 주세요.'}
+              : isPcDevice()
+                ? '컴퓨터에는 전화 회선이 없어요. 📞를 누르면 휴대폰으로 걸 수 있게 번호를 크게 보여 드려요.'
+                : '아이폰·브라우저는 폰의 통화 기록을 읽을 수 없어서, 이 앱에서 건 전화만 보여요. 받은 전화는 아래 버튼으로 메모해 주세요.'}
           </p>
           {ctx.canWrite && (
             <button type="button" onClick={ctx.pickMemo}>
@@ -484,7 +487,7 @@ function ContactRow({ name, sub, number, customer, ctx }: { name: string; sub: s
               aria-label={`${name} 문자`}
               onClick={(e) => {
                 e.stopPropagation()
-                ctx.onOpenSms(number)
+                ctx.onOpenSms(number, name)
               }}
             >
               ✉️
@@ -495,7 +498,7 @@ function ContactRow({ name, sub, number, customer, ctx }: { name: string; sub: s
               aria-label={`${name}에게 전화`}
               onClick={(e) => {
                 e.stopPropagation()
-                void startCall(number, customer?.id)
+                void startCall(number, customer?.id, name)
               }}
             >
               📞

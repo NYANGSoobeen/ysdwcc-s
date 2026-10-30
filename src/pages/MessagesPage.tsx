@@ -13,6 +13,7 @@ import {
   shortWhen,
   smsLink,
   smsSeen,
+  isPcDevice,
   startCall,
   timeText,
   useDeviceContacts,
@@ -135,7 +136,9 @@ export function MessagesPage({ team, uid, onOpenCustomer }: Props) {
             <p className="muted small">
               {hasPhoneNative
                 ? '권한을 허용하면 이 폰의 문자를 여기서 바로 보고 보낼 수 있어요.'
-                : '아이폰·브라우저는 폰의 문자를 읽을 수 없어요. "새 문자"로 받는 사람과 내용을 정하면 기본 문자 앱이 열려요. 고객 화면·전화 화면의 ✉️ 버튼도 같아요.'}
+                : isPcDevice()
+                  ? '컴퓨터에서는 문자를 읽거나 보낼 수 없어요. "새 문자"로 받는 사람과 내용을 정하면 휴대폰으로 보낼 수 있게 번호와 내용을 크게 보여 드려요.'
+                  : '아이폰·브라우저는 폰의 문자를 읽을 수 없어요. "새 문자"로 받는 사람과 내용을 정하면 기본 문자 앱이 열려요. 고객 화면·전화 화면의 ✉️ 버튼도 같아요.'}
             </p>
             <button type="button" className="primary" onClick={() => setComposing('')}>
               ✏️ 새 문자 쓰기
@@ -329,7 +332,7 @@ function SmsThreadView(props: {
           {name && <small className="muted">{prettyNumber(open.address)}</small>}
         </h2>
         <div className="sms-head-actions">
-          <button type="button" className="ghost" onClick={() => void startCall(open.address, customer?.id)} aria-label="전화 걸기">
+          <button type="button" className="ghost" onClick={() => void startCall(open.address, customer?.id, name || undefined)} aria-label="전화 걸기">
             📞
           </button>
           <MoreMenu actions={headerActions} />
@@ -453,14 +456,16 @@ function NewMessage(props: {
 }) {
   const [q, setQ] = useState(props.initial)
   const [to, setTo] = useState(props.initial)
+  const [toName, setToName] = useState<string | undefined>(undefined)
   const [body, setBody] = useState('')
   const people = searchPeople(q, props.customers, props.contacts, 20)
   const digits = q.replace(/[^\d+]/g, '')
 
-  function choose(number: string) {
+  function choose(number: string, name?: string) {
     if (props.native) props.onPick(number)
     else {
       setTo(number)
+      setToName(name)
       setQ(number)
     }
   }
@@ -496,7 +501,7 @@ function NewMessage(props: {
           )}
           {people.map((p) => (
             <li key={p.number}>
-              <button type="button" className="call-row" onClick={() => choose(p.number)}>
+              <button type="button" className="call-row" onClick={() => choose(p.number, p.name)}>
                 <PersonDot name={p.name} work={!!p.customer} />
                 <div className="call-main">
                   <div className="call-name">
@@ -520,7 +525,20 @@ function NewMessage(props: {
         <button type="button" className="ghost" onClick={props.onClose}>
           닫기
         </button>
-        {!props.native && (
+        {!props.native && isPcDevice() && (
+          <button
+            type="button"
+            className="primary"
+            disabled={!to}
+            onClick={() => {
+              props.onClose()
+              void import('../pcGuide.tsx').then((m) => m.showSmsGuide(to, toName, body.trim() || undefined))
+            }}
+          >
+            휴대폰으로 보내기
+          </button>
+        )}
+        {!props.native && !isPcDevice() && (
           <a className={to ? 'button primary' : 'button primary disabled'} href={to ? smsLink(to, body) : undefined} onClick={() => to && props.onClose()} aria-disabled={!to}>
             문자 앱 열기
           </a>

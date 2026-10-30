@@ -13,6 +13,7 @@ import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
 import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellViewing, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsSync } from './native.ts'
+import { isPcDevice } from './phone.ts'
 import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage, promptCreateChannel } from './pages/ChatPage.tsx'
@@ -310,7 +311,9 @@ function SignedIn({ user }: { user: User }) {
     }
     setTab('customers')
   }
-  const openSms = (number: string) => {
+  const openSms = (number: string, name?: string) => {
+    // PC: 문자를 보낼 수 없어 "휴대폰으로 보내주세요" 안내 (src/pcGuide.tsx)
+    if (isPcDevice()) return void import('./pcGuide.tsx').then((m) => m.showSmsGuide(number, name))
     openSmsTo(number)
     setTab('messages')
   }
