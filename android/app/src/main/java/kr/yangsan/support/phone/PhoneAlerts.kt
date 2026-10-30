@@ -30,14 +30,18 @@ import org.json.JSONObject
 // 문자 내용·통화 기록은 서버에 올리지 않는다 (CLAUDE.md 데이터 저장 규칙).
 object PhoneAlerts {
     private const val PREFS = "phone_alerts"
-    private const val CH_SMS = "sms"
-    private const val CH_MISSED = "missed"
-    private const val CH_CALLER = "caller"
+    // 1.5.0: 앱 아이콘 빨간 숫자는 업무(고객) 문자만 세도록 채널을 새로 만든다 (채널 설정은 만든 뒤 못 바꿈)
+    private const val CH_SMS = "sms_work"
+    private const val CH_MISSED = "missed2"
+    private const val CH_CALLER = "caller2"
+    private val OLD_CHANNELS = listOf("sms", "missed", "caller")
     private const val ID_CALLER = 1001
     private const val ID_MISSED = 1002
 
     // 우리 앱 화면이 앞에 있으면 문자·부재중 알림은 띄우지 않는다 (앱 안 빨간 숫자로 보임)
     @Volatile var foreground = false
+    // 지금 우리 앱에서 보고 있는 문자 대화 번호 (그 대화의 알림은 안 띄움)
+    @Volatile var viewing: String? = null
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -53,6 +57,7 @@ object PhoneAlerts {
 
     fun clearAll(ctx: Context) {
         prefs(ctx).edit().clear().apply()
+        ChatStore.clear(ctx)
         NotificationManagerCompat.from(ctx).cancelAll()
     }
 
@@ -65,6 +70,17 @@ object PhoneAlerts {
     } catch (_: Exception) {
         null
     }
+
+    // "[업무] 이름" 알림 제목 → 고객 번호 (같은 이름 고객이 둘 이상이면 모름)
+    fun customerNumber(ctx: Context, name: String): String? = try {
+        val all = JSONObject(prefs(ctx).getString("customers", "{}") ?: "{}")
+        val hits = all.keys().asSequence().filter { all.optJSONObject(it)?.optString("n") == name }.toList()
+        hits.singleOrNull()
+    } catch (_: Exception) {
+        null
+    }
+
+    fun isCustomer(ctx: Context, number: String) = customer(ctx, number) != null
 
     // 알림에 보일 이름: 고객이면 "[업무] 이름", 아니면 폰 연락처 이름, 없으면 번호
     fun nameFor(ctx: Context, number: String): String {
@@ -95,11 +111,12 @@ object PhoneAlerts {
     private fun channels(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        fun ch(id: String, name: String, importance: Int) =
-            NotificationChannel(id, name, importance).apply { setSound(null, null); enableVibration(false) }
-        nm.createNotificationChannel(ch(CH_SMS, "문자", NotificationManager.IMPORTANCE_DEFAULT))
-        nm.createNotificationChannel(ch(CH_MISSED, "부재중 전화", NotificationManager.IMPORTANCE_DEFAULT))
-        nm.createNotificationChannel(ch(CH_CALLER, "고객 전화 정보", NotificationManager.IMPORTANCE_HIGH))
+        fun ch(id: String, name: String, importance: Int, badge: Boolean) =
+            NotificationChannel(id, name, importance).apply { setSound(null, null); enableVibration(false); setShowBadge(badge) }
+        OLD_CHANNELS.forEach { nm.deleteNotificationChannel(it) }
+        nm.createNotificationChannel(ch(CH_SMS, "업무 문자", NotificationManager.IMPORTANCE_DEFAULT, true))
+        nm.createNotificationChannel(ch(CH_MISSED, "부재중 전화", NotificationManager.IMPORTANCE_DEFAULT, false))
+        nm.createNotificationChannel(ch(CH_CALLER, "고객 전화 정보", NotificationManager.IMPORTANCE_HIGH, false))
     }
 
     // 알림을 누르면 우리 앱을 열고 그 화면으로 (MainActivity가 "open" 값을 웹앱 주소로 넘김)
@@ -124,10 +141,14 @@ object PhoneAlerts {
     private fun smsId(number: String) = 3000 + (OffDay.local(number).hashCode() and 0xffff)
 
     // ── 1) 문자 ──
+    // 업무(고객) 문자만 알린다 (2026-10-30 사용자 요청: 개인 연락은 빼고 업무 연락만 앱 아이콘 숫자로).
+    // 개인 문자는 삼성 메시지 알림이 그대로 온다. 앱을 보고 있어도 띄워 숫자를 올리되, 그 대화를 보고 있으면 안 띄운다.
     fun onSms(ctx: Context, address: String, body: String) {
-        if (!on(ctx, "sms") || foreground || address.isBlank()) return
+        if (!on(ctx, "sms") || address.isBlank() || !isCustomer(ctx, address)) return
+        if (foreground && viewing?.let { OffDay.local(it) == OffDay.local(address) } == true) return
         val key = "sms_" + OffDay.local(address)
         val lines = try { JSONArray(prefs(ctx).getString(key, "[]")) } catch (_: Exception) { JSONArray() }
+        if (lines.length() > 0 && lines.getString(lines.length() - 1) == body.take(300)) return
         lines.put(body.take(300))
         while (lines.length() > 5) lines.remove(0)
         prefs(ctx).edit().putString(key, lines.toString()).apply()

@@ -131,6 +131,7 @@ export function MessagesPage({ team, onOpenCustomer }: Props) {
       <div className="page-body">
         {oldAndroidApp && <OldAppCard />}
         {hasPhoneNative && perms.loaded && <PermissionCard kind="sms" what="이 폰의 문자" granted={perms.sms} />}
+        {hasPhoneNative && perms.sms && perms.chat === false && <ChatPlusCard />}
         {native ? (
           <ThreadList who={who} onOpen={setOpen} />
         ) : (
@@ -262,7 +263,7 @@ function SmsThreadView(props: {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const load = () =>
-    void PhoneNative.messages({ threadId: open.threadId, limit: 300 })
+    void PhoneNative.messages({ threadId: open.threadId, address: open.address, limit: 300 })
       .then(({ messages }) => {
         setMessages(messages)
         markSmsSeen(open.threadId)
@@ -271,6 +272,11 @@ function SmsThreadView(props: {
       .catch((e) => toast(String(e.message ?? e), { error: true }))
   useEffect(load, [open.threadId])
   usePhoneChanged('sms', load)
+  // 이 대화를 보는 동안은 이 번호의 우리 알림을 안 띄운다 (갤럭시 앱 1.5.0)
+  useEffect(() => {
+    void PhoneNative.alertsViewing({ number: open.address }).catch(() => {})
+    return () => void PhoneNative.alertsViewing({ number: null }).catch(() => {})
+  }, [open.address])
 
   // 새 문자가 오거나 보내면 맨 아래로 (위에서 읽는 중이면 그대로)
   useLayoutEffect(() => {
@@ -431,6 +437,7 @@ function SmsBubble({ m, day, customer, onRetry }: { m: Local; day: string | null
         <div className="sms-bubble has-menu" {...menu}>
           {!!m.images && <div className="sms-mms">📷 사진 {m.images}장 (삼성 메시지 앱에서 보기)</div>}
           {m.text}
+          {m.rcs && <span className="sms-rcs">💬 채팅+</span>}
         </div>
         <span className="sms-meta muted">
           {m.sending ? '보내는 중…' : m.failed ? '' : timeText(m.date)}
@@ -545,5 +552,49 @@ function NewMessage(props: {
         )}
       </div>
     </Modal>
+  )
+}
+
+// 💬 채팅+(RCS)로 온 문자는 문자함에 없어서, "알림 접근"을 켜야 목록에 보인다 (갤럭시 앱 1.5.0, ChatListener.kt)
+const CHATPLUS_HIDE = 'chatplus-card-hide'
+function ChatPlusCard() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return !!localStorage.getItem(CHATPLUS_HIDE)
+    } catch {
+      return false
+    }
+  })
+  if (hidden) return null
+  return (
+    <div className="card phone-hint">
+      <p className="small">
+        <strong>💬 채팅+(파란 말풍선)로 온 문자가 안 보여요</strong>
+        <br />
+        <span className="muted">
+          삼성 메시지의 채팅+ 문자는 다른 앱이 읽을 수 없어요. "알림 접근"을 켜면 받은 채팅+를 이 폰 안에서만 읽어 여기에 보여 드려요(서버에 안 올림). 회색으로
+          막혀 있으면 앱 정보 ⋮ → "제한된 설정 허용" 먼저.
+        </span>
+      </p>
+      <div className="button-row">
+        <button type="button" className="primary" onClick={() => void PhoneNative.openChatAccess().catch(() => {})}>
+          💬 알림 접근 켜기
+        </button>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => {
+            try {
+              localStorage.setItem(CHATPLUS_HIDE, '1')
+            } catch {
+              // 다음에 또 보일 뿐
+            }
+            setHidden(true)
+          }}
+        >
+          안 볼게요
+        </button>
+      </div>
+    </div>
   )
 }

@@ -8,9 +8,7 @@ import { AvatarFace } from '../ui/Avatar.tsx'
 import { ProfileEditor } from './ProfileEditor.tsx'
 import { ContactsSync } from './ContactsSync.tsx'
 import { InstallCard } from './InstallCard.tsx'
-import { PushCard } from './PushCard.tsx'
 import { OffDayCard } from './OffDayCard.tsx'
-import { PhoneAlertsCard } from './PhoneAlertsCard.tsx'
 import { SummaryGuideCard } from './SummaryGuideCard.tsx'
 import { PcPhoneLinkCard } from './PcPhoneLinkCard.tsx'
 import type { Profile, Team } from '../hooks.ts'
@@ -22,7 +20,7 @@ type Props = {
   team: Team
 }
 
-export function ProfilePage({ user, profile, team }: Props) {
+export function ProfilePage({ user, profile, team, onOpenAlerts }: Props & { onOpenAlerts?: () => void }) {
   return (
     <div className="page">
       <header className="page-header">
@@ -33,7 +31,15 @@ export function ProfilePage({ user, profile, team }: Props) {
       <div className="page-body two-col">
         <div className="col">
         <InstallCard />
-        <PushCard />
+        {onOpenAlerts && (
+          <section className="card">
+            <h3>🔔 알림</h3>
+            <p className="muted small">알림 켜기·받을 알림·알림 방식은 메뉴 맨 아래 "🔔 알림 설정"으로 옮겼어요.</p>
+            <button type="button" onClick={onOpenAlerts}>
+              🔔 알림 설정 열기
+            </button>
+          </section>
+        )}
         <section className="card">
           <ProfileSummary uid={user.uid} profile={profile} />
           <dl className="stats">
@@ -45,7 +51,6 @@ export function ProfilePage({ user, profile, team }: Props) {
         <PasswordForm title="비밀번호 바꾸기" />
         </div>
         <div className="col">
-        <PhoneAlertsCard />
         <OffDayCard uid={user.uid} profile={profile} />
         <PcPhoneLinkCard />
         <SummaryGuideCard />

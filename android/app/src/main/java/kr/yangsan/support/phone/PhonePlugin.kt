@@ -67,14 +67,25 @@ class PhonePlugin : Plugin() {
         try {
             context.contentResolver.registerContentObserver(CallLog.Calls.CONTENT_URI, true, calls)
             context.contentResolver.registerContentObserver(Uri.parse("content://mms-sms/"), true, sms)
+            context.contentResolver.registerContentObserver(Uri.parse("content://sms/"), true, sms)
             observers = listOf(calls, sms)
         } catch (_: Exception) {
-            // 권한을 받기 전에는 등록이 안 될 수 있다 → 권한을 받으면 다시 등록
+            // 권한을 받기 전에는 등록이 안 될 수 있다 → 앱으로 돌아올 때 다시 등록
         }
+        // 💬 채팅+(RCS)가 오면 (ChatListener.kt) 문자 목록을 새로 그리게
+        ChatStore.onChange = { handler.post { notifyListeners("changed", JSObject().put("what", "sms")) } }
     }
 
     override fun handleOnDestroy() {
         observers.forEach { context.contentResolver.unregisterContentObserver(it) }
+        observers = emptyList()
+    }
+
+    // 앱으로 돌아올 때마다 다시 등록 (설정에서 권한을 켜고 돌아온 경우, 등록이 풀린 경우) + 화면에 새로 읽으라고 알림
+    override fun handleOnResume() {
+        super.handleOnResume()
+        handleOnDestroy()
+        load()
     }
 
     private fun granted(alias: String) = getPermissionState(alias) == PermissionState.GRANTED
@@ -95,8 +106,34 @@ class PhonePlugin : Plugin() {
                 .put("calls", granted("calls"))
                 .put("sms", granted("sms"))
                 .put("contacts", granted("contacts"))
-                .put("phonestate", granted("phonestate")),
+                .put("phonestate", granted("phonestate"))
+                .put("chat", ChatStore.listenerEnabled(context)),
         )
+    }
+
+    // 💬 채팅+ 받기: "알림 접근" 설정 화면 (안드로이드 11+는 우리 앱 항목을 바로 연다)
+    @PluginMethod
+    fun openChatAccess(call: PluginCall) {
+        val intent = if (Build.VERSION.SDK_INT >= 30) {
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ChatStore.componentName(context).flattenToString())
+        } else {
+            Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        call.resolve()
+    }
+
+    // 지금 보고 있는 문자 대화 (그 대화의 우리 알림은 안 띄움)
+    @PluginMethod
+    fun alertsViewing(call: PluginCall) {
+        PhoneAlerts.viewing = call.getString("number")
+        call.resolve()
     }
 
     @PluginMethod
@@ -160,9 +197,11 @@ class PhonePlugin : Plugin() {
             JSObject()
                 .put("notify", PhoneAlerts.canPost(context))
                 .put("sms", granted("smsnotify"))
-                .put("phonestate", granted("phonestate")),
+                .put("phonestate", granted("phonestate"))
+                .put("chat", ChatStore.listenerEnabled(context)),
         )
     }
+
 
     // 알림·문자 받기·전화 상태 권한을 한 번에 묻는다 (안드로이드 13 미만은 알림 권한을 묻지 않음)
     @PluginMethod
@@ -338,17 +377,36 @@ class PhonePlugin : Plugin() {
                         }
                     }
                 }
+                // 💬 채팅+(RCS): 번호가 같은 대화에 합치고, 없으면 "rcs:번호" 대화로 (ChatListener.kt)
+                val byAddr = HashMap<String, JSObject>()
+                latest.values.forEach { byAddr[OffDay.local(it.getString("address") ?: "")] = it }
+                val chats = ChatStore.all(context)
+                for (i in 0 until chats.length()) {
+                    val o = chats.getJSONObject(i)
+                    val a = o.optString("a")
+                    val d = o.optLong("d")
+                    var t = byAddr[a]
+                    if (t == null) {
+                        t = JSObject().put("threadId", "rcs:$a").put("address", a).put("text", "").put("date", 0L).put("mine", false)
+                        byAddr[a] = t
+                        latest[-(i + 1).toLong() - 1_000_000_000L] = t
+                    }
+                    if (t.getLong("date") <= d) t.put("text", o.optString("t")).put("date", d).put("mine", false).put("rcs", true)
+                    if (o.optBoolean("u")) t.put("rcsUnread", t.optInt("rcsUnread") + 1)
+                }
                 val out = JSArray()
                 val shown = latest.values.sortedByDescending { it.getLong("date") }.take(limit)
                 // 보일 사진 문자들의 글을 한 번에 읽는다
                 val texts = Mms.texts(context, shown.mapNotNull { mmsOf[it.getString("threadId")!!.toLong()]?.first })
                 shown.forEach {
-                    val t = it.getString("threadId")!!.toLong()
+                    val t = it.getString("threadId")!!.toLongOrNull() ?: -1L
+                    if (it.optBoolean("rcs")) mmsOf.remove(t)
                     mmsOf[t]?.let { (id, inbox) ->
                         if (it.getString("address").isNullOrEmpty()) it.put("address", Mms.address(context, id, inbox))
                         it.put("text", texts[id]?.takeIf { s -> s.isNotEmpty() } ?: "📷 사진")
                     }
-                    it.put("unread", unread[t] ?: 0)
+                    it.put("unread", (unread[t] ?: 0) + it.optInt("rcsUnread"))
+                    it.remove("rcsUnread")
                     out.put(it)
                 }
                 call.resolve(JSObject().put("threads", out))
@@ -362,12 +420,25 @@ class PhonePlugin : Plugin() {
     @PluginMethod
     fun messages(call: PluginCall) {
         if (!granted("sms")) return call.reject("문자 권한이 없습니다.", "NO_PERMISSION")
-        val threadId = call.getString("threadId")?.toLongOrNull() ?: return call.reject("대화가 없습니다.")
+        val rawId = call.getString("threadId").orEmpty()
+        val address = call.getString("address") ?: rawId.removePrefix("rcs:").takeIf { rawId.startsWith("rcs:") }
+        val threadId = rawId.toLongOrNull() ?: if (rawId.startsWith("rcs:")) -1L else return call.reject("대화가 없습니다.")
         val limit = call.getInt("limit", 200)!!
         val before = call.getLong("before", Long.MAX_VALUE)!!
         execute {
             try {
                 val list = ArrayList<JSObject>()
+                // 💬 채팅+(RCS) 받은 글 (ChatListener.kt), 본 것으로 표시
+                if (!address.isNullOrBlank()) {
+                    val key = OffDay.local(address)
+                    val chats = ChatStore.all(context)
+                    for (i in 0 until chats.length()) {
+                        val o = chats.getJSONObject(i)
+                        if (o.optString("a") != key || o.optLong("d") >= before) continue
+                        list.add(JSObject().put("id", o.optString("id")).put("text", o.optString("t")).put("date", o.optLong("d")).put("mine", false).put("rcs", true))
+                    }
+                    ChatStore.markRead(context, address)
+                }
                 context.contentResolver.query(
                     Telephony.Sms.CONTENT_URI,
                     arrayOf(Telephony.Sms._ID, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE, Telephony.Sms.STATUS),

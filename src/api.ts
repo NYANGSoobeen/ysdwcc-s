@@ -85,6 +85,7 @@ export const api = {
   getMyAccess: call<void, { superAdmin: boolean; refresh?: boolean }>('getMyAccess'),
   createTeam: call<{ name: string }, { teamId: string }>('createTeam'),
   enableContactsSync: call<void, { username: string; password: string }>('enableContactsSync'),
+  sendTestPush: call<void, { devices: number; sent: number }>('sendTestPush'),
   disableContactsSync: call<void, { ok: true }>('disableContactsSync'),
   deleteMessagesInRange: call<
     { teamId: string; from: number; to: number; dryRun: boolean; channels?: string[] },

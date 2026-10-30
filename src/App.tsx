@@ -30,6 +30,7 @@ import { NoticesPage } from './pages/NoticesPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
 import { PasswordForm } from './pages/PasswordForm.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
+import { AlertsPage } from './pages/AlertsPage.tsx'
 import { SchedulePage } from './pages/SchedulePage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 import { IDLE_NOTICE, rememberSignedIn, wasSignedIn, watchIdle } from './session.ts'
@@ -48,7 +49,7 @@ function savedTeam() {
 
 // F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
 const TAB_KEY = 'current-tab'
-const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'members', 'staff', 'admin', 'usage', 'profile']
+const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'members', 'staff', 'admin', 'usage', 'profile', 'alerts']
 
 function savedTab(): Tab {
   try {
@@ -137,7 +138,7 @@ function SignedIn({ user }: { user: User }) {
   // 📞·✉️ 화면을 알림에서 다시 열 때 새로 그리기 (보던 칸·대화를 알림 내용으로)
   const [phoneNonce, setPhoneNonce] = useState(0)
   // 갤럭시 앱: 앱을 열면 통화 기록·문자 목록을 미리 읽고(화면이 빨리 뜨게) 아래 탭 빨간 숫자를 센다
-  const phoneBadges = usePhoneBadges(!desktop)
+  const phoneBadges = usePhoneBadges(!desktop, team?.id ?? null)
   // 휴대폰: 지금 팀 고객·폰 연락처 이름을 미리 읽어 📞·✉️ 화면의 번호가 바로 이름으로 보이게
   usePrefetchPhoneNames(team?.id ?? null, !desktop)
 
@@ -433,7 +434,8 @@ function SignedIn({ user }: { user: User }) {
             )}
             {current === 'usage' && <UsagePage team={team} />}
             {current === 'front' && <FrontChatPage roomId={frontRoomId} onOpenRoom={openFrontRoom} />}
-            {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} />}
+            {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} onOpenAlerts={() => setTab('alerts')} />}
+            {current === 'alerts' && <AlertsPage unread={badgeTotal} workSms={phoneBadges.sms} />}
           </div>
           {/* 휴대폰: 맨 아래 자주 쓰는 화면 (전화 · 문자 · 고객 · 설정). 채팅방 안에서는 입력칸 자리라 숨긴다. */}
           {!desktop && current !== 'chat' && current !== 'front' && (

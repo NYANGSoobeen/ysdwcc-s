@@ -6,6 +6,31 @@
  */
 const viewing = new Map() // 창(client id) → 보고 있는 tag
 const BADGE_CACHE = 'app-badge'
+// 🔔 알림 방식 (알림 설정 화면, 기기마다): 'sound' 소리 + 알림창 · 'quiet' 소리 없이 알림창만 · 'badge' 무음(숫자만)
+async function readMode() {
+  try {
+    const res = await (await caches.open(BADGE_CACHE)).match('/__mode')
+    return res ? await res.text() : 'sound'
+  } catch (e) {
+    return 'sound'
+  }
+}
+async function writeMode(m) {
+  try {
+    await (await caches.open(BADGE_CACHE)).put('/__mode', new Response(String(m)))
+  } catch (e) {
+    /* 기억 못 하면 소리 + 알림창 */
+  }
+}
+// 알림 띄우기: 무음이면 잠깐 띄웠다 바로 닫는다 (아이폰은 푸시를 받으면 알림을 꼭 띄워야 해서)
+async function show(title, options) {
+  const mode = await readMode()
+  await self.registration.showNotification(title, { ...options, silent: mode !== 'sound' })
+  if (mode === 'badge') {
+    const list = await self.registration.getNotifications({ tag: options.tag })
+    list.forEach((n) => n.close())
+  }
+}
 
 async function readBadge() {
   try {
@@ -37,6 +62,14 @@ self.addEventListener('message', (event) => {
     else viewing.delete(id)
   }
   if (d.type === 'badge') event.waitUntil(writeBadge(Number(d.count) || 0))
+  if (d.type === 'mode') event.waitUntil(writeMode(d.mode))
+  if (d.type === 'test')
+    event.waitUntil(
+      (async () => {
+        if (d.mode) await writeMode(d.mode)
+        await show('🔔 알림 테스트', { body: '채팅 알림이 이렇게 와요', tag: `test-${Date.now()}`, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', lang: 'ko', data: { url: '/' } })
+      })(),
+    )
 })
 
 self.addEventListener('push', (event) => {
@@ -58,7 +91,7 @@ self.addEventListener('push', (event) => {
       if (tag && windows.some((w) => w.visibilityState === 'visible' && viewing.get(w.id) === tag)) return
       // 채팅 알림이면 앱 아이콘 숫자를 하나 올린다 (공지는 안 읽은 채팅 수가 아니라서 제외).
       if (d.kind !== 'notice') await writeBadge((await readBadge()) + 1)
-      await self.registration.showNotification(title, {
+      await show(title, {
         body,
         tag,
         renotify: Boolean(tag),

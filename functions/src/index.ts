@@ -8,7 +8,7 @@ import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-fu
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
-import { notifyChatMessage, notifyFront, notifyNotice } from './push.js'
+import { notifyChatMessage, notifyFront, notifyNotice, sendNotes, tokensOf } from './push.js'
 import { kakaoSearch, SearchError, type SearchKind } from './search.js'
 import { classifyTeamFiles, messageCollectionsOf, UNUSED, type StoredFile } from './usage.js'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
@@ -951,6 +951,19 @@ function sameSecret(a: string, b: string) {
   const y = Buffer.from(b)
   return x.length === y.length && timingSafeEqual(x, y)
 }
+
+// 🔔 알림 설정 화면 "📡 서버로 테스트 보내기": 내 기기들(알림을 켠 곳)에 테스트 알림을 보낸다.
+export const sendTestPush = onCall(async (req) => {
+  const uid = requireUid(req)
+  const tokens = await tokensOf([uid])
+  const sent = await sendNotes(
+    tokens.map((token) => ({
+      token,
+      note: { title: '🔔 알림 테스트 (서버)', body: '서버에서 보낸 테스트예요. 이 알림이 보이면 정상이에요 👍', url: '/', tag: `test-${Date.now()}`, kind: 'notice' as const },
+    })),
+  )
+  return { devices: tokens.length, sent }
+})
 
 // 최고 관리자: 프론트 알림 연동 정보 보기 / 비밀값 새로 만들기·넣기.
 // 비밀값은 만들 때 한 번만 보여 준다 (프론트 앱 ⚙️ 타부서 연동 설정에 같은 값을 넣는다).

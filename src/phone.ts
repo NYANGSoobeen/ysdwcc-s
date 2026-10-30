@@ -21,10 +21,10 @@ export type CallEntry = {
   duration: number // 초
   approx?: boolean // 아이폰·PC: 실제 통화 시간을 알 수 없어, 앱에서 걸고 돌아오기까지 걸린 시간(어림값)
 }
-export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number }
-export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number }
+export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number; rcs?: boolean }
+export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number; rcs?: boolean }
 export type DeviceContact = { name: string; number: string; company?: string }
-type Perms = { calls: boolean; sms: boolean; contacts: boolean; phonestate?: boolean }
+type Perms = { calls: boolean; sms: boolean; contacts: boolean; phonestate?: boolean; chat?: boolean }
 export type OffDayLog = { at: number; number: string; silenced: boolean; sent: boolean }
 
 type PhonePlugin = {
@@ -40,7 +40,7 @@ type PhonePlugin = {
   callLog(o: { limit?: number; since?: number }): Promise<{ calls: CallEntry[] }>
   dial(o: { number: string }): Promise<{ direct: boolean }>
   threads(o: { limit?: number }): Promise<{ threads: SmsThread[] }>
-  messages(o: { threadId: string; limit?: number; before?: number }): Promise<{ messages: SmsMessage[] }>
+  messages(o: { threadId: string; address?: string; limit?: number; before?: number }): Promise<{ messages: SmsMessage[] }>
   threadFor(o: { number: string }): Promise<{ threadId: string }>
   sendSms(o: { number: string; text: string }): Promise<{ parts: number }>
   contacts(): Promise<{ contacts: DeviceContact[] }>
@@ -51,9 +51,12 @@ type PhonePlugin = {
   requestAlerts(): Promise<AlertsStatus>
   clearAlerts(o: { kind: 'sms' | 'missed'; number?: string }): Promise<void>
   alertsOff(): Promise<void>
+  // 💬 채팅+(RCS) 받기 (1.5.0, android/.../phone/ChatListener.kt): 알림 접근 설정, 지금 보는 대화
+  openChatAccess(): Promise<void>
+  alertsViewing(o: { number: string | null }): Promise<void>
 }
 export type AlertCustomer = { n: string; c?: string; o?: string; x?: string }
-export type AlertsStatus = { notify: boolean; sms: boolean; phonestate: boolean }
+export type AlertsStatus = { notify: boolean; sms: boolean; phonestate: boolean; chat?: boolean }
 
 export const PhoneNative = registerPlugin<PhonePlugin>('Phone')
 // 갤럭시 앱이지만 1.3.0 전 버전이면 플러그인이 없다 → 업데이트 안내, 그동안은 아이폰과 같은 방식
@@ -167,6 +170,7 @@ function customerStore(teamId: string) {
   return st
 }
 function holdCustomers(teamId: string) {
+  if (!teamId) return () => {}
   const st = customerStore(teamId)
   st.users += 1
   clearTimeout(st.timer)
@@ -481,11 +485,13 @@ function missedSeenAt() {
 export function unreadThread(t: SmsThread, seen: Record<string, number>) {
   return t.unread > 0 && !t.mine && t.date > (seen[t.threadId] ?? 0)
 }
-export function usePhoneBadges(enabled: boolean) {
+// ✉️ 숫자는 업무(지금 팀 고객) 문자 대화만 센다 (2026-10-30 사용자 요청: 개인 연락은 빼고)
+export function usePhoneBadges(enabled: boolean, teamId: string | null) {
   const perms = usePhonePerms()
   const on = enabled && hasPhoneNative
   const calls = useCallLog(on && perms.calls, () => {})
   const threads = useSmsThreads(on && perms.sms, () => {})
+  const { find } = useTeamCustomers(teamId ?? '')
   // 본 시각이 바뀌어도(최근기록을 봄, 대화를 엶) 다시 센다
   const tick = usePhoneData(() => Date.now())
   return useMemo(() => {
@@ -493,10 +499,10 @@ export function usePhoneBadges(enabled: boolean) {
     const seen = smsSeen()
     return {
       missed: on && calls ? calls.filter((c) => c.type === 3 && c.date > since).length : 0,
-      sms: on && threads ? threads.filter((t) => unreadThread(t, seen)).length : 0,
+      sms: on && threads && teamId ? threads.filter((t) => unreadThread(t, seen) && find(t.address)).length : 0,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, calls, threads, tick])
+  }, [on, calls, threads, tick, find, teamId])
 }
 
 // 로그아웃하면 이 기기의 전화·문자 기록(앱에서 건 전화, 본 시각)을 지운다.

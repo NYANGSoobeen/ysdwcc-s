@@ -170,6 +170,28 @@ async function toWorker(message: unknown) {
   reg?.active?.postMessage(message)
 }
 
+// 🔔 알림 방식 (기기마다, 알림 설정 화면). 서비스 워커가 알림을 그릴 때 따른다(public/push-sw.js).
+export type PushSound = 'sound' | 'quiet' | 'badge'
+const SOUND_KEY = 'push-sound'
+export function pushSound(): PushSound {
+  try {
+    return (localStorage.getItem(SOUND_KEY) as PushSound | null) ?? 'sound'
+  } catch {
+    return 'sound'
+  }
+}
+export function setPushSound(mode: PushSound) {
+  try {
+    localStorage.setItem(SOUND_KEY, mode)
+  } catch {
+    // 기억 못 하면 소리 + 알림창
+  }
+  void toWorker({ type: 'mode', mode })
+}
+export function testPushHere() {
+  void toWorker({ type: 'test', mode: pushSound() })
+}
+
 // 지금 보고 있는 방(알림 tag)을 알려 주면, 그 방의 알림은 띄우지 않고 이미 뜬 알림은 지운다.
 export function tellViewing(tag: string | null) {
   void toWorker({ type: 'viewing', tag })

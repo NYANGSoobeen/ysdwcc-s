@@ -72,7 +72,7 @@ export const NativeContacts = registerPlugin<ContactsSyncPlugin>('ContactsSync')
 // 갤럭시 앱 설치 파일 주소. Firebase Hosting은 APK 파일을 올리지 못해(배포 실패) GitHub 저장소에서 받는다.
 export const APK_URL = 'https://github.com/NYANGSoobeen/ysdwcc-s/raw/main/release/yangsan-support.apk'
 // 저장소에 올린 최신 갤럭시 앱 (release/yangsan-support.apk). APK를 새로 만들면 android/app/build.gradle과 같이 올린다.
-export const LATEST_APK = { code: 8, name: '1.4.0' }
+export const LATEST_APK = { code: 9, name: '1.5.0' }
 
 // 이 폰에 깔린 갤럭시 앱 버전. 1.3.1부터는 Phone.appInfo로 정확히, 그 전 앱은 들어 있는 기능으로 짐작한다
 // (Phone 플러그인 = 1.3.0, FileSaver = 1.2.x, 그 밖 = 1.1 이하).
