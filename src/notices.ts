@@ -1,11 +1,11 @@
-import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, type Timestamp } from 'firebase/firestore'
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, type QueryDocumentSnapshot, type Timestamp } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { deleteObject, ref, uploadBytes } from 'firebase/storage'
 import { resizeToJpeg, type Attachment } from './chat.ts'
 import { auth, db, storage } from './firebase.ts'
 
 // 📢 공지 게시판 (7번): 팀마다 teams/{teamId}/notices/{id}
-// {title, body, photos[{path, thumbPath, width, height, size, thumbSize}], authorUid, createdAt, editedAt, editedBy, stk, stkLast}
+// {title(없어도 됨), body, photos[{path, thumbPath, width, height, size, thumbSize}], authorUid, createdAt, editedAt, editedBy, stk, stkLast, pinned, order}
 // 사진은 채팅처럼 줄여서(긴 쪽 1600px + 썸네일 400px) Storage teams/{teamId}/notices/{id}/ 에 둔다.
 // 공지를 고치거나 지우면 Functions(onNoticeWritten)가 안 쓰는 사진을 지운다.
 // 보는 화면에서만 최근 50개를 실시간으로 받는다.
@@ -20,6 +20,8 @@ export type Notice = {
   editedAt: Timestamp | null
   editedBy: string | null
   stk: unknown
+  pinned: boolean // 📌 상단 고정
+  order: number // 순서 (작을수록 위, ⠿ 끌어서 바꿈). 없으면 -만든 시각 → 새 글이 위
 }
 
 export const NOTICE_PAGE = 50
@@ -27,33 +29,58 @@ export const MAX_NOTICE_PHOTOS = 10
 
 export const noticesRef = (teamId: string) => collection(db, 'teams', teamId, 'notices')
 
+function toNotice(d: QueryDocumentSnapshot): Notice {
+  const v = d.data({ serverTimestamps: 'estimate' })
+  const createdAt = (v.createdAt as Timestamp) ?? null
+  return {
+    id: d.id,
+    title: String(v.title ?? ''),
+    body: String(v.body ?? ''),
+    photos: (v.photos as Attachment[]) ?? [],
+    authorUid: String(v.authorUid ?? ''),
+    createdAt,
+    editedAt: (v.editedAt as Timestamp) ?? null,
+    editedBy: (v.editedBy as string) ?? null,
+    stk: v.stk ?? null,
+    pinned: v.pinned === true,
+    order: typeof v.order === 'number' ? v.order : -(createdAt?.toMillis() ?? Date.now()),
+  }
+}
+
+// 최근 50개 + 상단 고정 공지(오래돼도)를 실시간으로. 고정이 먼저, 그다음 순서(order) 작은 것부터.
 export function useNotices(teamId: string) {
-  const [notices, setNotices] = useState<Notice[] | null>(null)
+  const [recent, setRecent] = useState<Notice[] | null>(null)
+  const [pinned, setPinned] = useState<Notice[]>([])
   useEffect(() => {
-    setNotices(null)
-    return onSnapshot(
+    setRecent(null)
+    setPinned([])
+    const a = onSnapshot(
       query(noticesRef(teamId), orderBy('createdAt', 'desc'), limit(NOTICE_PAGE)),
-      (snap) =>
-        setNotices(
-          snap.docs.map((d) => {
-            const v = d.data({ serverTimestamps: 'estimate' })
-            return {
-              id: d.id,
-              title: String(v.title ?? ''),
-              body: String(v.body ?? ''),
-              photos: (v.photos as Attachment[]) ?? [],
-              authorUid: String(v.authorUid ?? ''),
-              createdAt: (v.createdAt as Timestamp) ?? null,
-              editedAt: (v.editedAt as Timestamp) ?? null,
-              editedBy: (v.editedBy as string) ?? null,
-              stk: v.stk ?? null,
-            }
-          }),
-        ),
-      () => setNotices([]),
+      (snap) => setRecent(snap.docs.map(toNotice)),
+      () => setRecent([]),
     )
+    const b = onSnapshot(
+      query(noticesRef(teamId), where('pinned', '==', true)),
+      (snap) => setPinned(snap.docs.map(toNotice)),
+      () => setPinned([]),
+    )
+    return () => {
+      a()
+      b()
+    }
   }, [teamId])
-  return notices
+  if (recent === null) return null
+  const byId = new Map<string, Notice>()
+  for (const n of [...recent, ...pinned]) byId.set(n.id, n)
+  for (const n of recent) if (n.pinned && !pinned.some((p) => p.id === n.id)) byId.set(n.id, n)
+  return [...byId.values()].sort((x, y) => Number(y.pinned) - Number(x.pinned) || x.order - y.order)
+}
+
+export async function setNoticePinned(teamId: string, id: string, pinned: boolean) {
+  await updateDoc(doc(noticesRef(teamId), id), { pinned })
+}
+export async function setNoticeOrder(teamId: string, id: string, order: number) {
+  await updateDoc(doc(noticesRef(teamId), id), { order })
 }
 
 // 새 공지 또는 고치기: 남긴 사진(keep) + 새 사진(files)을 올리고 저장한다. 저장에 실패하면 새로 올린 사진을 지운다.
@@ -85,7 +112,7 @@ export async function saveNotice(
     }
     const fields = { title: data.title.trim().slice(0, 100), body: data.body.trim().slice(0, 5000), photos }
     if (existing) await updateDoc(noticeRef, { ...fields, editedAt: serverTimestamp(), editedBy: uid })
-    else await setDoc(noticeRef, { ...fields, authorUid: uid, createdAt: serverTimestamp(), editedAt: null, editedBy: null })
+    else await setDoc(noticeRef, { ...fields, authorUid: uid, createdAt: serverTimestamp(), editedAt: null, editedBy: null, pinned: false, order: -Date.now() })
   } catch (error) {
     await Promise.allSettled(uploaded.map((p) => deleteObject(ref(storage, p))))
     throw error

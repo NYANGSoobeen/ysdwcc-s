@@ -299,7 +299,9 @@ test('🏷️ 붙이는 스티커: 팀원은 한 번에 하나씩 자기 스티�
 test('📢 공지: 편집 이상만 쓰고, 고치기·지우기는 쓴 사람이나 관리자, 스티커는 팀원 누구나', async () => {
   const n = (by, extra = {}) => ({ title: '회의', body: '3시', photos: [], authorUid: by, createdAt: serverTimestamp(), editedAt: null, editedBy: null, ...extra })
   await assertFails(setDoc(doc(fs('viewer'), 'teams/t1/notices/n0'), n('viewer')))
-  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/notices/n0'), n('ed', { title: '' })))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/notices/n0'), n('ed', { title: '', body: '' })))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/notices/n9'), n('ed', { title: '', pinned: false, order: -1 })))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/notices/n8'), n('ed', { pinned: 'yes' })))
   await assertFails(setDoc(doc(fs('ed'), 'teams/t1/notices/n0'), n('ed2')))
   await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/notices/n1'), n('ed')))
   await assertSucceeds(getDoc(doc(fs('viewer'), 'teams/t1/notices/n1')))
@@ -308,6 +310,10 @@ test('📢 공지: 편집 이상만 쓰고, 고치기·지우기는 쓴 사람�
   await assertSucceeds(updateDoc(doc(fs('admin'), 'teams/t1/notices/n1'), { title: '관리자 수정', editedBy: 'admin', editedAt: serverTimestamp() }))
   await assertSucceeds(updateDoc(doc(fs('viewer'), 'teams/t1/notices/n1'), { 'stk.s1': { e: '📌', x: 0.1, y: 0.1, by: 'viewer', at: serverTimestamp() }, stkLast: 's1' }))
   await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/notices/n1'), { title: '스티커도 지움', stk: {}, editedBy: 'ed', editedAt: serverTimestamp() }))
+  // 📌 고정·⠿ 순서는 편집 이상 누구나, 보기 권한은 못 함
+  await assertSucceeds(updateDoc(doc(fs('ed2'), 'teams/t1/notices/n1'), { pinned: true, order: 5 }))
+  await assertFails(updateDoc(doc(fs('viewer'), 'teams/t1/notices/n1'), { pinned: false }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/notices/n1'), { pinned: false, body: '몰래 고침' }))
   await assertFails(deleteDoc(doc(fs('ed2'), 'teams/t1/notices/n1')))
   await assertSucceeds(deleteDoc(doc(fs('ed'), 'teams/t1/notices/n1')))
 })

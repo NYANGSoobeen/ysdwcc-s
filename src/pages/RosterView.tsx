@@ -134,7 +134,7 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
 
         {roster === undefined && <p className="center muted">불러오는 중…</p>}
         {roster === null && (
-          <section className="card roster-empty">
+          <section className="card roster-empty-card">
             <p>
               <strong>{monthLabel(month)} 근무표가 아직 없어요.</strong>
             </p>

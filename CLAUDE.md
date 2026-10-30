@@ -58,7 +58,7 @@
   - 메뉴 묶음: "단체 채팅", "관리자 전용"은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`).
   - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면은 📢 공지(7번에서 고객 → 공지로 바꿈).
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
-  - 앱 버전: 메뉴 맨 아래(`팀 · v0.8.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
+  - 앱 버전: 메뉴 맨 아래(`팀 · v0.9.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
   - 입력칸 글자는 16px 이상 (아이폰이 입력칸을 누를 때 화면을 확대하지 않게, `style.css` 끝 `@media (hover: none)` 규칙).
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.
@@ -171,10 +171,11 @@
   - 미리보기에서 고른다: 새 고객은 체크(폰 연락처는 처음엔 아무것도 안 고름), 이미 있음(같은 번호 고객)·위와 같은 번호(파일 안 중복)·번호 없음·이름 없음(회사만 있으면 회사를 이름으로)은 건너뜀. 찾기, (찾은 것) 모두 선택/해제, 300줄까지 표시.
   - 저장: 400개씩 writeBatch, 담당자 = 가져온 사람, 한 번에 2000명까지(`IMPORT_MAX`, 무료 쓰기 한도). 고객마다 `onCustomerWrittenForContacts`가 돈다.
   - 테스트: e2e(PC 엑셀·EUC-KR CSV, 아이폰 .vcf, 가짜 다리로 갤럭시 폰 연락처). Playwright는 한글 이름 파일을 못 넘겨 시험 파일은 영어 이름으로.
-- **📢 공지 게시판 (7번, 2026-10-28, `src/pages/NoticesPage.tsx`, `src/notices.ts`):** 팀마다 `teams/{teamId}/notices/{id}` {title(100자), body(5000자), photos[채팅 사진과 같은 모양, 10장], authorUid, createdAt, editedAt, editedBy, stk, stkLast}. 메뉴 맨 위 📢 공지, 앱 첫 화면.
-  - 쓰기는 편집 이상(＋ 쓰기 → 창: 제목·내용·사진 붙이기/빼기), 고치기·지우기는 쓴 사람이나 관리자(⋯ 메뉴), 보기와 🏷️ 스티커 붙이기는 팀원 모두(보기 권한 포함, 6번과 같은 방식으로 공지 카드 안 비율). 글 속 주소는 링크, 사진은 누르면 크게.
+- **📢 공지 게시판 (7번, 2026-10-28 → 2026-10-30 프론트 앱 공지와 같은 모양으로, 색만 우리 앱, `src/pages/NoticesPage.tsx`, `src/notices.ts`):** 팀마다 `teams/{teamId}/notices/{id}` {title(**선택**, 100자), body(5000자), photos[채팅 사진과 같은 모양, 10장], authorUid, createdAt, editedAt, editedBy, stk, stkLast, **pinned**(📌 상단 고정), **order**(순서, 작을수록 위, 새 글 = -만든 시각)}. 메뉴 맨 위 📢 공지, 앱 첫 화면.
+  - 화면: 머리줄 오른쪽 작은 🔍 검색(제목·내용) · 맨 위 글쓰기 칸(`NoticeComposer`: 제목 (선택) · 공지 내용 · 파일 선택(사진) · 게시하기 📌, 편집 이상) · 카드(PC 두 칸, 순서대로 왼쪽·오른쪽 번갈아 → 고정 공지가 맨 위 줄, 휴대폰 한 칸). 카드: 고정이면 주색 띠 "📌 상단 고정" + 주색 테두리, 제목(명조·주색), 내용, 사진, 아래 "쓴 사람 · 날짜 · 수정: 이름" + 🏷️ 스티커 · 📌 고정/풀기(편집 이상) · ✏️ 수정 · ✕ 삭제(쓴 사람·관리자), 오른쪽 위 ⠿ 끌어서 순서 바꾸기(편집 이상, 같은 묶음(고정/보통) 안, 놓은 카드 앞으로, 검색 중엔 없음). 수정은 창(`NoticeEditor`).
+  - 규칙: 제목·내용·사진 중 하나는 있어야, pinned bool, order number. 쓰기는 편집 이상, 내용 고치기는 쓴 사람이나 관리자, **pinned·order만 바꾸기는 편집 이상 누구나**, 스티커는 팀원 모두.
   - 사진은 채팅처럼 긴 쪽 1600px + 썸네일 400px JPEG, Storage `teams/{teamId}/notices/{id}/{시각}_{n}.jpg`(규칙: 편집 이상, 2MB 미만 JPEG). 고치면 빠진 사진, 지우면 폴더째 `onNoticeWritten`이 지운다(10분 안에 올린 건 저장 중일 수 있어 남김). 용량 관리 종류 "공지 사진".
-  - 실시간 구독은 공지 화면을 볼 때만, 최근 50개. 위쪽 검색칸은 제목·내용. PC 두 칸, 휴대폰 한 칸.
+  - 실시간 구독은 공지 화면을 볼 때만: 최근 50개 + 고정 공지(`pinned == true`, 오래돼도). 정렬은 고정 먼저, 그다음 order.
 - **👤 프로필 (8번, 2026-10-28, `src/ui/Avatar.tsx`, `src/pages/ProfileEditor.tsx`):** `users/{uid}.position`(직급 20자), `avatar` = `''`(이름 첫 글자 동그라미) | `preset:아이디`(기본 그림 16개, 파일 없이 그림 문자+바탕색 `AVATAR_PRESETS`) | `avatars/{uid}/{시각}.jpg`(사진). 규칙: 본인만, avatar는 기본 그림이나 내 폴더만. Storage `avatars/{uid}/`는 본인만 올리고 지움(JPEG 300KB까지).
   - 내 정보 → 👤 카드 ✏️ 프로필 수정 창: 📷 사진 고르기(480px JPEG, 60KB 넘으면 화질 낮춰 다시 → 30~60KB, 고르는 즉시 올림) · 기본 그림 · 사진 없애기 · 이름 · 직급. **저장 안 하고 닫으면 그 창에서 올린 사진을 지운다**, 저장하면 안 고른 새 사진과 예전 사진도 지운다.
   - `Avatar`는 uid만으로 그린다: `useProfile`·`useMemberProfiles`가 읽은 프로필을 `rememberPeople` 저장소에 넣어 둔다. `card`를 주면 누를 때 프로필 카드(사진 크게·이름·직급, `showProfileCard`): 채팅 말풍선 옆, 팀원 화면.
@@ -260,7 +261,7 @@ customers/{customerId}           teamId, name, company, phones[] (E.164), ownerU
 customers/{id}/notes/{noteId}    kind ("수신 통화"|"발신 통화"|"방문 미팅"|...), body, authorUid,
                                  createdAt, editedBy, editedAt, editCount
 customers/{id}/notes/{id}/revisions/{revId}   body, editedBy, editedAt
-teams/{teamId}/notices/{id}      title, body, photos[], authorUid, createdAt, editedAt, editedBy, stk, stkLast   (📢 공지)
+teams/{teamId}/notices/{id}      title(선택), body, photos[], authorUid, createdAt, editedAt, editedBy, stk, stkLast, pinned, order   (📢 공지)
 teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null), size, pdfDropped,
                                  images[{assetId(경로), name:'1쪽', w, h, scale}],
                                  marks[{p(쪽 0부터), x, y, w?, h?, t}], marksAt, marksBy, authorId, createdAt

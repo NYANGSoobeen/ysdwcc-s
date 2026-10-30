@@ -191,9 +191,12 @@ service cloud.firestore {
       match /notices/{noticeId} {
         function validNotice() {
           let d = request.resource.data;
-          return d.title is string && d.title.size() > 0 && d.title.size() <= 100
+          return d.title is string && d.title.size() <= 100
             && d.body is string && d.body.size() <= 5000
-            && d.photos is list && d.photos.size() <= 10;
+            && d.photos is list && d.photos.size() <= 10
+            && (d.title.size() > 0 || d.body.size() > 0 || d.photos.size() > 0)
+            && d.get('pinned', false) is bool
+            && d.get('order', 0) is number;
         }
         allow read: if isMember(teamId);
         allow create: if canEdit(teamId) && validNotice()
@@ -204,7 +207,11 @@ service cloud.firestore {
             && unchanged('authorUid') && unchanged('createdAt')
             && request.resource.data.editedBy == request.auth.uid
             && request.resource.data.get('stk', {}) == resource.data.get('stk', {}))
-          || (isMember(teamId) && onlyChanges(['stk', 'stkLast']) && stkOk('stk'));
+          || (isMember(teamId) && onlyChanges(['stk', 'stkLast']) && stkOk('stk'))
+          // 📌 상단 고정·⠿ 순서 바꾸기는 편집 이상 누구나
+          || (canEdit(teamId) && onlyChanges(['pinned', 'order'])
+            && request.resource.data.get('pinned', false) is bool
+            && request.resource.data.get('order', 0) is number);
         allow delete: if isAdmin(teamId) || (canEdit(teamId) && resource.data.authorUid == request.auth.uid);
       }
 

@@ -4138,51 +4138,178 @@ a.st-link-btn {
   color: var(--danger);
 }
 
-/* ══ 📢 공지 게시판: 휴대폰 한 칸, PC 두 칸 ══ */
-.notice-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  align-items: start;
+/* ══ 📢 공지 게시판: 프론트 앱 공지와 같은 모양(색만 우리 앱). 휴대폰 한 칸, PC 두 칸 ══ */
+.notice-body {
+  gap: 18px;
 }
-.shell.desktop .notice-grid {
-  grid-template-columns: 1fr 1fr;
+.shell.desktop .notice-body {
+  padding: 22px 28px 40px;
+}
+.notices-header .header-search input {
+  width: 120px;
+}
+.shell.desktop .notices-header .header-search input {
+  width: 160px;
+}
+/* 맨 위 글쓰기 칸 */
+.notice-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.notice-composer input,
+.notice-composer textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.notice-composer textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.55;
+}
+.notice-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notice-composer-row .file-pick {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 13.5px;
+}
+.notice-composer-row .post {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 8px 18px;
+}
+/* 카드 */
+.notice-grid {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.notice-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .notice-anchor {
   min-width: 0;
 }
 .notice-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(var(--shadow) / 0.06);
+}
+.notice-card.pinned {
+  border: 2px solid var(--accent);
+  box-shadow: 0 2px 10px rgb(var(--shadow) / 0.16);
+}
+.notice-pin-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.notice-handle-row {
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  padding: 0 12px;
+}
+.notice-handle {
+  cursor: grab;
+  padding: 6px 2px 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  user-select: none;
+  touch-action: none;
+}
+.notice-pin-band .notice-handle {
+  color: var(--accent-text);
+  padding: 0;
+}
+.notice-inner {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 0;
-}
-.notice-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 8px;
+  padding: 16px 18px 12px;
 }
-.notice-head h3 {
-  margin: 0 0 2px;
+.notice-title {
+  margin: 0;
+  padding-right: 18px;
   color: var(--accent);
   font-family: var(--font-serif);
   font-size: 17px;
+  font-weight: 700;
   word-break: keep-all;
   overflow-wrap: anywhere;
-}
-.notice-head p {
-  margin: 0;
 }
 .notice-text {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  line-height: 1.6;
+  line-height: 1.65;
+  font-size: 15px;
 }
 .notice-card .photos {
   border-radius: 10px;
   overflow: hidden;
+}
+.notice-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.notice-tools {
+  display: flex;
+  flex-shrink: 0;
+}
+.notice-tools button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px;
+  font-size: 15px;
+  filter: grayscale(0.7);
+  opacity: 0.7;
+}
+.notice-tools button:hover,
+.notice-tools button.on {
+  filter: none;
+  opacity: 1;
+}
+.notice-tools button.del {
+  color: var(--muted);
+  font-size: 14px;
+}
+.notice-anchor.dragging {
+  opacity: 0.45;
+}
+.notice-anchor.drop-target .notice-card {
+  outline: 3px dashed var(--rock);
+  outline-offset: 3px;
 }
 .notice-body.placing,
 .notice-body.placing * {
@@ -5521,4 +5648,76 @@ a.button:not(.primary) {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--accent);
+}
+
+/* 📋 근무표 여백 (2026-10-30) */
+.roster-body {
+  gap: 18px;
+}
+.shell.desktop .roster-body {
+  padding: 22px 28px 40px;
+}
+.roster-month {
+  margin: 2px 0;
+}
+.roster-empty-card p {
+  margin: 0 0 6px;
+}
+.roster-empty-card p:last-of-type {
+  margin-bottom: 12px;
+}
+.roster-empty-card strong {
+  font-size: 16px;
+}
+.roster-days {
+  padding: 4px 2px 8px;
+  gap: 8px;
+}
+.roster-day-card {
+  padding: 18px 20px;
+}
+.roster-day-card h3 {
+  margin: 0 0 12px;
+  font-family: var(--font-serif);
+  color: var(--accent);
+}
+.roster-list li {
+  padding: 8px 0;
+}
+.roster-list .muted.small {
+  padding: 6px 0;
+}
+.roster-table-toggle {
+  margin: 4px 0 -6px;
+}
+.shell.desktop .roster-table th,
+.shell.desktop .roster-table td {
+  min-width: 34px;
+  height: 34px;
+}
+.roster-table-wrap {
+  padding: 0;
+}
+/* PC: 날짜 띠는 잘리지 않게 두 줄로 */
+.shell.desktop .roster-days {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+/* 공지 머리줄 검색칸: 프론트처럼 작고 둥글게 */
+.notices-header .search-bar.header-search {
+  height: 38px;
+  padding: 0 6px 0 12px;
+}
+.notices-header .header-search input {
+  min-height: 34px;
+  height: 34px;
+  font-size: 14px;
+}
+@media (hover: none) {
+  .notices-header .header-search input {
+    font-size: 16px;
+  }
+  .notice-composer textarea {
+    min-height: 64px;
+  }
 }
