@@ -45,7 +45,15 @@ type PhonePlugin = {
   sendSms(o: { number: string; text: string }): Promise<{ parts: number }>
   contacts(): Promise<{ contacts: DeviceContact[] }>
   addListener(event: 'changed', fn: (e: { what: 'calls' | 'sms' }) => void): Promise<PluginListenerHandle>
+  // 🔔 전화·문자 알림 (갤럭시 앱 1.4.0, android/.../phone/PhoneAlerts.kt)
+  alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean }): Promise<void>
+  alertsStatus(): Promise<AlertsStatus>
+  requestAlerts(): Promise<AlertsStatus>
+  clearAlerts(o: { kind: 'sms' | 'missed'; number?: string }): Promise<void>
+  alertsOff(): Promise<void>
 }
+export type AlertCustomer = { n: string; c?: string; o?: string; x?: string }
+export type AlertsStatus = { notify: boolean; sms: boolean; phonestate: boolean }
 
 export const PhoneNative = registerPlugin<PhonePlugin>('Phone')
 // 갤럭시 앱이지만 1.3.0 전 버전이면 플러그인이 없다 → 업데이트 안내, 그동안은 아이폰과 같은 방식
@@ -274,13 +282,120 @@ export function markSmsSeen(threadId: string) {
   } catch {
     // 기억하지 못하면 안 읽은 수가 남을 뿐
   }
+  emitPhoneData()
+}
+
+// ── 통화 기록·문자 목록 미리 읽어 두기 (2026-10-30, "불러오기가 느려요") ──
+// 한 번 읽은 목록은 메모리에 두고 화면을 다시 열면 바로 보여 준 뒤 뒤에서 새로 읽는다.
+// 앱을 열면(App의 usePhoneBadges) 바로 읽기 시작하므로 📞·✉️ 화면을 처음 열 때도 대개 이미 읽혀 있다.
+// (메모리에만 두고 기기에 저장하지 않는다 — 앱을 닫으면 사라짐)
+const DATA_EVENT = 'phone-data'
+let callsCache: CallEntry[] | null = null
+let threadsCache: SmsThread[] | null = null
+let callsLoading: Promise<void> | null = null
+let threadsLoading: Promise<void> | null = null
+function emitPhoneData() {
+  window.dispatchEvent(new Event(DATA_EVENT))
+}
+export function loadCalls(): Promise<void> {
+  if (!hasPhoneNative) return Promise.resolve()
+  callsLoading ??= PhoneNative.callLog({ limit: 400 })
+    .then(({ calls }) => {
+      callsCache = calls
+      emitPhoneData()
+    })
+    .finally(() => (callsLoading = null))
+  return callsLoading
+}
+export function loadThreads(): Promise<void> {
+  if (!hasPhoneNative) return Promise.resolve()
+  threadsLoading ??= PhoneNative.threads({ limit: 300 })
+    .then(({ threads }) => {
+      threadsCache = threads
+      emitPhoneData()
+    })
+    .finally(() => (threadsLoading = null))
+  return threadsLoading
+}
+function usePhoneData<T>(get: () => T) {
+  const [value, setValue] = useState(get)
+  useEffect(() => {
+    const update = () => setValue(get)
+    update()
+    window.addEventListener(DATA_EVENT, update)
+    return () => window.removeEventListener(DATA_EVENT, update)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return value
+}
+// 화면용: 미리 읽은 목록을 바로 쓰고, 열 때·바뀔 때 새로 읽는다 (실패는 onError)
+export function useCallLog(enabled: boolean, onError: (e: unknown) => void) {
+  const calls = usePhoneData(() => callsCache)
+  const load = () => void (enabled ? loadCalls().catch(onError) : undefined)
+  useEffect(load, [enabled])
+  usePhoneChanged('calls', load)
+  return calls
+}
+export function useSmsThreads(enabled: boolean, onError: (e: unknown) => void) {
+  const threads = usePhoneData(() => threadsCache)
+  const load = () => void (enabled ? loadThreads().catch(onError) : undefined)
+  useEffect(load, [enabled])
+  usePhoneChanged('sms', load)
+  return threads
+}
+
+// ── 📛 아래 탭 빨간 숫자: 📞 부재중(최근기록을 마지막으로 본 뒤), ✉️ 안 읽은 문자 대화 ──
+const MISSED_SEEN = 'missed-seen'
+export function markMissedSeen() {
+  try {
+    localStorage.setItem(MISSED_SEEN, String(Date.now()))
+  } catch {
+    // 기억 못 하면 숫자가 남을 뿐
+  }
+  if (hasPhoneNative) void PhoneNative.clearAlerts({ kind: 'missed' }).catch(() => {})
+  emitPhoneData()
+}
+function missedSeenAt() {
+  try {
+    // 처음엔 지금부터 센다 (예전 부재중이 모두 숫자로 뜨지 않게)
+    const v = localStorage.getItem(MISSED_SEEN)
+    if (v) return Number(v)
+    localStorage.setItem(MISSED_SEEN, String(Date.now()))
+  } catch {
+    // 아래 지금 시각
+  }
+  return Date.now()
+}
+export function unreadThread(t: SmsThread, seen: Record<string, number>) {
+  return t.unread > 0 && !t.mine && t.date > (seen[t.threadId] ?? 0)
+}
+export function usePhoneBadges(enabled: boolean) {
+  const perms = usePhonePerms()
+  const on = enabled && hasPhoneNative
+  const calls = useCallLog(on && perms.calls, () => {})
+  const threads = useSmsThreads(on && perms.sms, () => {})
+  // 본 시각이 바뀌어도(최근기록을 봄, 대화를 엶) 다시 센다
+  const tick = usePhoneData(() => Date.now())
+  return useMemo(() => {
+    const since = missedSeenAt()
+    const seen = smsSeen()
+    return {
+      missed: on && calls ? calls.filter((c) => c.type === 3 && c.date > since).length : 0,
+      sms: on && threads ? threads.filter((t) => unreadThread(t, seen)).length : 0,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, calls, threads, tick])
 }
 
 // 로그아웃하면 이 기기의 전화·문자 기록(앱에서 건 전화, 본 시각)을 지운다.
 export function wipePhoneData() {
   // 🌙 휴무일 자동 응답도 끈다 (다음 사람 폰에서 내 문구가 나가지 않게)
   if (hasPhoneNative) void PhoneNative.offDayConfig({ enabled: false, dates: [], numbers: [], message: '' }).catch(() => {})
-  for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED, 'private-phone-notes']) {
+  // 🔔 전화·문자 알림: 폰에 넣어 둔 고객 정보와 뜬 알림을 지운다 (1.4.0 전 앱은 이 기능이 없음)
+  if (hasPhoneNative) void PhoneNative.alertsOff().catch(() => {})
+  callsCache = null
+  threadsCache = null
+  for (const k of [APP_CALLS_KEY, SEEN_KEY, CALL_MEMO_CHECKED, MISSED_SEEN, 'private-phone-notes']) {
     try {
       localStorage.removeItem(k)
     } catch {

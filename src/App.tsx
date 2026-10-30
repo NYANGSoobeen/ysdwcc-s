@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth'
-import { doc, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, ROLE_LABELS } from './api.ts'
 import { logOutAndWipe, rememberDisabledReason, toLoginId } from './auth.ts'
@@ -12,8 +12,10 @@ import { FrontChatPage } from './front/FrontChatPage.tsx'
 import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
 import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellViewing, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
-import { useNativeContactsSync } from './native.ts'
-import { isPcDevice } from './phone.ts'
+import { useNativeContactsAutoOn, useNativeContactsSync } from './native.ts'
+import { isPcDevice, usePhoneBadges } from './phone.ts'
+import { useAlertsSync } from './phoneAlerts.ts'
+import { normalizePhone } from './customers.ts'
 import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
 import { ApkUpdateBanner } from './ApkUpdateBanner.tsx'
@@ -132,6 +134,10 @@ function SignedIn({ user }: { user: User }) {
   const [channelState, setChannelState] = useState<{ teamId: string; id: string | null } | null>(savedChannel)
   const [searchFocused, setSearchFocused] = useState(false)
   const desktop = useIsDesktop()
+  // 📞·✉️ 화면을 알림에서 다시 열 때 새로 그리기 (보던 칸·대화를 알림 내용으로)
+  const [phoneNonce, setPhoneNonce] = useState(0)
+  // 갤럭시 앱: 앱을 열면 통화 기록·문자 목록을 미리 읽고(화면이 빨리 뜨게) 아래 탭 빨간 숫자를 센다
+  const phoneBadges = usePhoneBadges(!desktop)
 
   function setTab(next: Tab) {
     setTabState(next)
@@ -164,6 +170,10 @@ function SignedIn({ user }: { user: User }) {
 
   // 갤럭시 앱: 폰 연락처의 "지원팀" 계정을 내 모든 팀의 고객과 맞춘다.
   useNativeContactsSync(myTeamIds)
+  // 갤럭시 앱은 "휴대폰 연락처에 고객 표시"를 처음부터 켠다 (걸려 온 전화에 고객 이름, 2026-10-30 사용자가 정함)
+  useNativeContactsAutoOn()
+  // 🔔 전화·문자 알림: 고객 정보를 폰에 맞추고, 처음 한 번 권한을 묻는다 (갤럭시 앱 1.4.0)
+  useAlertsSync(myTeamIds)
   // 🌙 휴무일 자동 응답: 내 휴무 날짜·고객 번호·문구를 폰에 맞춰 둔다 (갤럭시 앱, 켰을 때만)
   useOffDaySync(user.uid, myTeamIds, profile ?? null)
 
@@ -234,6 +244,22 @@ function SignedIn({ user }: { user: User }) {
   const openRequest = useRef<(req: OpenRequest) => void>(() => {})
   openRequest.current = (req) => {
     if (req.kind === 'front') return openFrontRoom(req.ch)
+    // 🔔 갤럭시 앱 전화·문자 알림을 누르고 들어옴
+    if (req.kind === 'sms') {
+      openSmsTo(req.number)
+      setPhoneNonce((n) => n + 1)
+      return setTab('messages')
+    }
+    if (req.kind === 'calls') {
+      try {
+        sessionStorage.setItem('phone-sub', 'recent')
+      } catch {
+        // 기억 못 하면 보던 칸
+      }
+      setPhoneNonce((n) => n + 1)
+      return setTab('phone')
+    }
+    if (req.kind === 'caller') return void openCallerCustomer(req.number)
     if (!teamIds.includes(req.teamId)) return
     if (req.teamId !== team?.id) selectTeam(req.teamId)
     if (req.kind === 'notice') return setTab('notices')
@@ -334,6 +360,26 @@ function SignedIn({ user }: { user: User }) {
     }
     setTab('customers')
   }
+  // 고객 전화 알림을 누르면 그 번호의 고객 (내 팀들에서 찾아, 다른 팀이면 팀도 바꿈). 못 찾으면 최근기록
+  const openCallerCustomer = async (number: string) => {
+    const phone = normalizePhone(number)
+    for (let i = 0; i < myTeamIds.length; i += 30) {
+      const snap = await getDocs(
+        query(collection(db, 'customers'), where('teamId', 'in', myTeamIds.slice(i, i + 30)), where('phones', 'array-contains', phone), limit(1)),
+      ).catch(() => null)
+      const hit = snap?.docs[0]
+      if (!hit) continue
+      const teamId = hit.get('teamId') as string
+      if (teamId !== team.id) selectTeam(teamId)
+      try {
+        sessionStorage.setItem('open-customer', `${teamId}:${hit.id}`)
+      } catch {
+        // 기억 못 하면 고객 목록이 열린다
+      }
+      return setTab('customers')
+    }
+    setTab('phone')
+  }
   const openSms = (number: string, name?: string) => {
     // PC: 문자를 보낼 수 없어 "휴대폰으로 보내주세요" 안내 (src/pcGuide.tsx)
     if (isPcDevice()) return void import('./pcGuide.tsx').then((m) => m.showSmsGuide(number, name))
@@ -358,8 +404,8 @@ function SignedIn({ user }: { user: User }) {
           <div className="shell-body">
             {current === 'notices' && <NoticesPage team={team} uid={user.uid} />}
             {current === 'customers' && <CustomersPage team={team} uid={user.uid} desktop={desktop} onOpenSms={openSms} />}
-            {current === 'phone' && <PhonePage team={team} uid={user.uid} onOpenCustomer={openCustomer} onOpenSms={openSms} />}
-            {current === 'messages' && <MessagesPage team={team} uid={user.uid} onOpenCustomer={openCustomer} />}
+            {current === 'phone' && <PhonePage key={phoneNonce} team={team} uid={user.uid} onOpenCustomer={openCustomer} onOpenSms={openSms} />}
+            {current === 'messages' && <MessagesPage key={phoneNonce} team={team} uid={user.uid} onOpenCustomer={openCustomer} />}
             {current === 'chat' && (
               <ChatPage
                 team={team}
@@ -397,12 +443,17 @@ function SignedIn({ user }: { user: User }) {
                   ['customers', '📇', '고객'],
                   ['profile', '⚙️', '설정'],
                 ] as const
-              ).map(([id, icon, label]) => (
-                <button key={id} type="button" className={current === id ? 'selected' : ''} aria-current={current === id ? 'page' : undefined} onClick={() => setTab(id)}>
-                  <span aria-hidden="true">{icon}</span>
-                  {label}
-                </button>
-              ))}
+              ).map(([id, icon, label]) => {
+                // 📛 📞 부재중(최근기록을 본 뒤) · ✉️ 안 읽은 문자 대화 (갤럭시 앱)
+                const count = id === 'phone' ? phoneBadges.missed : id === 'messages' ? phoneBadges.sms : 0
+                return (
+                  <button key={id} type="button" className={current === id ? 'selected' : ''} aria-current={current === id ? 'page' : undefined} onClick={() => setTab(id)}>
+                    <span aria-hidden="true">{icon}</span>
+                    {label}
+                    {count > 0 && <b className="tab-badge">{count > 99 ? '99+' : count}</b>}
+                  </button>
+                )
+              })}
             </nav>
           )}
         </div>

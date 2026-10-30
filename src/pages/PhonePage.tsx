@@ -14,12 +14,12 @@ import {
   hasPhoneNative,
   isPcDevice,
   oldAndroidApp,
-  PhoneNative,
   prettyNumber,
   startCall,
   timeText,
   useDeviceContacts,
-  usePhoneChanged,
+  markMissedSeen,
+  useCallLog,
   usePhonePerms,
   useTeamCustomers,
   type CallEntry,
@@ -266,20 +266,25 @@ function Keypad({ customers, contacts, ctx }: { customers: Customer[]; contacts:
 type Group = { key: string; first: CallEntry; count: number }
 
 function Recent({ ctx, callsGranted, loaded }: { ctx: RowCtx; callsGranted: boolean; loaded: boolean }) {
-  const [calls, setCalls] = useState<CallEntry[] | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const { query } = useTabSearch()
   const native = hasPhoneNative && callsGranted
-
-  const load = () => {
-    if (native)
-      void PhoneNative.callLog({ limit: 400 })
-        .then(({ calls }) => setCalls(calls))
-        .catch((e) => toast(String(e.message ?? e), { error: true }))
-    else setCalls(appCalls())
-  }
-  useEffect(load, [native])
-  usePhoneChanged('calls', load)
+  // 갤럭시 앱: 앱을 열 때 미리 읽어 둔 통화 기록을 바로 보여 주고 뒤에서 새로 읽는다 (src/phone.ts)
+  const nativeCalls = useCallLog(native, (e) => toast(String((e as Error).message ?? e), { error: true }))
+  const [appList, setAppList] = useState<CallEntry[] | null>(null)
+  useEffect(() => {
+    if (!native) setAppList(appCalls())
+  }, [native])
+  const calls = native ? nativeCalls : appList
+  const setCalls = setAppList
+  // 최근기록을 보면 📞 탭 빨간 숫자와 부재중 알림을 지운다
+  useEffect(() => {
+    if (!native) return
+    markMissedSeen()
+    const onVisible = () => document.visibilityState === 'visible' && markMissedSeen()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [native, nativeCalls])
   // 🔒 이 기기에 내 메모가 있는 번호 (고객이 아닌 번호)
   const [noted, setNoted] = useState(deviceNoteNumbers)
   useEffect(() => {

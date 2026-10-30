@@ -65,6 +65,16 @@
             </intent-filter>
         </receiver>
 
+        <!-- 🔔 문자가 오면 (앱이 꺼져 있어도) 우리 앱 알림 → 누르면 ✉️ 그 대화 (1.4.0) -->
+        <receiver
+            android:name=".phone.SmsAlertReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -94,6 +104,9 @@
     <!-- ✉️ 문자 화면: 문자 읽기·보내기(이 폰 안에서만, 서버에 안 올림). 받은 문자 알림은 삼성 메시지 앱이 그대로 -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- 🔔 전화·문자 알림 (1.4.0): 문자 받기 방송, 알림 띄우기(안드로이드 13+) -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 🌙 휴무일 자동 응답: 걸려 온 전화 알기, 무음 모드로 바꾸기(방해 금지 접근은 설정에서 따로 허용) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />

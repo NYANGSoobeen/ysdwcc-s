@@ -72,7 +72,7 @@ export const NativeContacts = registerPlugin<ContactsSyncPlugin>('ContactsSync')
 // 갤럭시 앱 설치 파일 주소. Firebase Hosting은 APK 파일을 올리지 못해(배포 실패) GitHub 저장소에서 받는다.
 export const APK_URL = 'https://github.com/NYANGSoobeen/ysdwcc-s/raw/main/release/yangsan-support.apk'
 // 저장소에 올린 최신 갤럭시 앱 (release/yangsan-support.apk). APK를 새로 만들면 android/app/build.gradle과 같이 올린다.
-export const LATEST_APK = { code: 7, name: '1.3.2' }
+export const LATEST_APK = { code: 8, name: '1.4.0' }
 
 // 이 폰에 깔린 갤럭시 앱 버전. 1.3.1부터는 Phone.appInfo로 정확히, 그 전 앱은 들어 있는 기능으로 짐작한다
 // (Phone 플러그인 = 1.3.0, FileSaver = 1.2.x, 그 밖 = 1.1 이하).
@@ -178,9 +178,33 @@ export function useNativeContactsSync(teamIds: string[]) {
   }, [enabled, key])
 }
 
+// 갤럭시 앱은 처음부터 켠다 (2026-10-30 사용자가 정함: 걸려 온 전화에 고객 이름이 떠야 함).
+// 직원이 직접 끈 적이 있으면(값 'false') 그대로 둔다. 로그아웃하면 기억을 지워 다음 로그인 때 다시 켠다.
+export function useNativeContactsAutoOn() {
+  useEffect(() => {
+    if (!isAndroidApp) return
+    try {
+      if (localStorage.getItem(ENABLED_KEY) !== null) return
+    } catch {
+      return
+    }
+    void NativeContacts.requestPermission()
+      .then(({ permission }) => setNativeContactsEnabled(permission))
+      .catch(() => {})
+  }, [])
+}
+
 // 로그아웃, 팀 제외, 끄기: 폰의 "지원팀" 연락처 계정을 통째로 지운다.
-export async function clearNativeContacts() {
+// 로그아웃(forget)이면 켜고 끈 기억도 지워, 다음에 로그인하면 다시 저절로 켜진다.
+export async function clearNativeContacts(opts: { forget?: boolean } = {}) {
   if (!isAndroidApp) return
   await NativeContacts.clear().catch(() => {})
   setNativeContactsEnabled(false)
+  if (opts.forget) {
+    try {
+      localStorage.removeItem(ENABLED_KEY)
+    } catch {
+      // 지우지 못하면 다음 로그인 때 설정에서 켜야 한다
+    }
+  }
 }

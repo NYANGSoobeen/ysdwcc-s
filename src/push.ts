@@ -193,7 +193,14 @@ export function setBadge(count: number) {
 }
 
 // 알림을 눌러 들어온 주소(/?room=팀:방, /?front=방, /?notice=팀)나, 앱이 열려 있을 때 서비스 워커가 보낸 주소를 처리한다.
-export type OpenRequest = { kind: 'room'; teamId: string; channelId: string } | { kind: 'front'; ch: string } | { kind: 'notice'; teamId: string }
+export type OpenRequest =
+  | { kind: 'room'; teamId: string; channelId: string }
+  | { kind: 'front'; ch: string }
+  | { kind: 'notice'; teamId: string }
+  // 갤럭시 앱 🔔 전화·문자 알림 (android/.../phone/PhoneAlerts.kt): ✉️ 그 번호 대화, 📞 최근기록, 📇 그 번호 고객
+  | { kind: 'sms'; number: string }
+  | { kind: 'calls' }
+  | { kind: 'caller'; number: string }
 export function parseOpenUrl(url: string): OpenRequest | null {
   const params = new URL(url, location.origin).searchParams
   const room = params.get('room')
@@ -205,6 +212,11 @@ export function parseOpenUrl(url: string): OpenRequest | null {
   if (front) return { kind: 'front', ch: front }
   const notice = params.get('notice')
   if (notice) return { kind: 'notice', teamId: notice }
+  const sms = params.get('sms')
+  if (sms) return { kind: 'sms', number: sms }
+  if (params.get('calls')) return { kind: 'calls' }
+  const caller = params.get('customer')
+  if (caller) return { kind: 'caller', number: caller }
   return null
 }
 
@@ -219,6 +231,15 @@ export function listenOpenRequests(handle: (req: OpenRequest) => void) {
     const req = parseOpenUrl(String(e.data.url))
     if (req) handle(req)
   }
+  // 갤럭시 앱이 열려 있을 때 알림을 누르면 MainActivity가 이 이벤트로 알려 준다 (다시 불러오지 않음)
+  const onNative = (e: Event) => {
+    const req = parseOpenUrl(String((e as CustomEvent).detail))
+    if (req) handle(req)
+  }
   navigator.serviceWorker?.addEventListener('message', onMessage)
-  return () => navigator.serviceWorker?.removeEventListener('message', onMessage)
+  window.addEventListener('native-open', onNative)
+  return () => {
+    navigator.serviceWorker?.removeEventListener('message', onMessage)
+    window.removeEventListener('native-open', onNative)
+  }
 }

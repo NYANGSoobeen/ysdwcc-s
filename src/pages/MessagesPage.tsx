@@ -18,11 +18,12 @@ import {
   timeText,
   useDeviceContacts,
   usePhoneChanged,
+  useSmsThreads,
   usePhonePerms,
   useTeamCustomers,
   type SmsMessage,
-  type SmsThread,
 } from '../phone.ts'
+import { clearSmsAlert } from '../phoneAlerts.ts'
 import { useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, Modal, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
@@ -170,15 +171,10 @@ export function MessagesPage({ team, onOpenCustomer }: Props) {
 
 // ── 대화 목록 ──
 function ThreadList({ who, onOpen }: { who: (a: string) => { customer?: Customer; name: string }; onOpen: (o: Open) => void }) {
-  const [threads, setThreads] = useState<SmsThread[] | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const { query } = useTabSearch()
-  const load = () =>
-    void PhoneNative.threads({ limit: 300 })
-      .then(({ threads }) => setThreads(threads))
-      .catch((e) => toast(String(e.message ?? e), { error: true }))
-  useEffect(load, [])
-  usePhoneChanged('sms', load)
+  // 앱을 열 때 미리 읽어 둔 대화 목록을 바로 보여 주고 뒤에서 새로 읽는다 (src/phone.ts)
+  const threads = useSmsThreads(true, (e) => toast(String((e as Error).message ?? e), { error: true }))
   const seen = smsSeen()
 
   const shown = useMemo(() => {
@@ -267,6 +263,7 @@ function SmsThreadView(props: {
       .then(({ messages }) => {
         setMessages(messages)
         markSmsSeen(open.threadId)
+        clearSmsAlert(open.address)
       })
       .catch((e) => toast(String(e.message ?? e), { error: true }))
   useEffect(load, [open.threadId])

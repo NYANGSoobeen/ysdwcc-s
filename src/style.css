@@ -6137,3 +6137,34 @@ a.button:not(.primary) {
   /* 제스처 막대면 0, ◁ ○ ▢ 버튼 줄이면 그 높이 (src/native.ts) */
   padding-bottom: var(--tabs-bottom-pad, 0px);
 }
+
+/* 📛 아래 탭 빨간 숫자 (📞 부재중 · ✉️ 안 읽은 문자, 갤럭시 앱) */
+.bottom-tabs button {
+  position: relative;
+}
+.bottom-tabs .tab-badge {
+  position: absolute;
+  top: 3px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+/* 🔔 전화·문자 알림 카드 */
+.alert-kinds {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+.alert-kinds label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}

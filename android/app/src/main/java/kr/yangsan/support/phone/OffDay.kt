@@ -123,17 +123,25 @@ object OffDay {
     }
 }
 
+// 전화 상태 방송: 🌙 휴무일 자동 응답 + 🔔 부재중·고객 전화 알림 (PhoneAlerts.kt)
 class OffDayReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
+        // 번호는 통화 기록 권한이 있을 때만 들어온다 (같은 상태 방송이 번호 없이 한 번 더 오기도 함)
+        @Suppress("DEPRECATION")
+        val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
         when (intent.getStringExtra(TelephonyManager.EXTRA_STATE)) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
-                // 번호는 통화 기록 권한이 있을 때만 들어온다 (없으면 null인 방송이 한 번 더 오지 않음)
-                @Suppress("DEPRECATION")
-                val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: return
-                OffDay.onRinging(context, number)
+                if (number != null) OffDay.onRinging(context, number)
+                PhoneAlerts.onRinging(context, number)
             }
-            TelephonyManager.EXTRA_STATE_IDLE -> OffDay.restore(context)
+            TelephonyManager.EXTRA_STATE_OFFHOOK -> PhoneAlerts.onOffhook(context)
+            TelephonyManager.EXTRA_STATE_IDLE -> {
+                OffDay.restore(context)
+                // 부재중 확인은 통화 기록이 적힐 때까지 잠깐 기다린다
+                val pending = goAsync()
+                PhoneAlerts.onIdle(context) { pending.finish() }
+            }
         }
     }
 }

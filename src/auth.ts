@@ -93,7 +93,7 @@ export async function logOutAndWipe(notice?: string) {
   // 앱에서 건 전화 기록, 문자 본 시각 (이 기기에만 있던 것)
   wipePhoneData()
   // 갤럭시 앱이면 폰 연락처에 넣은 고객도 지운다 (데이터 저장 규칙: 계정째 삭제).
-  await clearNativeContacts()
+  await clearNativeContacts({ forget: true })
   // 이 기기 알림을 끈다 (다음 사람에게 내 알림이 가지 않게).
   await disablePush().catch(() => {})
   // 프론트 채팅(게스트) 로그인도 끊는다.

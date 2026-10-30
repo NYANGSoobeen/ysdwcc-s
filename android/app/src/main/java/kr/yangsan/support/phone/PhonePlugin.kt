@@ -39,6 +39,9 @@ import com.getcapacitor.annotation.PermissionCallback
         Permission(alias = "contacts", strings = [Manifest.permission.READ_CONTACTS]),
         // 🌙 휴무일 자동 응답: 걸려 온 번호 알기
         Permission(alias = "phonestate", strings = [Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG]),
+        // 🔔 전화·문자 알림 (1.4.0): 문자 받기 방송, 알림 띄우기(안드로이드 13+만 묻는 권한)
+        Permission(alias = "smsnotify", strings = [Manifest.permission.RECEIVE_SMS]),
+        Permission(alias = "notify", strings = ["android.permission.POST_NOTIFICATIONS"]),
     ],
 )
 class PhonePlugin : Plugin() {
@@ -135,6 +138,57 @@ class PhonePlugin : Plugin() {
                 .put("offToday", OffDay.isOffToday(context))
                 .put("log", log),
         )
+    }
+
+    // ── 🔔 전화·문자 알림 (PhoneAlerts.kt) ──
+    // { customers: { 번호: { n, c, o, x } }, sms, missed, caller }
+    @PluginMethod
+    fun alertsConfig(call: PluginCall) {
+        PhoneAlerts.save(
+            context,
+            call.getObject("customers", JSObject())!!,
+            call.getBoolean("sms", true)!!,
+            call.getBoolean("missed", true)!!,
+            call.getBoolean("caller", true)!!,
+        )
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun alertsStatus(call: PluginCall) {
+        call.resolve(
+            JSObject()
+                .put("notify", PhoneAlerts.canPost(context))
+                .put("sms", granted("smsnotify"))
+                .put("phonestate", granted("phonestate")),
+        )
+    }
+
+    // 알림·문자 받기·전화 상태 권한을 한 번에 묻는다 (안드로이드 13 미만은 알림 권한을 묻지 않음)
+    @PluginMethod
+    fun requestAlerts(call: PluginCall) {
+        val aliases = ArrayList<String>()
+        if (Build.VERSION.SDK_INT >= 33 && !granted("notify")) aliases.add("notify")
+        if (!granted("smsnotify")) aliases.add("smsnotify")
+        if (!granted("phonestate")) aliases.add("phonestate")
+        if (aliases.isEmpty()) return alertsStatus(call)
+        requestPermissionForAliases(aliases.toTypedArray(), call, "alertsResult")
+    }
+
+    @PermissionCallback
+    private fun alertsResult(call: PluginCall) = alertsStatus(call)
+
+    @PluginMethod
+    fun clearAlerts(call: PluginCall) {
+        PhoneAlerts.clear(context, call.getString("kind", "")!!, call.getString("number"))
+        call.resolve()
+    }
+
+    // 로그아웃: 고객 정보와 알림을 지운다
+    @PluginMethod
+    fun alertsOff(call: PluginCall) {
+        PhoneAlerts.clearAll(context)
+        call.resolve()
     }
 
     // 방해 금지 접근 설정 (무음 모드로 바꾸려면 필요)
@@ -256,7 +310,9 @@ class PhonePlugin : Plugin() {
                             .put("mine", c.getInt(4) != Telephony.Sms.MESSAGE_TYPE_INBOX)
                     }
                 }
-                // MMS: 대화의 마지막이 사진 문자면 그것으로 바꾼다.
+                // MMS: 대화의 마지막이 사진 문자면 그것으로 바꾼다. 글·주소는 목록에 보일 대화만 아래에서 읽는다
+                // (예전엔 사진 문자 대화마다 바로 두 번씩 더 읽어서, 광고 사진 문자가 많으면 목록이 느렸다).
+                val mmsOf = HashMap<Long, Pair<Long, Boolean>>() // 대화 → (MMS id, 받은 것)
                 context.contentResolver.query(
                     Telephony.Mms.CONTENT_URI,
                     arrayOf(Telephony.Mms._ID, Telephony.Mms.THREAD_ID, Telephony.Mms.DATE, Telephony.Mms.MESSAGE_BOX, Telephony.Mms.READ),
@@ -274,16 +330,25 @@ class PhonePlugin : Plugin() {
                         if (cur == null || cur.getLong("date") < date) {
                             latest[t] = JSObject()
                                 .put("threadId", t.toString())
-                                .put("address", cur?.getString("address")?.takeIf { it.isNotEmpty() } ?: Mms.address(context, id, inbox))
-                                .put("text", Mms.text(context, id).ifEmpty { "📷 사진" })
+                                .put("address", cur?.getString("address") ?: "")
+                                .put("text", "")
                                 .put("date", date)
                                 .put("mine", !inbox)
+                            mmsOf[t] = Pair(id, inbox)
                         }
                     }
                 }
                 val out = JSArray()
-                latest.values.sortedByDescending { it.getLong("date") }.take(limit).forEach {
-                    it.put("unread", unread[it.getString("threadId")!!.toLong()] ?: 0)
+                val shown = latest.values.sortedByDescending { it.getLong("date") }.take(limit)
+                // 보일 사진 문자들의 글을 한 번에 읽는다
+                val texts = Mms.texts(context, shown.mapNotNull { mmsOf[it.getString("threadId")!!.toLong()]?.first })
+                shown.forEach {
+                    val t = it.getString("threadId")!!.toLong()
+                    mmsOf[t]?.let { (id, inbox) ->
+                        if (it.getString("address").isNullOrEmpty()) it.put("address", Mms.address(context, id, inbox))
+                        it.put("text", texts[id]?.takeIf { s -> s.isNotEmpty() } ?: "📷 사진")
+                    }
+                    it.put("unread", unread[t] ?: 0)
                     out.put(it)
                 }
                 call.resolve(JSObject().put("threads", out))
@@ -461,6 +526,19 @@ private object Mms {
             while (c.moveToNext()) if (c.getString(1) == "text/plain") sb.append(c.getString(2) ?: "")
         }
         return sb.toString()
+    }
+
+    // 여러 사진 문자의 글을 한 번에: { MMS id → 글 }
+    fun texts(context: Context, ids: List<Long>): Map<Long, String> {
+        val out = HashMap<Long, StringBuilder>()
+        ids.chunked(200).forEach { chunk ->
+            if (chunk.isEmpty()) return@forEach
+            context.contentResolver.query(
+                Uri.parse("content://mms/part"), arrayOf("mid", "text"),
+                "ct = 'text/plain' AND mid IN (${chunk.joinToString(",")})", null, null,
+            )?.use { c -> while (c.moveToNext()) out.getOrPut(c.getLong(0)) { StringBuilder() }.append(c.getString(1) ?: "") }
+        }
+        return out.mapValues { it.value.toString() }
     }
 
     fun imageCount(context: Context, id: Long): Int {
