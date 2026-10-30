@@ -356,6 +356,8 @@ function SmsThreadView(props: {
       >
         {messages === null && <p className="center muted">불러오는 중…</p>}
         {messages && all.length === 0 && <p className="center muted">아직 주고받은 문자가 없어요. 아래에 써서 보내 보세요.</p>}
+        {/* 💬 채팅+(RCS)로 받은 글이 있으면 맨 위에 한 번만 (말마다 붙이면 많아 보여서, 2026-10-30 사용자 요청) */}
+        {all.some((m) => m.rcs) && <div className="sms-rcs-note">💬 채팅+ 대화 · 받은 글만 보여요 (삼성 메시지에서 보낸 채팅+는 안 보여요)</div>}
         {all.map((m, i) => (
           <SmsBubble
             key={m.id}
@@ -441,7 +443,6 @@ function SmsBubble({ m, day, customer, onRetry }: { m: Local; day: string | null
         <div className="sms-bubble has-menu" {...menu}>
           {!!m.images && <div className="sms-mms">📷 사진 {m.images}장 (삼성 메시지 앱에서 보기)</div>}
           {m.text}
-          {m.rcs && <span className="sms-rcs">💬 채팅+</span>}
         </div>
         <span className="sms-meta muted">
           {m.sending ? '보내는 중…' : m.failed ? '' : timeText(m.date)}
