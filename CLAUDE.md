@@ -69,7 +69,7 @@
   - 메뉴 묶음: "단체 채팅", "관리자 전용"은 제목을 눌러 접고 편다. 기기마다 기억(localStorage `menu-collapsed`).
   - F5를 눌러도 보던 탭(sessionStorage `current-tab`)과 열어 둔 고객(`open-customer`)을 유지. 앱을 새로 열면 첫 화면은 📢 공지(7번에서 고객 → 공지로 바꿈).
   - 위쪽 검색칸(`src/ui/search.tsx`의 `SearchBar`): 지금 탭 안에서만 찾는다 (고객, 팀원, 관리자, 채팅). 검색어는 탭마다 기억. 휴대폰은 검색칸을 누르고 있는 동안 아래 탭과 채팅 입력칸을 숨긴다. 채팅 검색은 거르지 않고 찾은 말로 이동(가운데, 주황 테두리 반짝, "2 / 5건 ▲ ▼", Enter = 이전, 지우면 맨 아래). 자세한 동작은 아래 4-6.
-  - 앱 버전: 메뉴 맨 아래(`팀 · v0.9.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
+  - 앱 버전: 메뉴 맨 아래(`팀 · v0.9.0 · 빌드 날짜 · 커밋`, `vite.config.ts`의 `buildVersion`). 갤럭시 앱은 그 아래 "📱 갤럭시 앱 1.6.5 ✅"(예전이면 "⚠️ 새 버전 …", `ApkVersion` in `menu.tsx`, `installedApkName`): 화면(웹) 버전과 APK 버전은 따로라 헷갈려서(2026-10-31). 기능을 크게 바꾸면 `package.json`의 version을 올린다.
 - **휴대폰 최적화 (공통 기능 3번):**
   - 입력칸 글자는 16px 이상 (아이폰이 입력칸을 누를 때 화면을 확대하지 않게, `style.css` 끝 `@media (hover: none)` 규칙).
   - 키보드: `.shell`은 `position: fixed` + 높이 `--vv-height`, 위치 `--vv-top`(`src/mobile.ts`가 visualViewport로 넣음) → 아이폰에서 머리줄이 밀려 올라가지 않고 입력칸이 키보드 바로 위. 갤럭시 크롬은 `index.html`의 `interactive-widget=resizes-content`, 갤럭시 앱은 Capacitor 8 SystemBars가 키보드만큼 화면을 줄인다(별도 코드 없음). 입력칸을 누르고 있는 동안 `html.keyboard-open` → 휴대폰 아래 탭 숨김.

@@ -6310,3 +6310,6 @@ p.recent-memos {
 body:has(.apk-update-banner) .toasts {
   bottom: calc(150px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
+.menu-foot .apk-version.old {
+  color: #ffd27a;
+}

@@ -3,6 +3,7 @@ import { logOutAndWipe } from './auth.ts'
 import { badgeText } from './reads.ts'
 import { ask } from './ui/dialogs.tsx'
 import { Avatar } from './ui/Avatar.tsx'
+import { installedApkName, isAndroidApp, LATEST_APK } from './native.ts'
 
 // 왼쪽 메뉴 (휴대폰 ☰ 서랍, PC 왼쪽 고정 메뉴). 프론트 앱과 같은 구조:
 // 내 프로필 → (팀 바꾸기) → 팀원 → ▾ 단체 채팅(+) → 메뉴 → ▾ 관리자 전용 → 로그인 상태·버전. 기능이 늘어나면 MENU_ITEMS에 추가한다.
@@ -193,6 +194,7 @@ function MenuList(props: MenuListProps) {
         <span>
           {props.teamName} · v{__APP_VERSION__}
         </span>
+        <ApkVersion />
         {document.documentElement.classList.contains('android-app') && <span className="screen-diag">{screenDiag()}</span>}
       </div>
     </>
@@ -382,5 +384,21 @@ export function Sidebar(props: Omit<MenuListProps, 'focusable'>) {
     <nav className="sidebar" aria-label="메뉴">
       <MenuList {...props} />
     </nav>
+  )
+}
+
+// 갤럭시 앱(APK) 버전: 화면(웹) 버전과 따로 올라간다. 예전이면 ⚠️ (업데이트는 아래 탭 위 띠에서)
+function ApkVersion() {
+  const [name, setName] = useState('')
+  useEffect(() => {
+    if (isAndroidApp) void installedApkName().then(setName)
+  }, [])
+  if (!name) return null
+  const old = name !== LATEST_APK.name
+  return (
+    <span className={old ? 'apk-version old' : 'apk-version'}>
+      📱 갤럭시 앱 {name}
+      {old ? ` ⚠️ 새 버전 ${LATEST_APK.name}` : ' ✅'}
+    </span>
   )
 }

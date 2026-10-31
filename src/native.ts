@@ -90,6 +90,17 @@ export async function installedApkCode(): Promise<number> {
   return Capacitor.isPluginAvailable('FileSaver') ? 4 : 3
 }
 
+// 메뉴 맨 아래에 보일 갤럭시 앱(APK) 버전 이름 (웹 버전 v0.9.x와 따로, 2026-10-31 "9.31버전인데 왜 오류?")
+export async function installedApkName(): Promise<string> {
+  if (!isAndroidApp) return ''
+  const Phone = registerPlugin<{ appInfo(): Promise<{ versionName: string }> }>('Phone')
+  if (Capacitor.isPluginAvailable('Phone')) {
+    const info = await Phone.appInfo().catch(() => null)
+    if (info?.versionName) return info.versionName
+  }
+  return '1.3.0 이전'
+}
+
 const ENABLED_KEY = 'native-contacts-enabled'
 const CHANGED = 'native-contacts-changed'
 
