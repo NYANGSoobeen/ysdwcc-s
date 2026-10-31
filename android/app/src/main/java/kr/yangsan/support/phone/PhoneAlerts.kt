@@ -68,7 +68,8 @@ object PhoneAlerts {
 
     fun canPost(ctx: Context) = NotificationManagerCompat.from(ctx).areNotificationsEnabled()
 
-    private fun on(ctx: Context, kind: String) = prefs(ctx).getBoolean(kind, false)
+    // 받은 전화 뒤 메모(memo)는 기본 켬: 웹앱이 아직 설정을 넣기 전(업데이트 직후)에도 동작하게 (1.6.7)
+    private fun on(ctx: Context, kind: String) = prefs(ctx).getBoolean(kind, kind == "memo")
 
     private fun customer(ctx: Context, number: String): JSONObject? = try {
         JSONObject(prefs(ctx).getString("customers", "{}") ?: "{}").optJSONObject(OffDay.local(number))
@@ -318,19 +319,9 @@ object PhoneAlerts {
         val work = isCustomer(ctx, number)
         if (!work && hasContactName(ctx, number)) return
         val path = "/?callend=" + Uri.encode(number)
-        if (Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(ctx)) {
-            try {
-                ctx.startActivity(
-                    Intent(ctx, MainActivity::class.java)
-                        .setAction("kr.yangsan.support.CALLEND")
-                        .putExtra("open", path)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                )
-                return
-            } catch (_: Exception) {
-                // 막히면 아래 알림으로
-            }
-        }
+        // 1.6.7: 앱 열기는 막혀도 오류 없이 조용히 무시되는 일이 있어(실제 폰: "다른 앱 위에 표시"를 허용해도 안 열림),
+        // 알림은 늘 띄우고(앱이 열리면 메모 창이 지움) 그 위에서 앱 열기를 시도한다
+        if (Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(ctx)) bringToFront(ctx, path)
         val title = if (work) "📝 ${nameFor(ctx, number)} 통화 메모" else "📝 모르는 번호 · ${format(number)}"
         post(
             ctx, ID_AFTER,
@@ -347,6 +338,46 @@ object PhoneAlerts {
                 // 1.6.6: "다른 앱 위에 표시"가 없어도 화면 위에 오래 떠 있게(잠금 화면이면 바로 열림). 실제 폰: 소리 없는 알림은 그냥 지나쳤다
                 .setFullScreenIntent(open(ctx, path, ID_AFTER + 1), true),
         )
+    }
+
+    // 백그라운드에서 우리 앱 열기. 안드로이드 15부터는 "다른 앱 위에 표시" 권한이 있어도 화면에 우리 창이 떠 있어야만
+    // 백그라운드에서 화면을 열 수 있다 → 1×1 투명 창을 잠깐 띄우고 연 뒤 바로 치운다.
+    private fun bringToFront(ctx: Context, path: String) {
+        val app = ctx.applicationContext
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            val wm = app.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+            var dot: android.view.View? = null
+            try {
+                @Suppress("DEPRECATION")
+                val type = if (Build.VERSION.SDK_INT >= 26) android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else android.view.WindowManager.LayoutParams.TYPE_PHONE
+                val lp = android.view.WindowManager.LayoutParams(
+                    1, 1, type,
+                    android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                    android.graphics.PixelFormat.TRANSLUCENT,
+                )
+                lp.gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                dot = android.view.View(app)
+                wm.addView(dot, lp)
+            } catch (_: Exception) {
+                dot = null
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    app.startActivity(
+                        Intent(app, MainActivity::class.java)
+                            .setAction("kr.yangsan.support.CALLEND")
+                            .putExtra("open", path)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    )
+                } catch (_: Exception) {
+                    // 막히면 알림을 눌러 연다
+                }
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    try { dot?.let { wm.removeView(it) } } catch (_: Exception) {}
+                }, 1500)
+            }, 150)
+        }
     }
 
     private fun hasContactName(ctx: Context, number: String): Boolean {
