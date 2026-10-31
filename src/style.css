@@ -6305,3 +6305,8 @@ p.recent-memos {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* 갤럭시 앱 새 버전 띠가 있으면 토스트는 그 위로 (2026-10-31: 오류 토스트가 띠를 덮어 "업데이트" 버튼만 삐져나왔다) */
+body:has(.apk-update-banner) .toasts {
+  bottom: calc(150px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}

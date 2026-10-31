@@ -181,7 +181,12 @@ function ThreadList({ who, onOpen }: { who: (a: string) => { customer?: Customer
   const [filter, setFilter] = useState<Filter>('all')
   const { query } = useTabSearch()
   // 앱을 열 때 미리 읽어 둔 대화 목록을 바로 보여 주고 뒤에서 새로 읽는다 (src/phone.ts)
-  const threads = useSmsThreads(true, (e) => toast(String((e as Error).message ?? e), { error: true }))
+  const threads = useSmsThreads(true, (e) => {
+    const msg = String((e as Error).message ?? e)
+    // 1.6.2 전 갤럭시 앱: 채팅+만 있는 대화(rcs:번호)가 있으면 목록을 못 읽는다 → 업데이트 안내 (2026-10-31 실제 폰)
+    if (/For input string/.test(msg)) toast('갤럭시 앱이 예전 버전이라 문자 목록을 못 읽었어요.\n아래 "업데이트"로 새 버전을 깔아 주세요.', { error: true, long: true })
+    else toast(msg, { error: true })
+  })
   const seen = smsSeen()
 
   const shown = useMemo(() => {
