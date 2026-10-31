@@ -122,6 +122,8 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 🌙 휴무일 자동 응답: 걸려 온 전화 알기, 무음 모드로 바꾸기(방해 금지 접근은 설정에서 따로 허용) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- 📝 받은 전화 끝나면 메모 알림을 화면 위에 띄움 (1.6.6) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 </manifest>

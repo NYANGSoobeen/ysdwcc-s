@@ -221,8 +221,28 @@ object PhoneAlerts {
         p.edit().remove("ring_at").remove("ring_number").remove("offhook").apply()
         // 받은 전화를 끊으면 바로 메모 (1.6.0): 고객이거나 모르는 번호일 때 우리 앱을 앞으로 (폰 연락처에 있는 개인 번호는 그대로)
         if (ringAt != 0L && answered) {
-            if (!ringNumber.isNullOrBlank() && on(ctx, "memo")) afterCall(ctx, ringNumber)
-            return done()
+            if (!on(ctx, "memo")) return done()
+            if (!ringNumber.isNullOrBlank()) {
+                afterCall(ctx, ringNumber)
+                return done()
+            }
+            // 1.6.6: 전화 상태 방송에 번호가 안 실려 오는 폰이 있다 → 통화 기록에서 방금 받은 전화 번호를 찾는다
+            Thread {
+                try {
+                    for (wait in listOf(1500L, 2500L, 4000L)) {
+                        Thread.sleep(wait)
+                        val n = lastIncoming(ctx, ringAt - 10_000)
+                        if (n != null) {
+                            if (n.isNotBlank()) afterCall(ctx, n)
+                            break
+                        }
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    done()
+                }
+            }.start()
+            return
         }
         if (ringAt == 0L || answered || !on(ctx, "missed")) return done()
         // 통화 기록에 적히기까지 조금 걸린다 (폰마다 달라 2.5초 → 5초 → 9초에 다시 본다)
@@ -237,6 +257,16 @@ object PhoneAlerts {
                 done()
             }
         }.start()
+    }
+
+    // 방금 받은 전화 번호 (아직 통화 기록에 안 적혔으면 null, 번호 없는 전화면 "")
+    private fun lastIncoming(ctx: Context, since: Long): String? {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) return ""
+        return ctx.contentResolver.query(
+            CallLog.Calls.CONTENT_URI, arrayOf(CallLog.Calls.NUMBER),
+            "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.TYPE} = ?", arrayOf(since.toString(), CallLog.Calls.INCOMING_TYPE.toString()),
+            "${CallLog.Calls.DATE} DESC",
+        )?.use { c -> if (c.moveToFirst()) c.getString(0) ?: "" else null }
     }
 
     // 통화 기록에 이번 통화가 적혀 있으면 true (부재중이면 알림). 아직 안 적혔으면 false → 조금 뒤 다시.
@@ -313,7 +343,9 @@ object PhoneAlerts {
                 .setSilent(true)
                 .setAutoCancel(true)
                 .setTimeoutAfter(10 * 60_000)
-                .setContentIntent(open(ctx, path, ID_AFTER)),
+                .setContentIntent(open(ctx, path, ID_AFTER))
+                // 1.6.6: "다른 앱 위에 표시"가 없어도 화면 위에 오래 떠 있게(잠금 화면이면 바로 열림). 실제 폰: 소리 없는 알림은 그냥 지나쳤다
+                .setFullScreenIntent(open(ctx, path, ID_AFTER + 1), true),
         )
     }
 
