@@ -23,13 +23,16 @@ export type CallEntry = {
   isNew?: boolean // 갤럭시 앱 1.6.1: 부재중을 아직 안 봄 (삼성 전화 앱에서 보면 false)
 }
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number; rcs?: boolean }
-export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number; rcs?: boolean }
+export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number; rcs?: boolean; im?: boolean }
 export type DeviceContact = { name: string; number: string; company?: string }
-type Perms = { calls: boolean; sms: boolean; contacts: boolean; phonestate?: boolean; chat?: boolean }
+// im: 삼성 채팅+ 저장소를 직접 읽을 수 있는 폰 (1.6.5, SamsungIm.kt)
+type Perms = { calls: boolean; sms: boolean; contacts: boolean; phonestate?: boolean; chat?: boolean; im?: boolean }
 export type OffDayLog = { at: number; number: string; silenced: boolean; sent: boolean }
 
 type PhonePlugin = {
   status(): Promise<Perms>
+  // 💬 삼성 채팅+ 저장소 점검 (1.6.5): 열리는 곳·줄 수·칸 이름만
+  rcsProbe(): Promise<{ readable: boolean; results: { uri: string; ok: boolean; count?: number; columns?: string[]; usable?: boolean; error?: string }[] }>
   requestCalls(): Promise<{ granted: boolean }>
   requestSms(): Promise<{ granted: boolean }>
   requestContacts(): Promise<{ granted: boolean }>

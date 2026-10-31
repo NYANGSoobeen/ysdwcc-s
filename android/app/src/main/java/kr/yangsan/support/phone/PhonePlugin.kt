@@ -110,8 +110,22 @@ class PhonePlugin : Plugin() {
                 .put("sms", granted("sms"))
                 .put("contacts", granted("contacts"))
                 .put("phonestate", granted("phonestate"))
-                .put("chat", ChatStore.listenerEnabled(context)),
+                .put("chat", ChatStore.listenerEnabled(context))
+                .put("im", granted("sms") && SamsungIm.available(context)),
         )
+    }
+
+    // 💬 삼성 채팅+ 저장소 점검 (1.6.5): 열리는 곳·줄 수·칸 이름만 (글 내용은 안 돌려줌)
+    @PluginMethod
+    fun rcsProbe(call: PluginCall) {
+        if (!granted("sms")) return call.reject("문자 권한이 없습니다.", "NO_PERMISSION")
+        execute {
+            try {
+                call.resolve(JSObject().put("results", JSArray(SamsungIm.probe(context).toString())).put("readable", SamsungIm.available(context)))
+            } catch (e: Exception) {
+                call.reject("점검하지 못했습니다: ${e.message}", e)
+            }
+        }
     }
 
     // 💬 채팅+ 받기: "알림 접근" 설정 화면 (안드로이드 11+는 우리 앱 항목을 바로 연다)
@@ -251,7 +265,8 @@ class PhonePlugin : Plugin() {
                 .put("notify", PhoneAlerts.canPost(context))
                 .put("sms", granted("smsnotify"))
                 .put("phonestate", granted("phonestate"))
-                .put("chat", ChatStore.listenerEnabled(context)),
+                .put("chat", ChatStore.listenerEnabled(context))
+                .put("im", granted("sms") && SamsungIm.available(context)),
         )
     }
 
@@ -485,12 +500,19 @@ class PhonePlugin : Plugin() {
                 val list = ArrayList<JSObject>()
                 // 💬 채팅+(RCS) 받은 글 (ChatListener.kt), 본 것으로 표시
                 if (!address.isNullOrBlank()) {
+                    // 삼성 채팅+ 저장소를 읽을 수 있는 폰이면 보낸 것·받은 것 모두 (1.6.5, SamsungIm.kt)
+                    val im = SamsungIm.messages(context, address, before, limit)
+                    for (o in im) list.add(JSObject(o.toString()))
                     val key = OffDay.local(address)
                     val chats = ChatStore.all(context)
                     for (i in 0 until chats.length()) {
                         val o = chats.getJSONObject(i)
                         if (o.optString("a") != key || o.optLong("d") >= before) continue
-                        list.add(JSObject().put("id", o.optString("id")).put("text", o.optString("t")).put("date", o.optLong("d")).put("mine", false).put("rcs", true))
+                        val t = o.optString("t")
+                        val d = o.optLong("d")
+                        // 알림에서 모은 글이 삼성 저장소에도 있으면 한 번만
+                        if (im.any { !it.optBoolean("mine") && it.optString("text") == t && Math.abs(it.optLong("date") - d) < 180_000 }) continue
+                        list.add(JSObject().put("id", o.optString("id")).put("text", t).put("date", d).put("mine", false).put("rcs", true))
                     }
                     ChatStore.markRead(context, address)
                 }

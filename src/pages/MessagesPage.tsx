@@ -133,7 +133,7 @@ export function MessagesPage({ team, onOpenCustomer }: Props) {
       <div className="page-body">
         {oldAndroidApp && <OldAppCard />}
         {hasPhoneNative && perms.loaded && <PermissionCard kind="sms" what="이 폰의 문자" granted={perms.sms} />}
-        {hasPhoneNative && perms.sms && <ChatPlusOffCard />}
+        {hasPhoneNative && perms.sms && !perms.im && <ChatPlusOffCard />}
         {hasPhoneNative && perms.sms && perms.chat === false && <ChatPlusCard />}
         {native ? (
           <ThreadList who={who} onOpen={setOpen} />
@@ -361,7 +361,9 @@ function SmsThreadView(props: {
         {messages === null && <p className="center muted">불러오는 중…</p>}
         {messages && all.length === 0 && <p className="center muted">아직 주고받은 문자가 없어요. 아래에 써서 보내 보세요.</p>}
         {/* 💬 채팅+(RCS)로 받은 글이 있으면 맨 위에 한 번만 (말마다 붙이면 많아 보여서, 2026-10-30 사용자 요청) */}
-        {all.some((m) => m.rcs) && (
+        {all.some((m) => m.im) ? (
+          <div className="sms-rcs-note">💬 채팅+ 대화 · 삼성 메시지에서 보낸 것·받은 것을 모두 읽어 왔어요</div>
+        ) : all.some((m) => m.rcs) && (
           <button type="button" className="sms-rcs-note" onClick={() => void showChatPlusOff()}>
             💬 채팅+ 대화 · 삼성 메시지에서 보낸 답장은 여기 안 보여요 · <u>채팅+ 끄는 법</u>
           </button>

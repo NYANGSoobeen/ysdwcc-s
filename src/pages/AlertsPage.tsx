@@ -20,7 +20,8 @@ import {
   type PushSound,
   type PushState,
 } from '../push.ts'
-import { tell, toast } from '../ui/dialogs.tsx'
+import { ask, tell, toast } from '../ui/dialogs.tsx'
+import { copyText } from './ChatPage.tsx'
 
 // 🔔 알림 설정 (2026-10-30, 프론트 앱 "알림 설정" 화면과 같은 모양, 색은 우리 앱). 메뉴 맨 아래 따로.
 // 설정은 기기마다: 이 기기의 알림(상태 확인) → 받을 알림(종류) → 알림 방식(소리·조용히·숫자만) + 테스트.
@@ -238,10 +239,16 @@ function WebAlerts({ unread }: { unread: number }) {
 function GalaxyAlerts({ workSms }: { workSms: number }) {
   const { supported, status, kinds } = useAlertsStatus()
   const [chat, setChat] = useState<boolean | null>(null)
+  const [im, setIm] = useState<boolean | null>(null)
   const [overlay, setOverlay] = useState<boolean | null>(null)
   useEffect(() => {
     const check = () => {
-      void PhoneNative.status().then((s) => setChat(s.chat ?? false)).catch(() => setChat(false))
+      void PhoneNative.status()
+        .then((s) => {
+          setChat(s.chat ?? false)
+          setIm(s.im ?? null)
+        })
+        .catch(() => setChat(false))
       // 1.6.0 전 앱에는 없다 (null = 모름)
       void PhoneNative.overlayStatus().then((o) => setOverlay(o.granted)).catch(() => setOverlay(null))
     }
@@ -266,6 +273,37 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
         title: '권한을 허용해 주세요',
         message: '앱 정보 → 권한에서 "알림", "SMS", "전화"를 허용해 주세요. 회색으로 막혀 있으면 앱 정보 오른쪽 위 ⋮ → "제한된 설정 허용"을 먼저 눌러 주세요.',
       }).then(() => PhoneNative.openSettings().catch(() => {}))
+  }
+  // 삼성 채팅+ 저장소가 이 폰에서 열리는지 (1.6.5): 결과(주소·줄 수·칸 이름, 글 내용 없음)를 복사해 개발자에게 보낸다
+  async function probeRcs() {
+    const r = await PhoneNative.rcsProbe().catch((e: unknown) => {
+      toast(String((e as Error).message ?? e).includes('not implemented') ? '갤럭시 앱 새 버전(1.6.5)이 필요해요' : String(e), { error: true })
+      return null
+    })
+    if (!r) return
+    setIm(r.readable)
+    const lines = r.results.map((x) =>
+      x.ok ? `✅ ${x.uri} · ${x.count}줄${x.usable ? ' · 읽기 가능' : ''}\n   칸: ${(x.columns ?? []).join(', ')}` : `⛔ ${x.uri} · ${x.error}`,
+    )
+    const text = `채팅+ 저장소 점검 (${navigator.userAgent.match(/Android [\d.]+; [^)]+/)?.[0] ?? ''})\n${lines.join('\n')}`
+    const copy = await ask({
+      title: r.readable ? '✅ 채팅+를 직접 읽을 수 있어요' : '⛔ 이 폰은 채팅+ 저장소가 막혀 있어요',
+      message: (
+        <>
+          <p className="small">
+            {r.readable
+              ? '✉️ 문자 대화에 채팅+로 보낸 것·받은 것이 모두 보여요. 내용이 이상하면 아래 결과를 복사해 보내 주세요.'
+              : '아래 결과를 복사해 개발자에게 보내 주시면, 이 폰에 맞는 곳을 더 찾아볼게요. (글 내용은 들어 있지 않아요)'}
+          </p>
+          <pre className="probe-out">{text}</pre>
+        </>
+      ),
+      ok: '📋 복사',
+      cancel: '닫기',
+    })
+    if (copy) {
+      await copyText(text)
+    }
   }
   async function openChat() {
     await tell({
@@ -295,6 +333,9 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
           <Check ok={!!status?.sms}>문자 받기: {status?.sms ? '허용됨' : '꺼짐'}</Check>
           <Check ok={!!status?.phonestate}>전화 상태(부재중·고객 전화): {status?.phonestate ? '허용됨' : '꺼짐'}</Check>
           <Check ok={!!chat}>💬 채팅+ 문자 받기(알림 접근): {chat ? '켜짐' : '꺼짐 — 채팅+로 온 문자가 안 보여요'}</Check>
+          {im !== null && (
+            <Check ok={im}>💬 채팅+ 전체 내역(삼성 저장소 직접 읽기): {im ? '읽을 수 있어요 — 보낸 것·받은 것 모두 보여요' : '이 폰에서는 막혀 있어요 — 받은 글만 보여요'}</Check>
+          )}
           {overlay !== null && (
             <Check ok={overlay}>📝 받은 전화 끝나면 앱 바로 띄우기(다른 앱 위에 표시): {overlay ? '허용됨' : '꺼짐 — 알림을 눌러야 메모 창이 열려요'}</Check>
           )}
@@ -316,6 +357,11 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
           {!chat && (
             <button type="button" className={ready ? 'primary' : 'ghost'} onClick={() => void openChat()}>
               💬 채팅+ 받기 켜기
+            </button>
+          )}
+          {status?.sms && (
+            <button type="button" className="ghost" onClick={() => void probeRcs()}>
+              🧪 채팅+ 저장소 점검
             </button>
           )}
         </div>

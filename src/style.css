@@ -6294,3 +6294,14 @@ p.recent-memos {
   padding-left: 20px;
   line-height: 1.7;
 }
+
+.probe-out {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
