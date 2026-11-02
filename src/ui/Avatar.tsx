@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { PhotoViewer } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
 import type { Attachment } from '../chat.ts'
-import { tell } from './dialogs.tsx'
+import { isTouchUi } from './dialogs.tsx'
 import { CenteredGlyph } from './inkCenter.tsx'
 
 // 프로필 사진 (8번). users/{uid}.avatar = '' (이름 첫 글자 동그라미) | 'preset:아이디' (기본 그림) | 'avatars/{uid}/파일.jpg' (사진)
@@ -106,41 +106,74 @@ export function Avatar({ uid, name, card = false }: { uid: string; name: string;
   )
 }
 
-// 프로필 카드. 사진이면 눌러서 크게 보기(두 손가락 확대, 2026-11-02 "프사 눌러도 확대해서 안 보여").
-// extra: 우리 직원이 아닌 사람(🏌️ 프론트 직원)의 직급·사진 주소
+// 프로필 카드 (2026-11-02 사용자가 준 모양: 흰 둥근 카드 · 큰 동그라미 사진 · 이름(명조) · 직급(주색) · 안내 · 알약 닫기).
+// 사진이면 눌러서 크게 보기(두 손가락 확대). extra: 우리 직원이 아닌 사람(🏌️ 프론트 직원)의 직급·사진 주소
+type Card = { uid: string; name: string; position: string; avatar: string; imageUrl?: string }
+let card: Card | null = null
+const cardListeners = new Set<() => void>()
+function setCard(c: Card | null) {
+  card = c
+  cardListeners.forEach((l) => l())
+}
 export function showProfileCard(uid: string, fallbackName: string, extra?: { position?: string; imageUrl?: string }) {
   const p = people[uid]
-  const name = p?.name || fallbackName
-  const position = extra?.position ?? p?.position
-  const avatar = p?.avatar ?? ''
-  const photo = extra?.imageUrl
-    ? { path: `ext/${uid}`, load: () => Promise.resolve(extra.imageUrl!) }
-    : avatar.startsWith('avatars/')
-      ? { path: avatar }
+  setCard({ uid, name: p?.name || fallbackName, position: extra?.position ?? p?.position ?? '', avatar: p?.avatar ?? '', imageUrl: extra?.imageUrl })
+}
+
+export function ProfileCardHost() {
+  const c = useSyncExternalStore(
+    (l) => {
+      cardListeners.add(l)
+      return () => cardListeners.delete(l)
+    },
+    () => card,
+  )
+  useEffect(() => {
+    if (!c) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !viewing) setCard(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [c])
+  if (!c) return null
+  const photo = c.imageUrl
+    ? { path: `ext/${c.uid}`, load: () => Promise.resolve(c.imageUrl!) }
+    : c.avatar.startsWith('avatars/')
+      ? { path: c.avatar }
       : null
-  const face = extra?.imageUrl ? (
-    <span className="avatar photo big" aria-hidden="true">
-      <img src={extra.imageUrl} alt="" />
+  const face = c.imageUrl ? (
+    <span className="avatar photo" aria-hidden="true">
+      <img src={c.imageUrl} alt="" />
     </span>
   ) : (
-    <AvatarFace uid={uid} name={name} avatar={avatar} className="big" />
+    <AvatarFace uid={c.uid} name={c.name} avatar={c.avatar} />
   )
-  void tell({
-    message: (
-      <span className="profile-card">
+  return (
+    <div
+      className="pcard-backdrop"
+      onClick={(e) => {
+        // 바깥을 눌러 닫기는 휴대폰(터치)만
+        if (e.target === e.currentTarget && isTouchUi()) setCard(null)
+      }}
+    >
+      <div className="pcard" role="dialog" aria-modal="true" aria-label={`${c.name} 프로필`}>
         {photo ? (
-          <button type="button" className="profile-photo-button" aria-label="사진 크게 보기" onClick={() => openProfilePhoto({ ...photo, name })}>
+          <button type="button" className="pcard-face zoomable" aria-label="사진 크게 보기" onClick={() => openProfilePhoto({ ...photo, name: c.name })}>
             {face}
-            <span className="profile-photo-hint">🔍 눌러서 크게</span>
           </button>
         ) : (
-          face
+          <span className="pcard-face">{face}</span>
         )}
-        <strong>{name}</strong>
-        {position && <span className="muted">{position}</span>}
-      </span>
-    ),
-  })
+        <strong className="pcard-name">{c.name}</strong>
+        {c.position && <span className="pcard-position">{c.position}</span>}
+        {photo && <span className="pcard-hint">사진을 누르면 크게 볼 수 있어요</span>}
+        <button type="button" className="pcard-close" onClick={() => setCard(null)} autoFocus>
+          닫기
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // 프로필 사진 크게 보기 (프로필 카드 창 위에 뜬다, main.tsx의 ProfilePhotoHost)

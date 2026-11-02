@@ -6379,18 +6379,75 @@ input[type='date']::-webkit-date-and-time-value {
   inset: 0;
   z-index: 80;
 }
-.profile-photo-button {
-  display: inline-flex;
+.pcard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(11 30 42 / 0.4);
+}
+.pcard {
+  display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  width: min(320px, 100%);
+  padding: 28px 24px 22px;
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.25);
+  text-align: center;
+}
+.pcard-face {
+  display: inline-flex;
   min-height: 0;
   padding: 0;
   border: 0;
+  border-radius: 50%;
   background: transparent;
+}
+.pcard-face.zoomable {
   cursor: zoom-in;
 }
-.profile-photo-hint {
+.pcard-face .avatar {
+  width: 196px;
+  height: 196px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--rock) 45%, var(--surface));
+  font-size: 76px;
+  overflow: hidden;
+}
+.pcard-face .avatar.preset {
+  font-size: 104px;
+}
+.pcard-name {
+  margin-top: 18px;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+.pcard-position {
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+.pcard-hint {
+  margin-top: 12px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
+}
+.pcard-close {
+  min-height: 0;
+  margin-top: 16px;
+  padding: 9px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rock) 22%, var(--surface));
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
 }
