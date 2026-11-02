@@ -1,4 +1,4 @@
-import { dialByLink, prettyNumber } from './phone.ts'
+import { dialByLink, pcPhoneLinked, prettyNumber, smsLink } from './phone.ts'
 import { tell, toast } from './ui/dialogs.tsx'
 
 // 💻 PC(마우스로 쓰는 컴퓨터)에는 전화 회선이 없어서, 전화·문자는 휴대폰으로 하도록 번호를 크게 보여 준다.
@@ -55,9 +55,30 @@ export function showSmsGuide(number: string, name?: string, body?: string) {
             </button>
           </span>
         )}
-        <span className="muted small">컴퓨터에서는 문자를 보낼 수 없어요. 휴대폰 문자로 보내 주세요. 윈도우 "휴대폰과 연결" 앱을 쓰면 그 앱의 메시지에 붙여넣어 PC에서 보낼 수도 있어요.</span>
+        <span className="muted small">컴퓨터에는 문자 회선이 없어요. 휴대폰 문자로 보내 주세요. 윈도우 "휴대폰과 연결" 앱을 쓰면 그 앱의 메시지에 붙여넣어 PC에서 보낼 수도 있어요.</span>
+        <button type="button" className="ghost pc-guide-link small" onClick={() => openSmsApp(number, body)}>
+          💻 이 PC에 휴대폰을 연결해 두었다면 → 여기서 문자 앱 열기
+        </button>
       </span>
     ),
     ok: '확인',
   })
+}
+
+// 💻 PC의 문자 앱(맥 메시지, 윈도우 "휴대폰과 연결")을 받는 사람·내용을 채워 연다 (sms: 주소, 2026-11-02 사용자 요청)
+function openSmsApp(number: string, body?: string) {
+  const a = document.createElement('a')
+  a.href = smsLink(number, body ?? '')
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+// PC에서 ✉️: "이 PC는 휴대폰과 연결했어요"를 켠 PC면 문자 앱을 바로 열고(안 열렸으면 알림을 눌러 안내 창),
+// 아니면 번호·내용을 크게 보여 주는 안내 창
+export function openPcSms(number: string, name?: string, body?: string) {
+  if (!pcPhoneLinked()) return showSmsGuide(number, name, body)
+  openSmsApp(number, body)
+  toast('💻 PC 문자 앱을 열었어요. 안 열렸으면 여기를 누르세요', { long: true, onClick: () => showSmsGuide(number, name, body) })
 }

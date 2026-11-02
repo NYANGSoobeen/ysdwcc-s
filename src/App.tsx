@@ -387,7 +387,7 @@ function SignedIn({ user }: { user: User }) {
   }
   const openSms = (number: string, name?: string) => {
     // PC: 문자를 보낼 수 없어 "휴대폰으로 보내주세요" 안내 (src/pcGuide.tsx)
-    if (isPcDevice()) return void import('./pcGuide.tsx').then((m) => m.showSmsGuide(number, name))
+    if (isPcDevice()) return void import('./pcGuide.tsx').then((m) => m.openPcSms(number, name))
     openSmsTo(number)
     setTab('messages')
   }

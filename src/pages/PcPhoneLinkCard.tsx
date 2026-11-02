@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isPcDevice, PC_LINK_CHANGED, pcPhoneLinked, setPcPhoneLinked } from '../phone.ts'
+import { isPcDevice, PC_LINK_CHANGED, pcPhoneLinked, setPcPhoneLinked, smsLink } from '../phone.ts'
 import { toast } from '../ui/dialogs.tsx'
 
 // 설정(PC에서만): 💻 PC에서 휴대폰으로 전화. 윈도우 "휴대폰과 연결" / 맥 "iPhone에서 통화"로 PC와 휴대폰을 이어 두면
@@ -18,9 +18,9 @@ export function PcPhoneLinkCard() {
 
   return (
     <section className="card pc-link-card">
-      <h3>💻 PC에서 휴대폰으로 전화</h3>
+      <h3>💻 PC에서 휴대폰으로 전화·문자</h3>
       <p className="muted small">
-        컴퓨터와 내 휴대폰을 한 번 연결해 두면, 이 앱에서 📞를 누를 때 <strong>휴대폰을 통해 PC에서 바로 걸려요</strong>(PC 스피커·마이크 또는 이어폰으로 통화). 원할 때만 켜세요.
+        컴퓨터와 내 휴대폰을 한 번 연결해 두면, 이 앱에서 📞를 누를 때 <strong>휴대폰을 통해 PC에서 바로 걸려요</strong>(PC 스피커·마이크 또는 이어폰으로 통화). ✉️를 누르면 <strong>PC 문자 앱</strong>(맥 메시지, 윈도우 휴대폰과 연결)이 받는 사람·내용이 채워진 채로 열려요. 원할 때만 켜세요.
       </p>
       {isMac ? (
         <ol className="summary-steps small">
@@ -30,7 +30,10 @@ export function PcPhoneLinkCard() {
           <li>
             <strong>맥</strong>: FaceTime 앱 → 설정 → <strong>iPhone에서 통화</strong> 켜기.
           </li>
-          <li>갤럭시는 맥과 전화 연결이 안 돼요. 갤럭시는 휴대폰에서 걸어 주세요.</li>
+          <li>
+            <strong>문자</strong>: 아이폰 설정 → 앱 → 메시지 → <strong>문자 메시지 전달</strong> → 이 맥 켜기 (맥 메시지 앱에서 일반 문자도 보내져요).
+          </li>
+          <li>갤럭시는 맥과 전화·문자 연결이 안 돼요. 갤럭시는 휴대폰에서 걸고 보내 주세요.</li>
         </ol>
       ) : (
         <ol className="summary-steps small">
@@ -46,9 +49,19 @@ export function PcPhoneLinkCard() {
           <li>
             아래에서 시험 전화를 걸어 봐요. "어떤 앱으로 열까요?"가 뜨면 <strong>휴대폰과 연결</strong>을 고르고 "항상"을 체크해요.
           </li>
+          <li>
+            <strong>문자</strong>는 휴대폰과 연결 앱의 <strong>메시지</strong> 탭을 켜 두세요(아이폰은 블루투스로 일반 문자만, 사진·단체 문자는 안 돼요). 윈도우에서 ✉️로 문자 앱이 안 열리면, 뜨는 알림을 눌러 번호·내용을 복사해 붙여 넣어요.
+          </li>
         </ol>
       )}
       <div className="pc-link-test">
+        <a
+          className={test.replace(/\D/g, '').length >= 3 ? 'button ghost' : 'button ghost disabled'}
+          href={smsLink(test.replace(/\D/g, ''), '시험 문자')}
+          onClick={() => toast('문자 앱(맥 메시지, 휴대폰과 연결)이 받는 사람이 채워진 채로 열리면 성공이에요. 보내지는 않아도 돼요.', { long: true })}
+        >
+          ✉️ 시험 문자
+        </a>
         <input value={test} onChange={(e) => setTest(e.target.value.replace(/[^\d-]/g, ''))} placeholder="시험으로 걸 번호" inputMode="tel" aria-label="시험 전화 번호" />
         <a
           className={test.replace(/\D/g, '').length >= 3 ? 'button' : 'button disabled'}
@@ -64,12 +77,12 @@ export function PcPhoneLinkCard() {
           checked={linked}
           onChange={(e) => {
             setPcPhoneLinked(e.target.checked)
-            toast(e.target.checked ? '이제 이 PC에서 📞를 누르면 바로 걸려요.' : '다시 "휴대폰으로 걸어주세요" 안내를 보여 드려요.')
+            toast(e.target.checked ? '이제 이 PC에서 📞를 누르면 바로 걸리고, ✉️를 누르면 문자 앱이 열려요.' : '다시 "휴대폰으로 걸어주세요·보내주세요" 안내를 보여 드려요.')
           }}
         />
-        <span>이 PC는 휴대폰과 연결했어요 — 📞를 누르면 바로 걸기</span>
+        <span>이 PC는 휴대폰과 연결했어요 — 📞 바로 걸기 · ✉️ 문자 앱 열기</span>
       </label>
-      <p className="muted small">이 설정은 이 컴퓨터에만 저장돼요. 문자는 휴대폰과 연결 앱의 메시지에서 보낼 수 있어요.</p>
+      <p className="muted small">이 설정은 이 컴퓨터에만 저장돼요.</p>
     </section>
   )
 }

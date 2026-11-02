@@ -559,7 +559,7 @@ function NewMessage(props: {
             disabled={!to}
             onClick={() => {
               props.onClose()
-              void import('../pcGuide.tsx').then((m) => m.showSmsGuide(to, toName, body.trim() || undefined))
+              void import('../pcGuide.tsx').then((m) => m.openPcSms(to, toName, body.trim() || undefined))
             }}
           >
             휴대폰으로 보내기
