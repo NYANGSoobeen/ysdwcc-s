@@ -2,7 +2,8 @@ import { doc, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { api } from '../api.ts'
 import { errorMessage } from '../auth.ts'
-import { ask, askText } from '../ui/dialogs.tsx'
+import { ask, askText, toast } from '../ui/dialogs.tsx'
+import { copyText } from './ChatPage.tsx'
 import { db } from '../firebase.ts'
 import { WorkContactsCard } from './WorkContactsCard.tsx'
 import {
@@ -24,6 +25,36 @@ type Status = {
   phoneCount?: number
   phoneCountAt?: Timestamp
   phoneAgent?: string
+  davLog?: { t: number; m: string; k: string; p: string; d: string; r: string; q: string; s: number; n: number; ua: string }[]
+}
+
+// 🔍 연결 점검 기록 (접속 정보를 만든 뒤 1시간, carddav.ts appendDavLog): 요청 종류·물어본 항목 이름·답한 상태만
+function DavLog({ log }: { log: NonNullable<Status['davLog']> }) {
+  const text = log
+    .map((e) => {
+      const time = new Date(e.t).toLocaleTimeString('ko-KR', { hour12: false })
+      return `${time} ${e.m} ${e.p} d=${e.d}${e.r ? ` ${e.r}` : ''} → ${e.s} (${e.n})${e.q ? ` [${e.q}]` : ''}`
+    })
+    .join('\n')
+  const ua = log.at(-1)?.ua ?? ''
+  return (
+    <details className="small" open>
+      <summary>🔍 연결 점검 기록 ({log.length}개)</summary>
+      <p className="muted small">폰이 서버에 물어본 순서예요 (고객 내용·암호는 없어요). 복사해서 개발자에게 보내 주세요.</p>
+      <pre className="probe-out">{`${ua}\n${text}`}</pre>
+      <button
+        type="button"
+        onClick={() =>
+          void copyText(`[CardDAV 점검]\n${ua}\n${text}`).then(
+            () => toast('복사했어요'),
+            () => toast('복사하지 못했어요', { error: true }),
+          )
+        }
+      >
+        📋 점검 기록 복사
+      </button>
+    </details>
+  )
 }
 
 const when = (t?: Timestamp) =>
@@ -56,6 +87,7 @@ function PhoneSyncState({ status }: { status: Status }) {
       {status.phoneCount === undefined && (
         <p className="muted small">폰이 연결은 됐지만 아직 고객 목록을 받아 가지 않았어요. 아이폰 연락처 앱에서 목록을 아래로 당기면 바로 받아요.</p>
       )}
+      {!!status.davLog?.length && <DavLog log={status.davLog} />}
       {!!status.phoneCount && (
         <details>
           <summary>폰에 고객이 안 보이면</summary>

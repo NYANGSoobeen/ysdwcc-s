@@ -129,6 +129,13 @@ test('폰이 받아 간 고객 수를 앱이 볼 수 있게 남기고, sync-coll
   const st = (await db.doc('users/ed/private/contactsSync').get()).data()
   assert.equal(st.phoneCount, 3)
   assert.ok(st.phoneSeenAt)
+  // 접속 정보를 만든 뒤 1시간은 요청 기록(종류·항목 이름만)
+  assert.ok(st.davLog.length > 3)
+  const rep = st.davLog.find((e) => e.m === 'REPORT')
+  assert.equal(rep.k, 'book')
+  assert.match(rep.r, /addressbook-(multiget|query)/)
+  assert.ok(st.davLog.some((e) => e.m === 'PROPFIND' && /current-user-principal|resourcetype/.test(e.q)), JSON.stringify(st.davLog.slice(0, 3)))
+  assert.ok(!JSON.stringify(st.davLog).includes('김협력'), '고객 내용이 기록됨')
   const body = (token) =>
     `<?xml version="1.0"?><d:sync-collection xmlns:d="DAV:"><d:sync-token>${token}</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/></d:prop></d:sync-collection>`
   const first = await request('REPORT', `${PREFIX}/book/`, { body: body(''), headers: { Depth: '1' } })

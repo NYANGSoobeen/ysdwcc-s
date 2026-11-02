@@ -51,7 +51,7 @@ function header(req: DavRequest, name: string) {
   return Array.isArray(v) ? v[0] : v
 }
 
-type Session = { uid: string; username: string; ref: DocumentReference; disabled: boolean; lastUsed: number }
+type Session = { uid: string; username: string; ref: DocumentReference; disabled: boolean; lastUsed: number; createdAt: number }
 
 async function authenticate(req: DavRequest): Promise<Session | null> {
   const auth = header(req, 'authorization') ?? ''
@@ -71,7 +71,8 @@ async function authenticate(req: DavRequest): Promise<Session | null> {
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null
 
   const lastUsed = snap.get('lastUsedAt')?.toMillis?.() ?? 0
-  return { uid: snap.get('uid'), username, ref, disabled: snap.get('disabled') === true, lastUsed }
+  const createdAt = snap.get('createdAt')?.toMillis?.() ?? 0
+  return { uid: snap.get('uid'), username, ref, disabled: snap.get('disabled') === true, lastUsed, createdAt }
 }
 
 // 폰이 언제 어디까지 받아 갔는지 남긴다 (2026-11-02 "아이폰 CardDAV 연결했는데 연락처가 안 떠" → 앱 설정 화면에서 확인).
@@ -269,7 +270,52 @@ function reply(status: number, body = '', headers: Record<string, string> = {}):
   return { status, headers, body }
 }
 
+// 🔍 연결 점검 기록 (2026-11-02, 아이폰이 접속은 하는데 고객 목록을 안 받아 감): 접속 정보를 만든 뒤 1시간 동안
+// 폰이 보낸 요청의 종류·물어본 항목 이름·답한 상태만 users/{uid}/private/contactsSync.davLog에 남긴다(최근 60개,
+// 고객 내용·암호 없음). 앱 설정 화면에서 복사해 개발자에게 보낸다.
+export const DAV_LOG_MS = 60 * 60 * 1000
+const DAV_LOG_MAX = 60
+
+function propNames(body: string) {
+  const inner = body.match(/<(?:[A-Za-z0-9_-]+:)?prop>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?prop>/)?.[1] ?? ''
+  return [...inner.matchAll(/<(?:[A-Za-z0-9_-]+:)?([A-Za-z0-9_-]+)\s*\/?>/g)].map((m) => m[1]).slice(0, 25).join(',')
+}
+
+async function appendDavLog(session: Session, req: DavRequest, res: DavResponse) {
+  if (session.disabled || Date.now() - session.createdAt > DAV_LOG_MS) return
+  const route = parsePath(req.path)
+  const body = req.body ?? ''
+  const entry = {
+    t: Date.now(),
+    m: req.method.toUpperCase(),
+    k: route.kind,
+    p: req.path.replace(/\/book\/[A-Za-z0-9_-]+\.vcf$/, '/book/(card).vcf').slice(0, 80),
+    d: String(header(req, 'depth') ?? ''),
+    r: body.replace(/<\?[^>]*\?>/g, '').match(/<(?:[A-Za-z0-9_-]+:)?([A-Za-z0-9_-]+)/)?.[1] ?? '',
+    q: propNames(body),
+    s: res.status,
+    n: (res.body.match(/<d:response>/g) ?? []).length,
+    ua: String(header(req, 'user-agent') ?? '').slice(0, 60),
+  }
+  const ref = getFirestore().doc(`users/${session.uid}/private/contactsSync`)
+  await getFirestore()
+    .runTransaction(async (tx) => {
+      const d = await tx.get(ref)
+      if (d.get('username') !== session.username) return
+      const log = ((d.get('davLog') ?? []) as unknown[]).slice(-(DAV_LOG_MAX - 1))
+      tx.set(ref, { davLog: [...log, entry] }, { merge: true })
+    })
+    .catch((e) => console.error('carddav log', e))
+}
+
 export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
+  const ctx: { session?: Session } = {}
+  const res = await handleRequest(req, ctx)
+  if (ctx.session) await appendDavLog(ctx.session, req, res)
+  return res
+}
+
+async function handleRequest(req: DavRequest, ctx: { session?: Session }): Promise<DavResponse> {
   const method = req.method.toUpperCase()
   const route = parsePath(req.path)
   const { prefix } = route
@@ -282,6 +328,7 @@ export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
   if (route.kind === 'wellknown') return reply(301, '', { Location: `${prefix}/` })
 
   const session = await authenticate(req)
+  if (session) ctx.session = session
   if (!session) {
     return reply(401, '로그인이 필요합니다.', {
       'WWW-Authenticate': `Basic realm="${REALM}", charset="UTF-8"`,
