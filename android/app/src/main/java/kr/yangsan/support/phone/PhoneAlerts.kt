@@ -36,6 +36,7 @@ object PhoneAlerts {
     private const val CH_SMS_PERSONAL = "sms_personal"
     private const val CH_MISSED = "missed2"
     private const val CH_CALLER = "caller2"
+    private const val CH_MEMO = "memo3"
     private val OLD_CHANNELS = listOf("sms", "missed", "caller")
     private const val ID_CALLER = 1001
     private const val ID_MISSED = 1002
@@ -131,6 +132,15 @@ object PhoneAlerts {
         nm.createNotificationChannel(ch(CH_SMS_PERSONAL, "개인 문자", NotificationManager.IMPORTANCE_DEFAULT, true))
         nm.createNotificationChannel(ch(CH_MISSED, "부재중 전화", NotificationManager.IMPORTANCE_DEFAULT, false))
         nm.createNotificationChannel(ch(CH_CALLER, "고객 전화 정보", NotificationManager.IMPORTANCE_HIGH, false))
+        // 1.6.9: 받은 전화 끝 메모 알림은 따로 (소리 없는 채널에선 화면 위로 안 떠 그냥 지나쳤다) → 짧은 진동 + 위로 뜨기
+        nm.createNotificationChannel(
+            NotificationChannel(CH_MEMO, "통화 후 메모", NotificationManager.IMPORTANCE_HIGH).apply {
+                setSound(null, null)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 120, 80, 120)
+                setShowBadge(false)
+            },
+        )
     }
 
     // 알림을 누르면 우리 앱을 열고 그 화면으로 (MainActivity가 "open" 값을 웹앱 주소로 넘김)
@@ -229,7 +239,10 @@ object PhoneAlerts {
         p.edit().remove("ring_at").remove("ring_number").remove("offhook").apply()
         // 받은 전화를 끊으면 바로 메모 (1.6.0): 고객이거나 모르는 번호일 때 우리 앱을 앞으로 (폰 연락처에 있는 개인 번호는 그대로)
         if (ringAt != 0L && answered) {
-            if (!on(ctx, "memo")) return done()
+            if (!on(ctx, "memo")) {
+                logCallEnd(ctx, ringNumber, "📝 받은 전화 메모가 꺼져 있음")
+                return done()
+            }
             if (!ringNumber.isNullOrBlank()) {
                 afterCall(ctx, ringNumber)
                 return done()
@@ -237,14 +250,17 @@ object PhoneAlerts {
             // 1.6.6: 전화 상태 방송에 번호가 안 실려 오는 폰이 있다 → 통화 기록에서 방금 받은 전화 번호를 찾는다
             Thread {
                 try {
+                    var found = false
                     for (wait in listOf(1500L, 2500L, 4000L)) {
                         Thread.sleep(wait)
                         val n = lastIncoming(ctx, ringAt - 10_000)
                         if (n != null) {
-                            if (n.isNotBlank()) afterCall(ctx, n)
+                            found = true
+                            if (n.isNotBlank()) afterCall(ctx, n) else logCallEnd(ctx, null, "번호를 모르는 전화(발신자 정보 없음)")
                             break
                         }
                     }
+                    if (!found) logCallEnd(ctx, null, "통화 기록에서 방금 받은 전화를 못 찾음")
                 } catch (_: Exception) {
                 } finally {
                     done()
@@ -322,30 +338,45 @@ object PhoneAlerts {
     // 받은 전화가 끝남 → "다른 앱 위에 표시"를 허용했으면 우리 앱을 바로 열고(메모 창은 웹앱이 통화 기록을 보고 띄움),
     // 아니면 눌러서 여는 알림(소리 없이 위에 잠깐 뜸). 우리 앱이 이미 앞에 있으면 웹앱이 알아서 띄우므로 아무것도 안 한다.
     private fun afterCall(ctx: Context, number: String) {
-        if (foreground) return
-        val work = isCustomer(ctx, number)
-        if (!work && hasContactName(ctx, number)) return
+        if (foreground) return logCallEnd(ctx, number, "앱이 이미 앞에 있음 → 웹앱이 메모 창")
+        val work = isCustomer(ctx, number) || onlyOurContact(ctx, number)
+        if (!work && hasContactName(ctx, number)) return logCallEnd(ctx, number, "폰 연락처에 있는 개인 번호 → 건너뜀")
         val path = "/?callend=" + Uri.encode(number)
         // 1.6.7: 앱 열기는 막혀도 오류 없이 조용히 무시되는 일이 있어(실제 폰: "다른 앱 위에 표시"를 허용해도 안 열림),
         // 알림은 늘 띄우고(앱이 열리면 메모 창이 지움) 그 위에서 앱 열기를 시도한다
-        if (Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(ctx)) bringToFront(ctx, path)
+        val overlay = Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(ctx)
+        if (overlay) bringToFront(ctx, path)
         val title = if (work) "📝 ${nameFor(ctx, number)} 통화 메모" else "📝 모르는 번호 · ${format(number)}"
         post(
             ctx, ID_AFTER,
-            NotificationCompat.Builder(ctx, CH_CALLER)
+            NotificationCompat.Builder(ctx, CH_MEMO)
                 .setSmallIcon(R.drawable.ic_stat_app)
                 .setContentTitle(title)
                 .setContentText(if (work) "방금 받은 전화 · 눌러서 메모 남기기" else "고객으로 저장할까요? 눌러서 정하기")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
-                .setSilent(true)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setAutoCancel(true)
                 .setTimeoutAfter(10 * 60_000)
                 .setContentIntent(open(ctx, path, ID_AFTER))
-                // 1.6.6: "다른 앱 위에 표시"가 없어도 화면 위에 오래 떠 있게(잠금 화면이면 바로 열림). 실제 폰: 소리 없는 알림은 그냥 지나쳤다
+                // 1.6.6: 잠금 화면이면 바로 열림, 아니면 화면 위에 오래 떠 있음
                 .setFullScreenIntent(open(ctx, path, ID_AFTER + 1), true),
         )
+        logCallEnd(ctx, number, (if (work) "고객" else "모르는 번호") + (if (overlay) " → 앱 열기 시도 + 알림" else " → 알림만(다른 앱 위에 표시 꺼짐)"))
     }
+
+    // 🧪 받은 전화 메모 점검 (1.6.9, "다른 앱 위에 표시 허용했는데 아직 안 떠"): 최근 10번의 판단을 폰에만 남긴다 (번호는 뒤 4자리만)
+    private fun logCallEnd(ctx: Context, number: String?, verdict: String) {
+        val p = prefs(ctx)
+        val log = try { JSONArray(p.getString("callend_log", "[]")) } catch (_: Exception) { JSONArray() }
+        val d = OffDay.local(number ?: "")
+        log.put(JSONObject().put("at", System.currentTimeMillis()).put("tail", if (d.length >= 4) d.takeLast(4) else d).put("verdict", verdict))
+        while (log.length() > 10) log.remove(0)
+        p.edit().putString("callend_log", log.toString()).apply()
+    }
+
+    fun callEndLog(ctx: Context): JSONArray = try { JSONArray(prefs(ctx).getString("callend_log", "[]")) } catch (_: Exception) { JSONArray() }
+    fun customerCount(ctx: Context) = allCustomers(ctx).length()
+    fun memoOn(ctx: Context) = on(ctx, "memo")
 
     // 백그라운드에서 우리 앱 열기. 안드로이드 15부터는 "다른 앱 위에 표시" 권한이 있어도 화면에 우리 창이 떠 있어야만
     // 백그라운드에서 화면을 열 수 있다 → 1×1 투명 창을 잠깐 띄우고 연 뒤 바로 치운다.
@@ -387,15 +418,36 @@ object PhoneAlerts {
         }
     }
 
-    private fun hasContactName(ctx: Context, number: String): Boolean {
-        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return false
+    // 폰 연락처에 이름이 있는 번호인지 (우리 "지원팀" 연락처 계정의 [업무] 고객은 빼고 — 1.6.9: 웹앱이 고객 목록을 아직 안 넣었으면
+    // 우리가 넣은 [업무] 연락처 때문에 고객 전화를 개인 번호로 보고 건너뛰었다)
+    private fun hasContactName(ctx: Context, number: String) = contactAccounts(ctx, number).any { it != OUR_ACCOUNT }
+
+    // 우리 지원팀 계정에만 있는 번호 = 고객
+    private fun onlyOurContact(ctx: Context, number: String): Boolean {
+        val types = contactAccounts(ctx, number)
+        return types.isNotEmpty() && types.all { it == OUR_ACCOUNT }
+    }
+
+    private const val OUR_ACCOUNT = "kr.yangsan.support.account"
+
+    // 그 번호를 가진 연락처들의 계정 종류 (폰에만 저장한 연락처는 "")
+    private fun contactAccounts(ctx: Context, number: String): List<String> {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return emptyList()
         return try {
+            val ids = ArrayList<Long>()
             ctx.contentResolver.query(
                 Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number)),
-                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null,
-            )?.use { it.moveToFirst() } ?: false
+                arrayOf(ContactsContract.PhoneLookup._ID), null, null, null,
+            )?.use { c -> while (c.moveToNext()) ids.add(c.getLong(0)) }
+            if (ids.isEmpty()) return emptyList()
+            val out = ArrayList<String>()
+            ctx.contentResolver.query(
+                ContactsContract.RawContacts.CONTENT_URI, arrayOf(ContactsContract.RawContacts.ACCOUNT_TYPE),
+                "${ContactsContract.RawContacts.CONTACT_ID} IN (${ids.joinToString(",")}) AND ${ContactsContract.RawContacts.DELETED} = 0", null, null,
+            )?.use { c -> while (c.moveToNext()) out.add(c.getString(0) ?: "") }
+            out
         } catch (_: Exception) {
-            false
+            emptyList()
         }
     }
 

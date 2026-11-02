@@ -24,6 +24,19 @@ export type CallEntry = {
 }
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number; rcs?: boolean }
 export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number; rcs?: boolean; im?: boolean }
+export type CallEndCheck = {
+  phonestate: boolean
+  calls: boolean
+  contacts: boolean
+  overlay: boolean
+  notifications: boolean
+  fullScreen: boolean
+  memo: boolean
+  customers: number
+  sdk: number
+  log: { at: number; tail: string; verdict: string }[]
+}
+
 export type WorkDuplicate = { rawId: number; name: string; number: string; customer: string; company: string; marked: boolean; canUndo: boolean }
 export type DeviceContact = { name: string; number: string; company?: string }
 // im: 삼성 채팅+ 저장소를 직접 읽을 수 있는 폰 (1.6.5, SamsungIm.kt)
@@ -57,6 +70,9 @@ type PhonePlugin = {
   alertsConfig(o: { customers: Record<string, AlertCustomer>; sms: boolean; missed: boolean; caller: boolean; personal: boolean; memo: boolean }): Promise<void>
   // 📝 받은 전화 끝나면 바로 메모 (1.6.0): "다른 앱 위에 표시" 권한, 뜬 알림 지우기
   overlayStatus(): Promise<{ granted: boolean }>
+  // 🧪 받은 전화 메모 점검 (갤럭시 앱 1.6.9)
+  callEndCheck(): Promise<CallEndCheck>
+  openFullScreenSettings(): Promise<void>
   // 📋 클립보드 글 읽기 (1.6.3, src/ui/ClipboardChip.tsx)
   readClipboard(opts?: { peek?: boolean }): Promise<{ text?: string; has?: boolean }>
   openOverlaySettings(): Promise<void>

@@ -305,6 +305,44 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
       await copyText(text)
     }
   }
+  // 🧪 받은 전화 메모 점검 (갤럭시 앱 1.6.9, "다른 앱 위에 표시 허용했는데 아직 안 떠"): 권한·설정 + 최근 받은 전화 판단(번호 뒤 4자리)
+  async function checkCallEnd() {
+    const r = await PhoneNative.callEndCheck().catch((e: unknown) => {
+      toast(String((e as Error).message ?? e).includes('not implemented') ? '갤럭시 앱 새 버전(1.6.9)이 필요해요' : String(e), { error: true })
+      return null
+    })
+    if (!r) return
+    const yes = (b: boolean) => (b ? '✅' : '⛔')
+    const rows = [
+      `${yes(r.phonestate)} 전화 상태 권한 (없으면 통화가 끝난 걸 몰라요)`,
+      `${yes(r.calls)} 통화 기록 권한`,
+      `${yes(r.notifications)} 알림 허용`,
+      `${yes(r.overlay)} 다른 앱 위에 표시`,
+      `${yes(r.fullScreen)} 전체 화면 알림`,
+      `${yes(r.memo)} 📝 받은 전화 끝나면 바로 메모 켜짐`,
+      `${r.customers > 0 ? '✅' : '⚠️'} 폰에 넣어 둔 고객 번호 ${r.customers}개`,
+    ]
+    const log = r.log.length
+      ? r.log
+          .slice()
+          .reverse()
+          .map((e) => `${new Date(e.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ·${e.tail ? ` …${e.tail} ·` : ''} ${e.verdict}`)
+      : ['(아직 받은 전화 기록이 없어요 — 전화를 한 번 받고 끊은 뒤 다시 눌러 주세요)']
+    const text = `받은 전화 메모 점검 (안드로이드 SDK ${r.sdk})\n${rows.join('\n')}\n\n최근 받은 전화\n${log.join('\n')}`
+    const copy = await ask({
+      title: '🧪 받은 전화 메모 점검',
+      message: (
+        <>
+          <p className="small">⛔가 있으면 먼저 허용해 주세요. 그래도 안 되면 아래를 복사해 보내 주세요. (번호는 뒤 4자리만)</p>
+          <pre className="probe-out">{text}</pre>
+        </>
+      ),
+      ok: '📋 복사',
+      cancel: '닫기',
+    })
+    if (copy) await copyText(text)
+    if (!r.fullScreen) await PhoneNative.openFullScreenSettings().catch(() => {})
+  }
   async function openChat() {
     await tell({
       title: '💬 채팅+ 문자 받기',
@@ -359,6 +397,9 @@ function GalaxyAlerts({ workSms }: { workSms: number }) {
               💬 채팅+ 받기 켜기
             </button>
           )}
+          <button type="button" className="ghost" onClick={() => void checkCallEnd()}>
+            🧪 받은 전화 메모 점검
+          </button>
           {status?.sms && (
             <button type="button" className="ghost" onClick={() => void probeRcs()}>
               🧪 채팅+ 저장소 점검

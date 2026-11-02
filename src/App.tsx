@@ -177,7 +177,8 @@ function SignedIn({ user }: { user: User }) {
   // 갤럭시 앱은 "휴대폰 연락처에 고객 표시"를 처음부터 켠다 (걸려 온 전화에 고객 이름, 2026-10-30 사용자가 정함)
   useNativeContactsAutoOn()
   // 🔔 전화·문자 알림: 고객 정보를 폰에 맞추고, 처음 한 번 권한을 묻는다 (갤럭시 앱 1.4.0)
-  useAlertsSync(myTeamIds)
+  // 최고 관리자는 팀원이 아니어도 모든 팀의 고객 번호로 (받은 전화 메모·고객 전화 정보, 2026-11-02)
+  useAlertsSync(isSuper && allTeamIds ? allTeamIds : myTeamIds)
   // 🌙 휴무일 자동 응답: 내 휴무 날짜·고객 번호·문구를 폰에 맞춰 둔다 (갤럭시 앱, 켰을 때만)
   useOffDaySync(user.uid, myTeamIds, profile ?? null)
 

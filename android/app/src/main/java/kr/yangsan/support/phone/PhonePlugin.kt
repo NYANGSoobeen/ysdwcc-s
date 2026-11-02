@@ -187,6 +187,38 @@ class PhonePlugin : Plugin() {
         call.resolve()
     }
 
+    // 🧪 받은 전화 메모 점검 (1.6.9): 권한·설정과 최근 10번의 판단(번호는 뒤 4자리만)
+    @PluginMethod
+    fun callEndCheck(call: PluginCall) {
+        val nm = context.getSystemService(android.app.NotificationManager::class.java)
+        call.resolve(
+            JSObject()
+                .put("phonestate", granted("phonestate"))
+                .put("calls", granted("calls"))
+                .put("contacts", granted("contacts"))
+                .put("overlay", Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(context))
+                .put("notifications", androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled())
+                .put("fullScreen", if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true)
+                .put("memo", PhoneAlerts.memoOn(context))
+                .put("customers", PhoneAlerts.customerCount(context))
+                .put("sdk", Build.VERSION.SDK_INT)
+                .put("log", JSArray(PhoneAlerts.callEndLog(context).toString())),
+        )
+    }
+
+    // 안드로이드 14+: 전체 화면 알림 허용 설정 화면
+    @PluginMethod
+    fun openFullScreenSettings(call: PluginCall) {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= 34) Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.fromParts("package", context.packageName, null))
+            else Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (_: Exception) {
+        }
+        call.resolve()
+    }
+
     // 📝 받은 전화 끝나면 우리 앱을 바로 열기: "다른 앱 위에 표시" 권한 (1.6.0)
     @PluginMethod
     fun overlayStatus(call: PluginCall) {
