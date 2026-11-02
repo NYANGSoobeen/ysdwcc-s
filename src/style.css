@@ -6451,3 +6451,13 @@ input[type='date']::-webkit-date-and-time-value {
   font-size: 15px;
   font-weight: 700;
 }
+
+/* 휴대폰 채팅 입력칸 아래 여백 (2026-11-02 "아이폰은 입력칸이 너무 밑에 붙어 있어 불편해, 프론트 앱처럼"):
+   홈 막대 칸(safe-area-inset-bottom)만큼 띄우고 10px 더. 키보드가 열리면 홈 막대가 키보드에 가려지므로 10px만. */
+.shell:not(.desktop) .composer {
+  padding: 10px 12px calc(10px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+html.keyboard-open .shell:not(.desktop) .composer,
+html.keyboard-open .sms-composer {
+  padding-bottom: 10px;
+}
