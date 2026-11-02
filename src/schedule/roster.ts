@@ -81,10 +81,11 @@ export function normalizeCode(raw: string) {
 
 const normName = (s: string) => s.replace(/[\s()·.,-]/g, '').toLowerCase()
 
-// 날짜 머리줄 칸: "1", "1일", "11/3", "2026. 11. 3.", "11-03"
+// 날짜 머리줄 칸: "1", "1일", "1(일)", "11/3", "2026. 11. 3.", "11-03"
+// (2026-11-02 실제 근무결과표: 날짜 칸이 "1(일)", "2(월)"처럼 요일이 붙어 있어 못 읽었다)
 function dayOf(cell: string): { day: number; month?: number; year?: number } | null {
   const s = cell.trim()
-  let m = s.match(/^(\d{1,2})\s*일?$/)
+  let m = s.match(/^(\d{1,2})\s*일?\s*(\([^)]{1,3}\))?$/)
   if (m) return Number(m[1]) >= 1 && Number(m[1]) <= 31 ? { day: Number(m[1]) } : null
   m = s.match(/^(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*[.일]?\s*(\(.\))?$/)
   if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) }
@@ -113,7 +114,8 @@ export function parseRosterTable(rows: string[][], members: { uid: string; name:
     let info: { month?: number; year?: number } = {}
     rows[i].forEach((c, j) => {
       const d = dayOf(c)
-      if (d) {
+      // 같은 날짜가 또 나오면(오른쪽 요약 칸의 숫자 등) 처음 것만
+      if (d && ![...cols.values()].includes(d.day)) {
         cols.set(j, d.day)
         if (d.month) info = { month: d.month, year: d.year ?? info.year }
       }
@@ -132,7 +134,9 @@ export function parseRosterTable(rows: string[][], members: { uid: string; name:
   if (!month) {
     for (const r of rows.slice(0, header + 1)) {
       for (const c of r) {
-        const m = c.match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*월?/) ?? c.match(/(?:^|\D)(\d{1,2})\s*월/)
+        // "2026년 11월", "26년 11월"(앞 두 자리는 20xx), "11월"
+        const yy = c.match(/(?:^|\D)(\d{2})\s*년\s*(\d{1,2})\s*월/)
+        const m = c.match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*월?/) ?? (yy ? [yy[0], `20${yy[1]}`, yy[2]] : null) ?? c.match(/(?:^|\D)(\d{1,2})\s*월/)
         if (m && m.length === 3) month = `${m[1]}-${m[2].padStart(2, '0')}`
         else if (m) month = `${fallbackMonth.slice(0, 4)}-${m[1].padStart(2, '0')}`
         if (month) break

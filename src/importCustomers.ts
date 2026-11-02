@@ -21,7 +21,8 @@ export type Candidate = {
 export const IMPORT_MAX = 2000 // 한 번에 (무료 사용량: 하루 쓰기 2만 회)
 
 // ── 표 (엑셀·CSV) ──
-export type Table = { rows: string[][]; sheetNames?: string[] }
+// sheets: 엑셀의 모든 시트(근무표처럼 시트마다 다른 부서가 있을 때 고르려고, 2026-11-02)
+export type Table = { rows: string[][]; sheetNames?: string[]; sheets?: { name: string; rows: string[][] }[] }
 export type Mapping = { header: number; name: number; company: number; phones: number[] } // -1 = 없음, header -1 = 머리줄 없음
 
 const NAME_RE = /^(이름|성명|성함|고객명|고객 ?이름|담당자|담당자명|성명\(?한글\)?|name|full ?name)$/i
@@ -108,7 +109,8 @@ export async function readTableFile(file: File): Promise<Table> {
     const sheets = await readXlsxFile(file)
     // 줄이 가장 많은 시트를 먼저
     sheets.sort((a, b) => b.data.length - a.data.length)
-    return { rows: sheets[0]?.data.map((r) => r.map(cellText)) ?? [], sheetNames: sheets.map((s) => s.sheet) }
+    const all = sheets.map((s) => ({ name: s.sheet, rows: s.data.map((r) => r.map(cellText)) }))
+    return { rows: all[0]?.rows ?? [], sheetNames: all.map((s) => s.name), sheets: all }
   }
   if (lower.endsWith('.xls')) throw new Error('예전 엑셀(.xls) 파일이에요. 엑셀에서 "다른 이름으로 저장 → Excel 통합 문서(.xlsx)"로 저장한 뒤 올려 주세요.')
   return { rows: parseCsv(await readText(file)) }

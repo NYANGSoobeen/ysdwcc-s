@@ -350,8 +350,19 @@ function RosterImportDialog(props: {
   async function open(file: File) {
     setBusy('엑셀을 읽는 중…')
     try {
-      const { rows } = await readTableFile(file)
-      const r = parseRosterTable(rows, props.members, props.month)
+      const { rows, sheets } = await readTableFile(file)
+      // 시트가 여럿이면(부서마다 시트) 우리 팀원 이름이 가장 많이 맞는 시트를 쓴다
+      let r: RosterImport | null = null
+      let firstError: unknown = null
+      for (const sheetRows of sheets?.map((x) => x.rows) ?? [rows]) {
+        try {
+          const t = parseRosterTable(sheetRows, props.members, props.month)
+          if (!r || t.matched.length > r.matched.length || (t.matched.length === r.matched.length && t.days > r.days)) r = t
+        } catch (err) {
+          firstError ??= err
+        }
+      }
+      if (!r) throw firstError ?? new Error('파일을 읽지 못했어요.')
       setResult({ ...r, fileName: file.name })
       setMonth(r.month)
     } catch (err) {
