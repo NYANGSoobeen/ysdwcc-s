@@ -111,7 +111,11 @@ class ChatListener : NotificationListenerService() {
                             val person = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)?.messages?.lastOrNull()?.person
                             me.numberOf(person?.uri, person?.name?.toString() ?: title)?.let { OffDay.local(it) == key } == true
                         }
-                        hit.forEach { me.cancelNotification(it.key) }
+                        // 1.7.1: 우리 앱에서 읽으면 삼성 메시지 알림의 "읽음" 버튼을 대신 눌러 삼성 앱에서도 읽음으로
+                        // (기본 문자 앱이 아니라 문자함 읽음 표시는 직접 못 바꾼다. 알림이 남아 있을 때만 됨)
+                        hit.forEach { sbn ->
+                            if (!pressMarkRead(sbn.notification)) me.cancelNotification(sbn.key)
+                        }
                         // 그 앱의 남은 알림이 없으면 묶음(요약) 알림도
                         hit.map { it.packageName }.toSet().forEach { pkg ->
                             if (mine.none { it.packageName == pkg && it !in hit }) {
@@ -125,6 +129,21 @@ class ChatListener : NotificationListenerService() {
                 }
             } catch (_: Exception) {
                 // 못 지우면 그 앱 알림은 남는다
+            }
+        }
+
+        // 알림의 "읽음(Mark as read)" 버튼 찾아 누르기. 누르면 그 앱이 스스로 읽음 처리하고 알림을 지운다
+        private fun pressMarkRead(n: Notification): Boolean {
+            val actions = n.actions ?: return false
+            val a = actions.firstOrNull { act ->
+                (android.os.Build.VERSION.SDK_INT >= 28 && act.semanticAction == Notification.Action.SEMANTIC_ACTION_MARK_AS_READ) ||
+                    act.title?.toString()?.let { t -> t.contains("읽음") || t.contains("읽은") || t.contains("read", ignoreCase = true) } == true
+            } ?: return false
+            return try {
+                a.actionIntent?.send() ?: return false
+                true
+            } catch (_: Exception) {
+                false
             }
         }
     }
@@ -162,21 +181,46 @@ class ChatListener : NotificationListenerService() {
         }
     }
 
-    // 삼성 메시지 알림을 지우면(삼성 앱에서 읽음) 우리 알림도 지운다
-    // 삼성 메시지·전화 앱에서 확인해 그 앱 알림이 사라지면 우리 알림도 지운다
+    // 삼성 메시지·전화 앱에서 확인해 그 앱 알림이 사라지면 우리 알림도 지운다.
+    // 1.7.1 (2026-11-02 "눌러서 읽지 않았는데 읽음 처리돼"): 알림이 사라지는 이유를 본다. 밀어서 지우기·묶음 정리·우리가 지운 것·
+    // 새 문자가 와서 다시 올리는 것은 "읽음"이 아니다 → 눌러서 열었거나(CLICK) 그 앱이 스스로 지운 것(APP_CANCEL)만,
+    // 그리고 2초 뒤 같은 번호 알림이 다시 떠 있지 않을 때만 읽음으로 본다.
+    override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap?, reason: Int) {
+        if (reason != REASON_CLICK && reason != REASON_APP_CANCEL) return
+        handleRemoved(sbn)
+    }
+
+    @Deprecated("API 26 미만")
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        if (android.os.Build.VERSION.SDK_INT < 26) handleRemoved(sbn)
+    }
+
+    private fun handleRemoved(sbn: StatusBarNotification) {
         val n = sbn.notification ?: return
         if (sbn.packageName != packageName && n.category == Notification.CATEGORY_MISSED_CALL) {
             PhoneAlerts.clear(this, "missed", null, others = false)
             return
         }
         if (sbn.packageName !in apps) return
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val title = n.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val number = numberOf(null, title) ?: return
-        // 삼성 앱에서 읽음 → 우리 목록의 채팅+ 안 읽은 표시도 지운다
-        ChatStore.markRead(this, number)
-        ChatStore.onChange?.invoke()
-        PhoneAlerts.clear(this, "sms", number, others = false)
+        val person = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)?.messages?.lastOrNull()?.person
+        val number = numberOf(person?.uri, person?.name?.toString() ?: title) ?: return
+        val key = OffDay.local(number)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                val again = activeNotifications?.any { a ->
+                    a.packageName == sbn.packageName && a.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 &&
+                        a.notification.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString() == title
+                } == true
+                if (again) return@postDelayed
+            } catch (_: Exception) {
+            }
+            // 삼성 앱에서 읽음 → 우리 목록의 채팅+ 안 읽은 표시도 지운다
+            ChatStore.markRead(this, key)
+            ChatStore.onChange?.invoke()
+            PhoneAlerts.clear(this, "sms", key, others = false)
+        }, 2000)
     }
 
     private fun take(number: String, text: String, date: Long) {
