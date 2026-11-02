@@ -21,7 +21,6 @@ import {
 } from '../schedule/roster.ts'
 import { Avatar } from '../ui/Avatar.tsx'
 import { ask, Modal, toast } from '../ui/dialogs.tsx'
-import { useIsDesktop } from '../useMedia.ts'
 
 // 📋 근무표: 엑셀에서 우리 팀원 줄만 가져와 깔끔한 표로. 날짜마다 B0 · 휴 목록으로 보고, 직접 고칠 수도 있다.
 // 데이터는 src/schedule/roster.ts. 휴무(휴)인 날은 갤럭시 앱이 고객 전화 무음 + 자동 문자 (src/offday.ts).
@@ -32,7 +31,6 @@ const MONTH_KEY = 'roster-month'
 
 export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs: ReactNode }) {
   const canEdit = team.myRole !== 'viewer'
-  const desktop = useIsDesktop()
   const today = new Date()
   const [month, setMonthState] = useState(() => {
     try {
@@ -64,7 +62,8 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
   const [tab, setTab] = useState<Tab>('B0')
   const [editing, setEditing] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [showTable, setShowTable] = useState(desktop)
+  // 한 달 표는 휴대폰도 처음부터 펼침 (2026-11-02 사용자 요청)
+  const [showTable, setShowTable] = useState(true)
   const n = daysIn(month)
   const d = Math.min(day, n)
   const codeOf = (u: string, dd: number) => roster?.codes?.[u]?.[dd] ?? ''
