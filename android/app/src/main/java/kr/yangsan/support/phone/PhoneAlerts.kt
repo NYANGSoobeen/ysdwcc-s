@@ -352,7 +352,7 @@ object PhoneAlerts {
             NotificationCompat.Builder(ctx, CH_MEMO)
                 .setSmallIcon(R.drawable.ic_stat_app)
                 .setContentTitle(title)
-                .setContentText(if (work) "방금 받은 전화 · 눌러서 메모 남기기" else "고객으로 저장할까요? 눌러서 정하기")
+                .setContentText(if (work) "방금 받은 전화 · 눌러서 메모 남기기" else "업무 고객 · 개인 연락처 중 어디에 저장할까요? 눌러서 정하기")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setAutoCancel(true)

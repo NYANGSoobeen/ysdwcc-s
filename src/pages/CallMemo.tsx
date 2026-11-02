@@ -376,11 +376,26 @@ function UnknownCallSheet(props: {
               props.onMemo({ customerId: id, name: (snap?.get('name') as string) ?? '', company: (snap?.get('company') as string) ?? '', number: call.number, kind: '수신 통화', at: call.at, duration: call.duration })
             }}
           >
-            ＋ 업무 고객으로 저장하고 메모
+            💼 업무 고객으로 저장하고 메모
           </button>
         )}
+        {/* 2026-11-02 사용자 요청 "업무로 저장할지 개인으로 저장할지": 폰 연락처 앱의 새 연락처 화면을 번호를 채워 연다 (갤럭시 앱 1.7.0) */}
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await PhoneNative.addContact({ number: call.number })
+              props.onClose()
+            } catch (e) {
+              const old = String((e as Error)?.message ?? e).includes('not implemented')
+              toast(old ? '갤럭시 앱 새 버전(1.7.0)이 필요해요. 위의 "📱 새 버전" 띠에서 업데이트해 주세요.' : '연락처 앱을 열지 못했어요.', { error: true, long: true })
+            }
+          }}
+        >
+          👤 개인 연락처로 저장 (폰 연락처)
+        </button>
         <button type="button" onClick={() => props.onMemo({ customerId: '', personal: true, name: pretty, number: call.number, kind: '수신 통화', at: call.at, duration: call.duration })}>
-          🔒 개인 번호로 두고 내 메모만 (이 폰에만)
+          🔒 저장 안 하고 내 메모만 (이 폰에만)
         </button>
         <button type="button" className="ghost" onClick={props.onClose}>
           그냥 닫기

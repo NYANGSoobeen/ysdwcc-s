@@ -206,6 +206,24 @@ class PhonePlugin : Plugin() {
         )
     }
 
+    // 👤 모르는 번호를 개인 연락처로 저장 (1.7.0): 삼성 연락처 앱의 "새 연락처" 화면을 번호를 채워 연다 (쓰기 권한 필요 없음, 저장은 직원이)
+    @PluginMethod
+    fun addContact(call: PluginCall) {
+        val number = call.getString("number").orEmpty()
+        if (number.isBlank()) return call.reject("번호가 없습니다.")
+        try {
+            val intent = Intent(Intent.ACTION_INSERT, android.provider.ContactsContract.Contacts.CONTENT_URI)
+                .putExtra(android.provider.ContactsContract.Intents.Insert.PHONE, number)
+                .putExtra(android.provider.ContactsContract.Intents.Insert.PHONE_TYPE, android.provider.ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE)
+                .putExtra("finishActivityOnSaveCompleted", true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("연락처 앱을 열지 못했습니다: ${e.message}", e)
+        }
+    }
+
     // 안드로이드 14+: 전체 화면 알림 허용 설정 화면
     @PluginMethod
     fun openFullScreenSettings(call: PluginCall) {

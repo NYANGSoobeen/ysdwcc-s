@@ -73,6 +73,8 @@ type PhonePlugin = {
   // 🧪 받은 전화 메모 점검 (갤럭시 앱 1.6.9)
   callEndCheck(): Promise<CallEndCheck>
   openFullScreenSettings(): Promise<void>
+  // 👤 폰 연락처 앱의 새 연락처 화면을 번호를 채워 열기 (갤럭시 앱 1.7.0)
+  addContact(o: { number: string }): Promise<void>
   // 📋 클립보드 글 읽기 (1.6.3, src/ui/ClipboardChip.tsx)
   readClipboard(opts?: { peek?: boolean }): Promise<{ text?: string; has?: boolean }>
   openOverlaySettings(): Promise<void>
