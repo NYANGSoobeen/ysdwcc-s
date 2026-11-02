@@ -6,7 +6,7 @@ import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
 import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
-import { Avatar } from '../ui/Avatar.tsx'
+import { Avatar, rememberedPerson } from '../ui/Avatar.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import {
@@ -328,6 +328,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 mine={mine}
                 author={nameOf(m.authorId)}
                 authorKey={m.authorId ?? '?'}
+                avatarAssetId={accounts.get(m.authorId ?? '')?.avatarAssetId ?? null}
                 showAuthor={!mine && !groupedWithPrev}
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
@@ -373,9 +374,39 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
 function authorName(id: string | null, me: string, accounts: Map<string, FrontAccount>) {
   if (!id) return '프론트'
   if (id === me) return '나'
-  if (id.startsWith('g_')) return '타부서'
+  // 같이 들어간 게스트는 우리 앱 직원(g_{우리 uid}) → 불러 둔 우리 직원이면 이름 (2026-11-02)
+  if (id.startsWith('g_')) {
+    const p = rememberedPerson(id.slice(2))
+    return p?.name ? [p.name, p.position].filter(Boolean).join(' ') : '타부서'
+  }
   const a = accounts.get(id)
   return a ? [a.name, a.position].filter(Boolean).join(' ') || '프론트 직원' : '프론트 직원'
+}
+
+// 보낸 사람 사진 (2026-11-02 "프론트랑 서로 프사가 안 보여"): 프론트 직원은 프론트 accounts의 avatarAssetId 사진
+// (프론트 Storage assets/{id}, 게스트도 보기만 가능), 같이 들어간 우리 직원(g_{uid})은 우리 프로필 사진.
+function FrontAvatar({ authorKey, name, avatarAssetId }: { authorKey: string; name: string; avatarAssetId: string | null }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    setUrl(null)
+    if (!avatarAssetId) return
+    let alive = true
+    assetUrl(avatarAssetId).then(
+      (u) => alive && setUrl(u),
+      () => {},
+    )
+    return () => {
+      alive = false
+    }
+  }, [avatarAssetId])
+  if (authorKey.startsWith('g_')) return <Avatar uid={authorKey.slice(2)} name={name} card />
+  if (url)
+    return (
+      <span className="avatar photo" aria-hidden="true">
+        <img src={url} alt="" />
+      </span>
+    )
+  return <Avatar uid={authorKey} name={name} />
 }
 
 const dayText = (ms: number) => new Date(ms).toLocaleDateString('ko-KR', { dateStyle: 'full' })
@@ -417,6 +448,7 @@ function FrontMessageItem(props: {
   mine: boolean
   author: string
   authorKey: string
+  avatarAssetId: string | null
   showAuthor: boolean
   time: string
   highlight: boolean
@@ -444,7 +476,7 @@ function FrontMessageItem(props: {
   const link = m.link
   return (
     <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
-      {!mine && (props.showAuthor ? <Avatar uid={props.authorKey} name={props.author} /> : <span className="avatar-space" />)}
+      {!mine && (props.showAuthor ? <FrontAvatar authorKey={props.authorKey} name={props.author} avatarAssetId={props.avatarAssetId} /> : <span className="avatar-space" />)}
       {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
         {m.deleted ? (

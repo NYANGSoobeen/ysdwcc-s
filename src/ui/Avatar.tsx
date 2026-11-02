@@ -48,6 +48,9 @@ export function rememberPeople(list: Record<string, { name?: string; avatar?: st
     listeners.forEach((l) => l())
   }
 }
+// 불러 둔 우리 직원 (🏌️ 프론트 채팅에서 같이 들어간 우리 직원 g_{uid} 이름 표시용)
+export const rememberedPerson = (uid: string): Person | undefined => people[uid]
+
 function usePerson(uid: string) {
   return useSyncExternalStore(
     (l) => {
