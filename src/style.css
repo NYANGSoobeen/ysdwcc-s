@@ -6313,3 +6313,13 @@ body:has(.apk-update-banner) .toasts {
 .menu-foot .apk-version.old {
   color: #ffd27a;
 }
+
+/* 버튼 줄: 한 줄에 안 들어가면 다음 줄로 (2026-11-02 아이폰 🔔 알림 설정 "서버로 테스트 보내기"가 카드 밖으로 삐져나감) */
+.button-row {
+  flex-wrap: wrap;
+}
+.button-row > button,
+.button-row > a.button {
+  flex: 1 1 auto;
+  max-width: 100%;
+}
