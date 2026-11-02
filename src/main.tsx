@@ -5,6 +5,7 @@ import { App } from './App.tsx'
 import './style.css'
 import { ContextMenuHost } from './ui/ContextMenu.tsx'
 import { DialogHost } from './ui/dialogs.tsx'
+import { ProfilePhotoHost } from './ui/Avatar.tsx'
 import { setupInstallPrompt, setupMobileViewport } from './mobile.ts'
 import { setupUpdateNotice } from './update.ts'
 
@@ -16,6 +17,7 @@ createRoot(document.getElementById('app')!).render(
     <App />
     <DialogHost />
     <ContextMenuHost />
+    <ProfilePhotoHost />
   </StrictMode>,
 )
 

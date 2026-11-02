@@ -6372,3 +6372,25 @@ input[type='date']::-webkit-date-and-time-value {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* 프로필 사진 크게 보기: 프로필 카드 창(.modal-backdrop z 60) 위에 */
+.profile-photo-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.profile-photo-button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.profile-photo-hint {
+  color: var(--muted);
+  font-size: 11.5px;
+}

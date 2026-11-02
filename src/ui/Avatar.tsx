@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
+import { PhotoViewer } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
+import type { Attachment } from '../chat.ts'
 import { tell } from './dialogs.tsx'
 import { CenteredGlyph } from './inkCenter.tsx'
 
@@ -104,16 +106,74 @@ export function Avatar({ uid, name, card = false }: { uid: string; name: string;
   )
 }
 
-export function showProfileCard(uid: string, fallbackName: string) {
+// 프로필 카드. 사진이면 눌러서 크게 보기(두 손가락 확대, 2026-11-02 "프사 눌러도 확대해서 안 보여").
+// extra: 우리 직원이 아닌 사람(🏌️ 프론트 직원)의 직급·사진 주소
+export function showProfileCard(uid: string, fallbackName: string, extra?: { position?: string; imageUrl?: string }) {
   const p = people[uid]
   const name = p?.name || fallbackName
+  const position = extra?.position ?? p?.position
+  const avatar = p?.avatar ?? ''
+  const photo = extra?.imageUrl
+    ? { path: `ext/${uid}`, load: () => Promise.resolve(extra.imageUrl!) }
+    : avatar.startsWith('avatars/')
+      ? { path: avatar }
+      : null
+  const face = extra?.imageUrl ? (
+    <span className="avatar photo big" aria-hidden="true">
+      <img src={extra.imageUrl} alt="" />
+    </span>
+  ) : (
+    <AvatarFace uid={uid} name={name} avatar={avatar} className="big" />
+  )
   void tell({
     message: (
       <span className="profile-card">
-        <AvatarFace uid={uid} name={name} avatar={p?.avatar} className="big" />
+        {photo ? (
+          <button type="button" className="profile-photo-button" aria-label="사진 크게 보기" onClick={() => openProfilePhoto({ ...photo, name })}>
+            {face}
+            <span className="profile-photo-hint">🔍 눌러서 크게</span>
+          </button>
+        ) : (
+          face
+        )}
         <strong>{name}</strong>
-        {p?.position && <span className="muted">{p.position}</span>}
+        {position && <span className="muted">{position}</span>}
       </span>
     ),
   })
+}
+
+// 프로필 사진 크게 보기 (프로필 카드 창 위에 뜬다, main.tsx의 ProfilePhotoHost)
+type Viewing = { path: string; name: string; load?: () => Promise<string> }
+let viewing: Viewing | null = null
+const viewListeners = new Set<() => void>()
+export function openProfilePhoto(v: Viewing) {
+  viewing = v
+  viewListeners.forEach((l) => l())
+}
+export function ProfilePhotoHost() {
+  const v = useSyncExternalStore(
+    (l) => {
+      viewListeners.add(l)
+      return () => viewListeners.delete(l)
+    },
+    () => viewing,
+  )
+  if (!v) return null
+  return (
+    <div className="profile-photo-layer">
+      <PhotoViewer
+        photos={[
+          {
+            attachment: { path: v.path, thumbPath: v.path, width: 0, height: 0, size: 0, thumbSize: 0 } as Attachment,
+            author: v.name,
+            createdAt: null,
+            load: v.load,
+          },
+        ]}
+        index={0}
+        onClose={() => openProfilePhoto(null as unknown as Viewing)}
+      />
+    </div>
+  )
 }
