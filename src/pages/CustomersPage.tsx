@@ -10,6 +10,7 @@ import {
   normalizePhone,
   toCustomer,
   type Customer,
+  hyphenPhone,
 } from '../customers.ts'
 import { db } from '../firebase.ts'
 import { teamPeople, useMemberProfiles, type Team } from '../hooks.ts'
@@ -223,7 +224,7 @@ export function PhoneFields({ phones, onChange }: { phones: string[]; onChange: 
             type="tel"
             inputMode="tel"
             value={p}
-            onChange={(e) => onChange(phones.map((v, j) => (j === i ? e.target.value : v)))}
+            onChange={(e) => onChange(phones.map((v, j) => (j === i ? hyphenPhone(e.target.value) : v)))}
             placeholder="010-1234-5678"
             aria-label={`전화번호 ${i + 1}`}
           />

@@ -61,7 +61,26 @@ export function formatPhone(e164: string) {
   const local = `0${e164.slice(3)}`
   if (/^02\d{7,8}$/.test(local)) return local.replace(/^(02)(\d{3,4})(\d{4})$/, '$1-$2-$3')
   if (/^0\d{9,10}$/.test(local)) return local.replace(/^(0\d{2})(\d{3,4})(\d{4})$/, '$1-$2-$3')
-  return local
+  return hyphenPhone(local)
+}
+
+// 입력 중인 번호에 하이픈을 넣는다 (숫자만 쳐도 010-1234-5678, 2026-11-02 사용자 요청).
+// 숫자·하이픈·공백·+ 말고 다른 글자가 있으면 그대로 둔다.
+export function hyphenPhone(raw: string) {
+  if (!/^[\d\s+()-]*$/.test(raw)) return raw
+  let d = raw.replace(/[^\d+]/g, '')
+  if (d.startsWith('+82')) d = `0${d.slice(3)}`
+  if (d.startsWith('+') || !d.startsWith('0')) return d
+  if (d.startsWith('02')) {
+    if (d.length <= 2) return d
+    if (d.length <= 5) return `${d.slice(0, 2)}-${d.slice(2)}`
+    if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`
+    return `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}`
+  }
+  if (d.length <= 3) return d
+  if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`
+  if (d.length <= 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
 }
 
 export function isValidPhone(e164: string) {

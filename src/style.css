@@ -6323,3 +6323,22 @@ body:has(.apk-update-banner) .toasts {
   flex: 1 1 auto;
   max-width: 100%;
 }
+
+/* 아이폰 날짜 칸이 카드 밖으로 튀어나옴 (2026-11-02, 고객 상세 "다음 연락") → 다른 입력칸과 같은 너비로 */
+input[type='date'],
+input[type='datetime-local'],
+input[type='time'],
+input[type='month'] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  text-align: left;
+}
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+}

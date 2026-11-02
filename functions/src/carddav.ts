@@ -86,6 +86,11 @@ async function memberTeams(session: Session) {
   const db = getFirestore()
   const user = await db.doc(`users/${session.uid}`).get()
   if (user.get('active') === false) return []
+  // 최고 관리자는 팀에 속하지 않아도 모든 팀을 보므로 모든 팀의 고객 (2026-11-02: 팀원이 아닌 최고 관리자 아이폰에 연락처가 비어 있었다)
+  if (user.get('superAdmin') === true) {
+    const all = await db.collection('teams').get()
+    return all.docs.map((t) => ({ id: t.id, version: Number(t.get('contactsVersion') ?? 0) }))
+  }
   const teamIds = (user.get('teamIds') ?? []) as string[]
   if (teamIds.length === 0) return []
   const teams = await db.getAll(...teamIds.map((id) => db.doc(`teams/${id}`)))
