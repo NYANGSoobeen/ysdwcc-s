@@ -27,7 +27,7 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions'
 import { connectStorageEmulator, getBlob, getDownloadURL, getStorage, ref } from 'firebase/storage'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { auth, db, keepSignedIn } from '../firebase.ts'
+import { auth, db, keepSignedIn, storage } from '../firebase.ts'
 import { toast } from '../ui/dialogs.tsx'
 
 // 🏌️ 프론트 채팅: 양산동원로얄CC 프론트 앱(다른 Firebase 프로젝트 ysdwcc-f)의 채팅방에 "타부서 게스트"로 들어간다.
@@ -155,16 +155,31 @@ function watchGuest(uid: string) {
 type AuthResult = { token: string; uid: string; channels: string[] }
 
 // 입장(초대 코드) 또는 다시 로그인. 초대 코드로 들어갈 때의 오류는 화면에 보여 주도록 던진다.
+// 내 프로필 사진 내려받기 주소 (GUEST_LINK 4-1, 2026-11-02): 들어갈 때·앱을 열 때마다 guestAuth에 같이 보내
+// 프론트 앱에서도 내 사진이 보이게 한다. 사진이 아니면(이름 글자·기본 그림) 안 보냄 → 프론트는 이름 첫 글자.
+async function myPhotoUrl(uid: string) {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid))
+    const avatar = String(snap.get('avatar') ?? '')
+    if (!avatar.startsWith('avatars/')) return null
+    return await getDownloadURL(ref(storage, avatar))
+  } catch {
+    return null
+  }
+}
+
 export async function connectFront(code?: string) {
   const me = auth.currentUser
   if (!me) return
   // 앱을 열 때 다시 로그인하는 동안만 "연결하는 중" (초대 코드를 넣을 때는 입력 화면을 그대로 둔다)
   if (!code && state.status === 'off') set({ status: 'connecting' })
   try {
-    const idToken = await me.getIdToken()
-    const res = await httpsCallable<{ idToken: string; code?: string }, AuthResult>(ydrFunctions, 'guestAuth')(
-      code ? { idToken, code: code.trim().toUpperCase() } : { idToken },
-    )
+    const [idToken, photoUrl] = await Promise.all([me.getIdToken(), myPhotoUrl(me.uid)])
+    const res = await httpsCallable<{ idToken: string; code?: string; photoUrl?: string }, AuthResult>(ydrFunctions, 'guestAuth')({
+      idToken,
+      ...(code ? { code: code.trim().toUpperCase() } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
+    })
     await signInWithCustomToken(ydrAuth, res.data.token)
     setFlag(true)
     rememberOnAccount(true)
