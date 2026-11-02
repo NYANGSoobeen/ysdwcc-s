@@ -24,6 +24,7 @@ export type CallEntry = {
 }
 export type SmsThread = { threadId: string; address: string; text: string; date: number; mine: boolean; unread: number; rcs?: boolean }
 export type SmsMessage = { id: string; text: string; date: number; mine: boolean; failed?: boolean; sending?: boolean; images?: number; rcs?: boolean; im?: boolean }
+export type WorkDuplicate = { rawId: number; name: string; number: string; customer: string; company: string; marked: boolean; canUndo: boolean }
 export type DeviceContact = { name: string; number: string; company?: string }
 // im: 삼성 채팅+ 저장소를 직접 읽을 수 있는 폰 (1.6.5, SamsungIm.kt)
 type Perms = { calls: boolean; sms: boolean; contacts: boolean; phonestate?: boolean; chat?: boolean; im?: boolean }
@@ -31,6 +32,9 @@ export type OffDayLog = { at: number; number: string; silenced: boolean; sent: b
 
 type PhonePlugin = {
   status(): Promise<Perms>
+  // 🏷️ 폰에 원래 있던 고객 연락처에 [업무] 붙이기 (1.6.8, WorkContacts.kt)
+  workDuplicates(): Promise<{ items: WorkDuplicate[] }>
+  markWork(o: { rawIds: number[]; undo?: boolean }): Promise<{ changed: number }>
   // 💬 삼성 채팅+ 저장소 점검 (1.6.5): 열리는 곳·줄 수·칸 이름만
   rcsProbe(): Promise<{ readable: boolean; results: { uri: string; ok: boolean; count?: number; columns?: string[]; usable?: boolean; error?: string }[] }>
   requestCalls(): Promise<{ granted: boolean }>

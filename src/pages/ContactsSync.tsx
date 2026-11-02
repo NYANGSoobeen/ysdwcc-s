@@ -4,6 +4,7 @@ import { api } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import { ask, askText } from '../ui/dialogs.tsx'
 import { db } from '../firebase.ts'
+import { WorkContactsCard } from './WorkContactsCard.tsx'
 import {
   APK_URL,
   clearNativeContacts,
@@ -40,6 +41,16 @@ const KAKAO_WARNING = (
 
 // 갤럭시 앱: 폰 연락처에 "지원팀" 전용 계정을 만들어 고객을 직접 넣는다. 접속 정보가 필요 없다.
 function NativeContactsSync() {
+  const { enabled } = useNativeSyncState()
+  return (
+    <>
+      <NativeContactsSyncCard />
+      {enabled && <WorkContactsCard />}
+    </>
+  )
+}
+
+function NativeContactsSyncCard() {
   const { enabled, last } = useNativeSyncState()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -74,7 +85,7 @@ function NativeContactsSync() {
       <p className="muted small">
         팀 고객을 이 폰 연락처의 <strong>"지원팀" 계정</strong>에 넣어, 고객에게 전화가 오면 <strong>"[업무] 이름"</strong>으로
         표시합니다. 앱을 열 때마다 고객 목록에 맞춰지고, 로그아웃하거나 팀에서 제외되면 자동으로 지워집니다. 개인 연락처는
-        건드리지 않습니다.
+        아래 🏷️에서 직접 고른 것만 이름 앞에 [업무]를 붙입니다.
       </p>
       <p className={enabled ? 'notice' : 'muted small'}>
         {!enabled

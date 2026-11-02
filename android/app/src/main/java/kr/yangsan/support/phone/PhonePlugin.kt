@@ -37,6 +37,8 @@ import com.getcapacitor.annotation.PermissionCallback
         Permission(alias = "calls", strings = [Manifest.permission.READ_CALL_LOG, Manifest.permission.CALL_PHONE]),
         Permission(alias = "sms", strings = [Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS]),
         Permission(alias = "contacts", strings = [Manifest.permission.READ_CONTACTS]),
+        // 🏷️ 폰 연락처에 [업무] 붙이기(1.6.8)에만 쓰는 쓰기 권한 (읽기와 같은 묶음이라 보통 이미 허용됨)
+        Permission(alias = "contactsWrite", strings = [Manifest.permission.WRITE_CONTACTS]),
         // 🌙 휴무일 자동 응답: 걸려 온 번호 알기
         Permission(alias = "phonestate", strings = [Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG]),
         // 🔔 전화·문자 알림 (1.4.0): 문자 받기 방송, 알림 띄우기(안드로이드 13+만 묻는 권한)
@@ -113,6 +115,45 @@ class PhonePlugin : Plugin() {
                 .put("chat", ChatStore.listenerEnabled(context))
                 .put("im", granted("sms") && SamsungIm.available(context)),
         )
+    }
+
+    // 🏷️ 폰에 원래 있던 고객 연락처 (1.6.8, WorkContacts.kt)
+    @PluginMethod
+    fun workDuplicates(call: PluginCall) {
+        if (!granted("contacts")) return call.reject("연락처 권한이 없습니다.", "NO_PERMISSION")
+        execute {
+            try {
+                call.resolve(JSObject().put("items", JSArray(WorkContacts.find(context).toString())))
+            } catch (e: Exception) {
+                call.reject("연락처를 읽지 못했습니다: ${e.message}", e)
+            }
+        }
+    }
+
+    // 고른 연락처 이름 앞에 "[업무] " (undo: true면 되돌리기). 쓰기 권한이 없으면 먼저 묻는다
+    @PluginMethod
+    fun markWork(call: PluginCall) {
+        if (!granted("contactsWrite")) return requestPermissionForAlias("contactsWrite", call, "markWorkAfterPermission")
+        doMarkWork(call)
+    }
+
+    @PermissionCallback
+    private fun markWorkAfterPermission(call: PluginCall) {
+        if (!granted("contactsWrite")) return call.reject("연락처 쓰기 권한이 없습니다.", "NO_PERMISSION")
+        doMarkWork(call)
+    }
+
+    private fun doMarkWork(call: PluginCall) {
+        val ids = call.getArray("rawIds")?.toList<Any>()?.mapNotNull { (it as? Number)?.toLong() ?: it.toString().toLongOrNull() }.orEmpty()
+        val undo = call.getBoolean("undo", false) == true
+        execute {
+            try {
+                val n = if (undo) WorkContacts.unmark(context, ids) else WorkContacts.mark(context, ids)
+                call.resolve(JSObject().put("changed", n))
+            } catch (e: Exception) {
+                call.reject("연락처를 고치지 못했습니다: ${e.message}", e)
+            }
+        }
     }
 
     // 💬 삼성 채팅+ 저장소 점검 (1.6.5): 열리는 곳·줄 수·칸 이름만 (글 내용은 안 돌려줌)

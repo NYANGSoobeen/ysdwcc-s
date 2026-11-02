@@ -88,6 +88,13 @@ object PhoneAlerts {
 
     fun isCustomer(ctx: Context, number: String) = customer(ctx, number) != null
 
+    // 웹앱이 넣어 둔 내 모든 팀 고객 (지역 번호 → {n: 이름, c: 회사, …}). 🏷️ 폰 연락처에 [업무] 붙이기(WorkContacts.kt)가 쓴다
+    fun allCustomers(ctx: Context): JSONObject = try {
+        JSONObject(prefs(ctx).getString("customers", "{}") ?: "{}")
+    } catch (_: Exception) {
+        JSONObject()
+    }
+
     // 알림에 보일 이름: 고객이면 "[업무] 이름", 아니면 폰 연락처 이름, 없으면 번호
     fun nameFor(ctx: Context, number: String): String {
         customer(ctx, number)?.optString("n")?.takeIf { it.isNotBlank() }?.let { return "[업무] $it" }
