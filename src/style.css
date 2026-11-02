@@ -57,11 +57,15 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  /* 당겨서 새로 고침, 화면 끝 튕김이 앱 화면을 흔들지 않게 (화면 전체 스크롤은 html 값을 따른다) */
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   background: var(--bg);
-  /* 당겨서 새로 고침, 화면 끝 튕김이 앱 화면을 흔들지 않게 */
-  overscroll-behavior: none;
 }
 
 button,

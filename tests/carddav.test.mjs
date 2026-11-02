@@ -125,6 +125,23 @@ test('고객이 바뀌면 주소록 버전(ctag)이 바뀌어 폰이 다시 받�
   assert.equal(cards.length, 3)
 })
 
+test('폰이 받아 간 고객 수를 앱이 볼 수 있게 남기고, sync-collection도 답한다', async () => {
+  const st = (await db.doc('users/ed/private/contactsSync').get()).data()
+  assert.equal(st.phoneCount, 3)
+  assert.ok(st.phoneSeenAt)
+  const body = (token) =>
+    `<?xml version="1.0"?><d:sync-collection xmlns:d="DAV:"><d:sync-token>${token}</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/></d:prop></d:sync-collection>`
+  const first = await request('REPORT', `${PREFIX}/book/`, { body: body(''), headers: { Depth: '1' } })
+  assert.equal(first.status, 207)
+  const text = await first.text()
+  assert.equal((text.match(/\.vcf</g) ?? []).length, 3)
+  const token = text.match(/<d:sync-token>([^<]+)</)[1]
+  const same = await request('REPORT', `${PREFIX}/book/`, { body: body(token), headers: { Depth: '1' } })
+  assert.equal(same.status, 207)
+  assert.ok(!(await same.text()).includes('.vcf'))
+  assert.equal((await request('REPORT', `${PREFIX}/book/`, { body: body('data:,old'), headers: { Depth: '1' } })).status, 403)
+})
+
 test('팀에서 제외되면 빈 주소록이 되어 폰에서 고객 연락처가 사라진다', async () => {
   await db.doc('teams/t1').update({ 'members.ed': FieldValue.delete() })
   await db.doc('users/ed').update({ teamIds: [] })

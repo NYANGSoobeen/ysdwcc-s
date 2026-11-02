@@ -14,7 +14,70 @@ import {
   useNativeSyncState,
 } from '../native.ts'
 
-type Status = { enabled: boolean; username: string | null; createdAt: Timestamp | null }
+type Status = {
+  enabled: boolean
+  username: string | null
+  createdAt: Timestamp | null
+  // 서버가 남긴 폰 접속 기록 (carddav.ts recordUse)
+  phoneSeenAt?: Timestamp
+  phoneStep?: string
+  phoneCount?: number
+  phoneCountAt?: Timestamp
+  phoneAgent?: string
+}
+
+const when = (t?: Timestamp) =>
+  t ? t.toDate().toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+
+// 폰이 서버에 언제 와서 몇 명을 받아 갔는지 → 안 보일 때 어디가 문제인지 (2026-11-02)
+function PhoneSyncState({ status }: { status: Status }) {
+  if (!status.enabled) return null
+  const iphone = /iPhone|iPad|iOS|dataaccessd|CFNetwork|Darwin/i.test(status.phoneAgent ?? '')
+  if (!status.phoneSeenAt) {
+    return (
+      <p className="muted small">
+        📱 아직 폰이 서버에 접속한 적이 없어요. 폰 설정에서 서버·사용자 이름·암호를 다시 확인해 주세요 (서버 주소는 아래 그대로).
+      </p>
+    )
+  }
+  return (
+    <div className="small">
+      <p>
+        📱 폰 마지막 접속 {when(status.phoneSeenAt)}
+        {iphone ? ' (아이폰)' : ''}
+        {status.phoneCount !== undefined && (
+          <>
+            {' '}
+            · 받아 간 고객 <strong>{status.phoneCount}명</strong> ({when(status.phoneCountAt)})
+          </>
+        )}
+      </p>
+      {status.phoneCount === 0 && <p className="error">서버가 보낸 고객이 0명이에요. 이 계정이 속한 팀에 고객이 있는지 확인해 주세요.</p>}
+      {status.phoneCount === undefined && (
+        <p className="muted small">폰이 연결은 됐지만 아직 고객 목록을 받아 가지 않았어요. 아이폰 연락처 앱에서 목록을 아래로 당기면 바로 받아요.</p>
+      )}
+      {!!status.phoneCount && (
+        <details>
+          <summary>폰에 고객이 안 보이면</summary>
+          <ol className="steps">
+            <li>
+              아이폰 <strong>설정 → 앱 → 연락처 → 연락처 계정 → 지원팀</strong>에서 <strong>연락처</strong> 스위치가 켜져 있는지 확인해요.
+            </li>
+            <li>
+              연락처 앱 왼쪽 위 <strong>목록</strong> → <strong>모든 연락처</strong>(또는 "지원팀 고객")를 고르고, 목록을 아래로 당겨 새로 고쳐요.
+            </li>
+            <li>
+              검색칸에 <strong>[업무]</strong>를 쳐 보세요. 이름이 모두 "[업무] 이름"이에요.
+            </li>
+            <li>
+              그래도 없으면 지원팀 계정을 지우고 <strong>접속 정보 새로 만들기</strong> → 다시 추가해요.
+            </li>
+          </ol>
+        </details>
+      )}
+    </div>
+  )
+}
 
 // 연락처 구독 서버 주소. 함수 주소는 "함수이름-프로젝트번호.리전.run.app" 형식이다
 // (프로젝트 번호 = 웹 앱 설정의 messagingSenderId).
@@ -222,6 +285,7 @@ function CardDavSync({ uid }: { uid: string }) {
             : '꺼짐'}
         </p>
       )}
+      {status && <PhoneSyncState status={status} />}
       {error && <p className="error">{error}</p>}
 
       {creds && (

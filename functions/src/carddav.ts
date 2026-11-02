@@ -25,7 +25,7 @@ export type DavResponse = { status: number; headers: Record<string, string>; bod
 export const NAME_PREFIX = '[업무] '
 const BOOK_NAME = '지원팀 고객'
 const REALM = 'Workphone Contacts'
-const LAST_USED_INTERVAL_MS = 12 * 3600 * 1000
+const LAST_USED_INTERVAL_MS = 30 * 60 * 1000
 
 const XML_HEADERS = { 'Content-Type': 'application/xml; charset=utf-8', DAV: '1, 3, addressbook' }
 
@@ -51,7 +51,7 @@ function header(req: DavRequest, name: string) {
   return Array.isArray(v) ? v[0] : v
 }
 
-type Session = { uid: string; ref: DocumentReference; disabled: boolean }
+type Session = { uid: string; username: string; ref: DocumentReference; disabled: boolean; lastUsed: number }
 
 async function authenticate(req: DavRequest): Promise<Session | null> {
   const auth = header(req, 'authorization') ?? ''
@@ -70,12 +70,34 @@ async function authenticate(req: DavRequest): Promise<Session | null> {
   const actual = Buffer.from(hashSecret(password), 'hex')
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null
 
-  // 마지막 사용 시각은 반나절에 한 번만 기록해 쓰기 횟수를 아낀다.
   const lastUsed = snap.get('lastUsedAt')?.toMillis?.() ?? 0
-  if (Date.now() - lastUsed > LAST_USED_INTERVAL_MS) {
-    await ref.update({ lastUsedAt: FieldValue.serverTimestamp() })
-  }
-  return { uid: snap.get('uid'), ref, disabled: snap.get('disabled') === true }
+  return { uid: snap.get('uid'), username, ref, disabled: snap.get('disabled') === true, lastUsed }
+}
+
+// 폰이 언제 어디까지 받아 갔는지 남긴다 (2026-11-02 "아이폰 CardDAV 연결했는데 연락처가 안 떠" → 앱 설정 화면에서 확인).
+// 연락처를 실제로 받아 갈 때(목록·받기)는 늘, 그 밖(바뀌었는지 확인)은 30분에 한 번만 써서 쓰기 횟수를 아낀다.
+async function recordUse(session: Session, req: DavRequest, step: string, count: number | null) {
+  const now = Date.now()
+  if (count === null && now - session.lastUsed < LAST_USED_INTERVAL_MS) return
+  const agent = String(header(req, 'user-agent') ?? '').slice(0, 120)
+  const db = getFirestore()
+  await Promise.all([
+    session.ref.update({ lastUsedAt: FieldValue.serverTimestamp() }),
+    db.doc(`users/${session.uid}/private/contactsSync`).get().then((d) =>
+      // 지금 쓰는 접속 정보일 때만 (예전 접속 정보로 붙은 폰이 덮어쓰지 않게)
+      d.get('username') === session.username
+        ? d.ref.set(
+            {
+              phoneSeenAt: FieldValue.serverTimestamp(),
+              phoneStep: step,
+              phoneAgent: agent,
+              ...(count === null ? {} : { phoneCount: count, phoneCountAt: FieldValue.serverTimestamp() }),
+            },
+            { merge: true },
+          )
+        : null,
+    ),
+  ]).catch((e) => console.error('carddav recordUse', e))
 }
 
 // ── 주소록 내용 ──────────────────────────────────────────────
@@ -277,17 +299,25 @@ export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
   const teams = await memberTeams(session)
   const ctag = ctagOf(teams)
   const depth = header(req, 'depth') ?? '0'
+  const report = method === 'REPORT' ? (req.body.match(/<(?:[A-Za-z0-9_-]+:)?(addressbook-multiget|addressbook-query|sync-collection)\b/)?.[1] ?? 'other') : ''
+  // 무엇을 물었는지만 남긴다 (고객 내용·암호는 안 남김) → 폰이 어디서 멈추는지 Cloud Logging에서 확인
+  console.log('carddav', JSON.stringify({ method, kind: route.kind, depth, report, teams: teams.length, ua: String(header(req, 'user-agent') ?? '').slice(0, 80) }))
 
   if (method === 'PROPFIND') {
     if (route.kind === 'root') {
       const items = [response(`${prefix}/`, rootProps(prefix))]
       if (depth !== '0') items.push(response(bookHref, bookProps(prefix, ctag)))
+      await recordUse(session, req, 'find', null)
       return reply(207, multistatus(items), XML_HEADERS)
     }
     if (route.kind === 'book') {
       const items = [response(bookHref, bookProps(prefix, ctag))]
       if (depth !== '0') {
-        for (const card of await loadCards(teams)) items.push(response(cardHref(card.id), cardProps(card, false)))
+        const cards = await loadCards(teams)
+        for (const card of cards) items.push(response(cardHref(card.id), cardProps(card, false)))
+        await recordUse(session, req, 'list', cards.length)
+      } else {
+        await recordUse(session, req, 'check', null)
       }
       return reply(207, multistatus(items), XML_HEADERS)
     }
@@ -307,10 +337,32 @@ export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
         const card = byHref.get(path)
         return card ? response(href, cardProps(card, true)) : notFound(href)
       })
+      await recordUse(session, req, 'get', cards.length)
       return reply(207, multistatus(items), XML_HEADERS)
     }
     if (/addressbook-query/.test(req.body)) {
+      await recordUse(session, req, 'get', cards.length)
       return reply(207, multistatus(cards.map((c) => response(cardHref(c.id), cardProps(c, true)))), XML_HEADERS)
+    }
+    // sync-collection: 내세우지는 않지만(supported-report-set에 없음) 폰이 물으면 답한다. 예전 표(sync-token)가
+    // 지금과 다르면 처음부터 다시 받게 하고(valid-sync-token 오류, 빠진 고객도 지워지게), 처음이면 전부 보낸다.
+    if (/sync-collection/.test(req.body)) {
+      const token = req.body.match(/<(?:[A-Za-z0-9_-]+:)?sync-token>([^<]*)</)?.[1]?.trim() ?? ''
+      const current = `data:,${ctag.replace(/"/g, '')}`
+      if (token && token !== current) {
+        return reply(
+          403,
+          '<?xml version="1.0" encoding="utf-8"?>\n<d:error xmlns:d="DAV:"><d:valid-sync-token/></d:error>',
+          XML_HEADERS,
+        )
+      }
+      const items = token ? [] : cards.map((c) => response(cardHref(c.id), cardProps(c, false)))
+      await recordUse(session, req, 'list', cards.length)
+      return reply(
+        207,
+        multistatus(items).replace('</d:multistatus>', `<d:sync-token>${xmlEscape(current)}</d:sync-token>\n</d:multistatus>`),
+        XML_HEADERS,
+      )
     }
     return reply(501, '지원하지 않는 요청입니다.')
   }

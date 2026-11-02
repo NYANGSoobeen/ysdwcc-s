@@ -25,6 +25,8 @@ export function setupMobileViewport() {
     update()
   }
 
+  if (isIOSDevice()) stopPageBounce()
+
   const isTextField = (el: EventTarget | null) =>
     el instanceof HTMLTextAreaElement ||
     (el instanceof HTMLInputElement && !['checkbox', 'radio', 'button', 'submit', 'file', 'range', 'color'].includes(el.type))
@@ -38,6 +40,57 @@ export function setupMobileViewport() {
       if (!isTextField(document.activeElement)) root.classList.remove('keyboard-open')
     }, 50)
   })
+}
+
+const isIOSDevice = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+// 아이폰: 머리줄처럼 스크롤이 없는 곳(또는 목록 맨 위)에서 아래로 끌면 사파리가 화면 전체를 끌어내렸다가
+// 튕기며 화면이 위로 밀려 올라갔다(2026-11-02). overscroll-behavior를 무시하는 아이폰이 있어,
+// 손가락이 움직일 때 그 방향으로 더 움직일 스크롤 영역이 없으면 화면 전체 끌기를 막는다.
+// 두 손가락(확대), 가로로 밀리는 영역, 슬라이더, 입력칸 안 글자 고르기는 그대로 둔다.
+function stopPageBounce() {
+  let startX = 0
+  let startY = 0
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      if (e.touches.length !== 1) return
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    },
+    { passive: true },
+  )
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.touches.length !== 1 || !e.cancelable) return
+      const dx = e.touches[0].clientX - startX
+      const dy = e.touches[0].clientY - startY
+      const vertical = Math.abs(dy) >= Math.abs(dx)
+      let el = e.target instanceof Element ? e.target : null
+      if (el?.closest('input[type=range]')) return
+      while (el && el !== document.body && el !== document.documentElement) {
+        const st = getComputedStyle(el)
+        if (vertical) {
+          if (/(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 1) {
+            // 맨 위에서 아래로·맨 아래에서 위로 끌면 바깥으로 번진다 → 바깥 스크롤 영역을 다시 찾고, 없으면 막는다
+            const atTop = el.scrollTop <= 0
+            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+            if (!((dy > 0 && atTop) || (dy < 0 && atBottom))) return
+          }
+          if (el instanceof HTMLTextAreaElement) return
+        } else if (/(auto|scroll)/.test(st.overflowX) && el.scrollWidth > el.clientWidth + 1) {
+          return
+        } else if (!vertical && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+          return
+        }
+        el = el.parentElement
+      }
+      e.preventDefault()
+    },
+    { passive: false },
+  )
 }
 
 // PWA 설치: 크롬(안드로이드, PC)은 설치 창을 띄울 수 있는 이벤트를 준다. 내 정보 화면의 "앱 설치" 버튼이 쓴다.
