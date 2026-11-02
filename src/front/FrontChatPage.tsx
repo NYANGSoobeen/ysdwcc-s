@@ -329,7 +329,6 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 author={nameOf(m.authorId)}
                 authorKey={m.authorId ?? '?'}
                 avatarAssetId={accounts.get(m.authorId ?? '')?.avatarAssetId ?? null}
-                authorPosition={accounts.get(m.authorId ?? '')?.position ?? ''}
                 showAuthor={!mine && !groupedWithPrev}
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
@@ -386,7 +385,7 @@ function authorName(id: string | null, me: string, accounts: Map<string, FrontAc
 
 // 보낸 사람 사진 (2026-11-02 "프론트랑 서로 프사가 안 보여"): 프론트 직원은 프론트 accounts의 avatarAssetId 사진
 // (프론트 Storage assets/{id}, 게스트도 보기만 가능), 같이 들어간 우리 직원(g_{uid})은 우리 프로필 사진.
-function FrontAvatar({ authorKey, name, position, avatarAssetId }: { authorKey: string; name: string; position: string; avatarAssetId: string | null }) {
+function FrontAvatar({ authorKey, name, avatarAssetId }: { authorKey: string; name: string; avatarAssetId: string | null }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     setUrl(null)
@@ -463,7 +462,6 @@ function FrontMessageItem(props: {
   author: string
   authorKey: string
   avatarAssetId: string | null
-  authorPosition: string
   showAuthor: boolean
   time: string
   highlight: boolean
@@ -491,7 +489,7 @@ function FrontMessageItem(props: {
   const link = m.link
   return (
     <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
-      {!mine && (props.showAuthor ? <FrontAvatar authorKey={props.authorKey} name={props.author} position={props.authorPosition} avatarAssetId={props.avatarAssetId} /> : <span className="avatar-space" />)}
+      {!mine && (props.showAuthor ? <FrontAvatar authorKey={props.authorKey} name={props.author} avatarAssetId={props.avatarAssetId} /> : <span className="avatar-space" />)}
       {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
         {m.deleted ? (
