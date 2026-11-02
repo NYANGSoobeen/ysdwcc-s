@@ -6461,3 +6461,20 @@ html.keyboard-open .shell:not(.desktop) .composer,
 html.keyboard-open .sms-composer {
   padding-bottom: 10px;
 }
+
+/* 📋 근무표 반차 (2026-11-02) */
+.roster-table td.half {
+  background: #dbeafe;
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 11px;
+}
+.roster-tab.selected.t-반차 {
+  background: #dbeafe;
+  border-color: #7aa7d8;
+  color: #1a1a1a;
+}
+.roster-dot.half {
+  color: #2b5f9e;
+  font-weight: 700;
+}

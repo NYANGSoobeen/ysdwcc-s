@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import type { SchedulePage as Page } from './data.ts'
 import { inkOffsetEm, STICKER_FONT, STICKER_STYLE, stickerBox, stickerDef, type Mark } from './stickers.ts'
 
-export function stickerColors(kind: 'work' | 'off'): CSSProperties {
+export function stickerColors(kind: keyof typeof STICKER_STYLE): CSSProperties {
   const s = STICKER_STYLE[kind]
   return { '--st-fill': s.fill, '--st-stroke': s.stroke, '--st-text': s.text } as CSSProperties
 }

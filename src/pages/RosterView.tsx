@@ -8,6 +8,7 @@ import {
   daysIn,
   monthKey,
   monthLabel,
+  HALF,
   OFF,
   parseRosterTable,
   saveRoster,
@@ -25,7 +26,7 @@ import { ask, Modal, toast } from '../ui/dialogs.tsx'
 // 📋 근무표: 엑셀에서 우리 팀원 줄만 가져와 깔끔한 표로. 날짜마다 B0 · 휴 목록으로 보고, 직접 고칠 수도 있다.
 // 데이터는 src/schedule/roster.ts. 휴무(휴)인 날은 갤럭시 앱이 고객 전화 무음 + 자동 문자 (src/offday.ts).
 type Member = { uid: string; name: string; position: string }
-type Tab = 'B0' | '휴' | 'etc' | 'none'
+type Tab = 'B0' | '휴' | '반차' | 'etc' | 'none'
 
 const MONTH_KEY = 'roster-month'
 
@@ -85,7 +86,8 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
   const lists = {
     B0: members.filter((m) => codeOf(m.uid, d) === WORK),
     휴: members.filter((m) => codeOf(m.uid, d) === OFF),
-    etc: members.filter((m) => codeOf(m.uid, d) && codeOf(m.uid, d) !== WORK && codeOf(m.uid, d) !== OFF),
+    반차: members.filter((m) => codeOf(m.uid, d) === HALF),
+    etc: members.filter((m) => codeOf(m.uid, d) && ![WORK, OFF, HALF].includes(codeOf(m.uid, d))),
     none: members.filter((m) => !codeOf(m.uid, d)),
   }
   const myOffs = Object.entries(roster?.codes?.[uid] ?? {})
@@ -160,6 +162,7 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
               {Array.from({ length: n }, (_, i) => i + 1).map((x) => {
                 const wd = weekday(month, x)
                 const offs = members.filter((m) => codeOf(m.uid, x) === OFF).length
+                const halves = members.filter((m) => codeOf(m.uid, x) === HALF).length
                 const mine = codeOf(uid, x)
                 return (
                   <button
@@ -175,7 +178,9 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
                   >
                     <small>{weekdayLabel(wd)}</small>
                     <strong>{x}</strong>
-                    <span className={mine === OFF ? 'roster-dot off' : mine === WORK ? 'roster-dot work' : 'roster-dot'}>{offs > 0 ? `휴${offs}` : ''}</span>
+                    <span className={mine === OFF ? 'roster-dot off' : mine === HALF ? 'roster-dot half' : mine === WORK ? 'roster-dot work' : 'roster-dot'}>
+                      {[offs > 0 && `휴${offs}`, halves > 0 && `반${halves}`].filter(Boolean).join(' ')}
+                    </span>
                   </button>
                 )
               })}
@@ -189,6 +194,7 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
               <div className="roster-tabs" role="tablist">
                 <TabButton id="B0" cur={tab} set={setTab} label={`B0 ${lists.B0.length}`} />
                 <TabButton id="휴" cur={tab} set={setTab} label={`휴 ${lists.휴.length}`} />
+                <TabButton id="반차" cur={tab} set={setTab} label={`반차 ${lists.반차.length}`} />
                 {lists.etc.length > 0 && <TabButton id="etc" cur={tab} set={setTab} label={`기타 ${lists.etc.length}`} />}
                 <TabButton id="none" cur={tab} set={setTab} label={`비어 있음 ${lists.none.length}`} />
               </div>
@@ -215,6 +221,11 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
                             → 휴
                           </button>
                         )}
+                        {tab !== '반차' && (
+                          <button type="button" className="chip" onClick={() => void change(m.uid, d, HALF)}>
+                            → 반차
+                          </button>
+                        )}
                         {tab !== 'none' && (
                           <button type="button" className="chip" onClick={() => void change(m.uid, d, '')} aria-label={`${m.name} 비우기`}>
                             ✕
@@ -229,7 +240,7 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
             </section>
 
             <button type="button" className="ghost roster-table-toggle" onClick={() => setShowTable(!showTable)} aria-expanded={showTable}>
-              {showTable ? '▾' : '▸'} 한 달 표 {editing && showTable ? '(칸을 누르면 B0 → 휴 → 비움)' : ''}
+              {showTable ? '▾' : '▸'} 한 달 표 {editing && showTable ? '(칸을 누르면 B0 → 휴 → 반차 → 비움)' : ''}
             </button>
             {showTable && (
               <MonthTable
@@ -265,7 +276,7 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
   )
 }
 
-const cycle = (c: string) => (c === WORK ? OFF : c === OFF ? '' : WORK)
+const cycle = (c: string) => (c === WORK ? OFF : c === OFF ? HALF : c === HALF ? '' : WORK)
 
 function TabButton({ id, cur, set, label }: { id: Tab; cur: Tab; set: (t: Tab) => void; label: string }) {
   return (
@@ -317,7 +328,7 @@ function MonthTable(props: {
                 return (
                   <td
                     key={x}
-                    className={[c === WORK && 'work', c === OFF && 'off', c && c !== WORK && c !== OFF && 'etc', x === props.selected && 'selected', props.onCell && 'editable'].filter(Boolean).join(' ')}
+                    className={[c === WORK && 'work', c === OFF && 'off', c === HALF && 'half', c && ![WORK, OFF, HALF].includes(c) && 'etc', x === props.selected && 'selected', props.onCell && 'editable'].filter(Boolean).join(' ')}
                     onClick={() => (props.onCell ? props.onCell(m.uid, x) : props.onDay(x))}
                   >
                     {c}
@@ -395,7 +406,7 @@ function RosterImportDialog(props: {
         <>
           <p className="muted small">
             직원 이름이 세로(왼쪽 열), 날짜(1~31)가 가로(위쪽 줄)인 엑셀(.xlsx)이나 CSV를 고르세요. <strong>우리 팀원과 이름이 같은 줄만</strong> 가져오고, 칸의
-            B0 · 휴(휴무·OFF도 휴로)를 날짜별로 정리해요. 엑셀에 없는 팀원은 비워 둬요.
+            B0 · 휴(휴무·OFF도 휴로) · 반차(오전·오후반차도 반차로)를 날짜별로 정리해요. 엑셀에 없는 팀원은 비워 둬요.
           </p>
           <button type="button" className="primary" onClick={() => input.current?.click()} disabled={!!busy}>
             📄 엑셀 파일 고르기
@@ -414,7 +425,7 @@ function RosterImportDialog(props: {
           <ul className="roster-import-list">
             {result.matched.map((m) => (
               <li key={m.uid}>
-                ✅ {m.name} <span className="muted small">B0 {m.works}일 · 휴 {m.offs}일</span>
+                ✅ {m.name} <span className="muted small">B0 {m.works}일 · 휴 {m.offs}일{m.halves ? ` · 반차 ${m.halves}일` : ''}</span>
               </li>
             ))}
             {result.missing.map((m) => (

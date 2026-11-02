@@ -17,6 +17,8 @@ export type Roster = {
 
 export const OFF = '휴'
 export const WORK = 'B0'
+// 반차 (2026-11-02 사용자 요청). 휴무가 아니라 🌙 휴무일 자동 응답은 안 함
+export const HALF = '반차'
 
 export const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 export const dateKey = (d: Date) => `${monthKey(d)}-${String(d.getDate()).padStart(2, '0')}`
@@ -70,12 +72,13 @@ export async function setCode(teamId: string, month: string, uid: string, day: n
 }
 
 // ── 엑셀 읽기 ──
-// 칸 글자를 근무 코드로: B0/bo/B O → B0, 휴/휴무/OFF → 휴, 나머지는 그대로(6자까지)
+// 칸 글자를 근무 코드로: B0/bo/B O → B0, 휴/휴무/OFF → 휴, 반차/반/오전반차/오후반차 → 반차, 나머지는 그대로(6자까지)
 export function normalizeCode(raw: string) {
   const s = raw.replace(/\s+/g, '').trim()
   if (!s) return ''
   if (/^b[0o]$/i.test(s)) return WORK
   if (/^(휴|휴무|휴일|off|오프|x)$/i.test(s)) return OFF
+  if (/^(반차|반|오전반차|오후반차|am반차|pm반차|b\/반|반반)$/i.test(s)) return HALF
   return s.slice(0, 6)
 }
 
@@ -98,7 +101,7 @@ export type RosterImport = {
   month: string
   monthFound: boolean // 파일에서 달을 찾았는지 (못 찾으면 화면에서 고른 달)
   days: number // 찾은 날짜 칸 수
-  matched: { uid: string; name: string; codes: Record<string, string>; offs: number; works: number }[]
+  matched: { uid: string; name: string; codes: Record<string, string>; offs: number; works: number; halves: number }[]
   unmatched: string[] // 우리 팀에 없는 이름 (건너뜀)
   ambiguous: string[] // 같은 이름 팀원이 둘 이상 (건너뜀)
   missing: { uid: string; name: string }[] // 엑셀에 없는 팀원 (비워 둠)
@@ -201,7 +204,7 @@ export function parseRosterTable(rows: string[][], members: { uid: string; name:
       if (code) codes[day] = code
     }
     const values = Object.values(codes)
-    matched.push({ uid: m.uid, name: m.name, codes, offs: values.filter((v) => v === OFF).length, works: values.filter((v) => v === WORK).length })
+    matched.push({ uid: m.uid, name: m.name, codes, offs: values.filter((v) => v === OFF).length, works: values.filter((v) => v === WORK).length, halves: values.filter((v) => v === HALF).length })
   }
   const missing = members.filter((m) => !seen.has(m.uid))
   return { month, monthFound, days: dayCols.size, matched, unmatched, ambiguous, missing }

@@ -3,17 +3,19 @@
 //   kind: 'work'(노란 스티커) | 'off'(휴무칸 색 스티커)
 //   row: 스티커 버튼 줄 (1줄, 2줄)
 //   half: 반차 스티커 (칸을 못 찾았을 때 기본 글자 크기를 72%로)
-export type StickerDef = { t: string; kind: 'work' | 'off'; row: 1 | 2; half?: boolean }
+export type StickerDef = { t: string; kind: 'work' | 'off' | 'half'; row: 1 | 2; half?: boolean }
 
-// 지원팀 근무 코드: B0(근무), 휴(휴무). 예) 반차를 넣으려면 { t: 'B/반', kind: 'work', row: 1, half: true }
+// 지원팀 근무 코드: B0(근무), 휴(휴무), 반차 (2026-11-02 추가, 📋 근무표 roster.ts HALF와 같은 글자)
 export const STICKERS: StickerDef[] = [
   { t: 'B0', kind: 'work', row: 1 },
   { t: '휴', kind: 'off', row: 1 },
+  { t: '반차', kind: 'half', row: 1 },
 ]
 
 export const STICKER_STYLE = {
   work: { fill: '#ffe14a', stroke: '#d4a800', text: '#1a1a1a' },
   off: { fill: '#fce4d6', stroke: '#f4b183', text: '#1a1a1a' },
+  half: { fill: '#dbeafe', stroke: '#7aa7d8', text: '#1a1a1a' },
 } as const
 
 // 저장 모양. 좌표는 그림 크기 대비 0~1 비율 (칸을 못 찾았으면 w, h 없음)
