@@ -85,6 +85,7 @@
 - **단체 채팅방 (공통 기능 4-1):**
   - 기본 방(`main`, 이름 기본 "전체 채팅"): 메시지는 처음부터 쓰던 `teams/{teamId}/messages`. 지울 수 없고 이름은 관리자만 바꾼다(`channels/main` 문서가 그때 생김).
   - 만든 방: `teams/{teamId}/channels/{channelId}` {name, createdBy, createdAt}, 메시지는 그 아래 `messages`. 사진은 방과 상관없이 `teams/{teamId}/chat/{msgId}/`. 만들기는 편집 이상, 이름 변경·삭제는 만든 사람이나 관리자. 방을 지우면 `onChannelDeleted`가 메시지를, `onChannelMessageDeleted`가 사진을 지운다. 용량 보기와 기간 삭제는 모든 방을 합친다(`messageCollections`).
+  - **👥 초대한 사람만 보는 방 (2026-11-03 사용자 요청 "관리자도 수다방에서 빠지기, 새 직원은 초대받아야"):** 방 문서 `members = {uid: true}`가 있으면 그 사람만 방이 메뉴에 보이고(`useChannels(teamId, uid)`가 거름) 메시지·읽음을 읽고 쓴다(규칙 `inRoom()`, **최고 관리자·관리자도 방에 없으면 못 봄**, 방 이름 바꾸기·삭제는 그대로 관리자 가능). `members`가 없는 예전 방은 팀원 모두. 기본 방(전체 채팅)은 늘 팀원 모두. 새 방은 만든 사람만 들어간 채로 만들어지고(방 위 "아직 나만 있는 방이에요 · 초대하기") 방 ⋯ → 👥 참여자·초대 / 🚪 이 방 나가기(`RoomPeople`). 나가기·초대는 함수 `roomMembers {teamId, channelId, action: leave|invite, uids}`만(방에 있는 사람만, 팀원만 초대, `members`는 앱이 직접 못 바꿈). **새 직원 등록(`addMember`)·부서 이동으로 들어올 때 그 팀의 예전 방을 "지금 팀원 + 최고 관리자"로 굳혀(`freezeRooms`) 새 사람에게는 안 보인다.** @부르기·@모두·읽음 숫자·푸시 대상도 방 사람만. 채팅 사진 파일 경로(`teams/{팀}/chat/{msgId}/`)는 방과 상관없이 팀원 규칙 그대로(경로를 알아야 볼 수 있음). 테스트 `tests/rooms.test.mjs`, `tests/rules.test.mjs` 👥.
   - 화면: 휴대폰 채팅 탭 = 방 목록(방 안에서 탭을 한 번 더 누르면 목록), 방 머리줄 ‹ 목록, ⋯(사진 모아보기, 이름 바꾸기, 삭제). ☰·PC 왼쪽 메뉴에 "단체 채팅" 묶음(방 목록 + 새 채팅방). 보던 방은 sessionStorage `chat-channel`.
   - 불러오기(`src/useMessages.ts`): 최근 100개는 실시간, 위로 올리면 이전 100개를 한 번만 읽어 앞에 붙이고 보던 자리 유지. 100개 밖으로 밀려난 메시지는 화면에 남긴다. 새 메시지는 맨 아래를 보고 있을 때만 따라 내려가고, 위에서 읽는 중이면 "새 메시지 ↓" 버튼.
   - 말 묶음: 같은 사람이 같은 분(시:분)에 보낸 말은 이름·동그라미(이름 첫 글자)는 첫 말에만, 시간은 마지막 말에만. 날짜가 바뀌면 날짜 줄.
@@ -312,7 +313,7 @@ teams/{teamId}/schedule/current  uploadId, fileName, assetId(원본 경로|null)
                                  images[{assetId(경로), name:'1쪽', w, h, scale}],
                                  marks[{p(쪽 0부터), x, y, w?, h?, t}], marksAt, marksBy, authorId, createdAt
 teams/{teamId}/roster/{YYYY-MM}  month, codes{uid: {일: 'B0'|'휴'|…}}, fileName, updatedAt, updatedBy   (📋 근무표)
-teams/{teamId}/channels/{channelId}  name, createdBy, createdAt, bgStk, stkLast   (단체 채팅방, main은 기본 방 이름·배경 스티커만)
+teams/{teamId}/channels/{channelId}  name, createdBy, createdAt, bgStk, stkLast, members{uid: true}(👥 있으면 그 사람만, Functions만 바꿈)   (단체 채팅방, main은 기본 방 이름·배경 스티커만)
 teams/{teamId}/channels/{c}/messages/{msgId}  기본 방 메시지와 같은 모양
 teams/{teamId}/channels/{c}/reads/{uid}       at (마지막으로 읽은 시각, 기본 방은 c = main)
 teams/{teamId}/messages/{msgId}  (기본 방) authorUid, body, mentions[uid], customerTags[customerId],

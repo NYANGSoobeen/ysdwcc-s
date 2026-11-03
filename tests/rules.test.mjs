@@ -403,3 +403,29 @@ test('🎮 게임 순위: 팀 직원은 모두의 순위를 보고, 자기 기�
   await assertFails(getDoc(doc(fs('ed2'), 'golfMine/ed')))
   await assertFails(setDoc(doc(fs('ed'), 'otherThing/ed'), { v: 1 }))
 })
+
+test('👥 초대한 사람만 보는 방: 방에 없으면 관리자·최고 관리자도 메시지·읽음을 못 보고, 방 사람 목록은 앱에서 못 바꾼다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore()
+    await setDoc(doc(db, 'teams/t1/channels/chat'), { name: '수다방', createdBy: 'ed', createdAt: 1, members: { ed: true, viewer: true } })
+    await setDoc(doc(db, 'teams/t1/channels/chat/messages/m1'), { authorUid: 'ed', body: '안녕', createdAt: 1 })
+    await setDoc(doc(db, 'teams/t1/channels/old'), { name: '예전 방', createdBy: 'ed', createdAt: 1 })
+    await setDoc(doc(db, 'teams/t1/channels/old/messages/m1'), { authorUid: 'ed', body: '예전', createdAt: 1 })
+  })
+  const boss = env.authenticatedContext('boss', { superAdmin: true }).firestore()
+  await assertSucceeds(getDoc(doc(fs('ed'), 'teams/t1/channels/chat/messages/m1')))
+  await assertSucceeds(getDoc(doc(fs('viewer'), 'teams/t1/channels/chat/messages/m1')))
+  await assertFails(getDoc(doc(fs('admin'), 'teams/t1/channels/chat/messages/m1')))
+  await assertFails(getDoc(doc(boss, 'teams/t1/channels/chat/messages/m1')))
+  await assertFails(getDoc(doc(fs('ed2'), 'teams/t1/channels/chat/reads/ed')))
+  await assertFails(setDoc(doc(fs('ed2'), 'teams/t1/channels/chat/messages/x'), { authorUid: 'ed2', body: '몰래', createdAt: 1 }))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/channels/chat/messages/y'), { authorUid: 'ed', body: '안녕', createdAt: 1 }))
+  // 예전 방(members 없음)은 팀원 모두
+  await assertSucceeds(getDoc(doc(fs('ed2'), 'teams/t1/channels/old/messages/m1')))
+  // 방 사람 목록은 Functions만
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/channels/chat'), { members: { ed: true, ed2: true } }))
+  await assertFails(updateDoc(doc(fs('admin'), 'teams/t1/channels/chat'), { members: { admin: true } }))
+  // 새 방은 만든 사람만 들어간 채로
+  await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/channels/new1'), { name: '새 방', createdBy: 'ed', createdAt: serverTimestamp(), members: { ed: true } }))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/channels/new2'), { name: '새 방', createdBy: 'ed', createdAt: serverTimestamp(), members: { ed: true, ed2: true } }))
+})

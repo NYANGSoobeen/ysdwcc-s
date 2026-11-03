@@ -127,7 +127,7 @@ function SignedIn({ user }: { user: User }) {
         : null,
     [rawTeam, user.uid, isSuper, superKey],
   )
-  const channels = useChannels(team?.id)
+  const channels = useChannels(team?.id, user.uid)
   const memberProfiles = useMemberProfiles(team ? teamPeople(team) : [])
   const memberNames = Object.fromEntries(Object.entries(memberProfiles).map(([id, p]) => [id, p.name]))
   const teamNames = useTeamNames(teamIds)

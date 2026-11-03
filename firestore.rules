@@ -269,6 +269,13 @@ service cloud.firestore {
       }
 
       match /channels/{channelId} {
+        // 👥 초대한 사람만 보는 방(2026-11-03): members = {uid: true}가 있으면 그 사람만 메시지·읽음을 본다.
+        // 최고 관리자·관리자도 방에 없으면 못 본다 (나가기·초대는 Functions roomMembers만). members가 없는 예전 방·기본 방은 팀원 모두.
+        function inRoom() {
+          let path = /databases/$(database)/documents/teams/$(teamId)/channels/$(channelId);
+          return !exists(path) || !('members' in get(path).data)
+            || get(path).data.members.get(request.auth.uid, false) == true;
+        }
         function validName() {
           return request.resource.data.name is string
             && request.resource.data.name.size() > 0
@@ -278,32 +285,36 @@ service cloud.firestore {
         allow read: if isMember(teamId);
         allow create: if (canEdit(teamId) && validName()
             && request.resource.data.createdBy == request.auth.uid
-            && (channelId != 'main' || isAdmin(teamId)))
+            && (channelId != 'main' || isAdmin(teamId))
+            // 새 방은 만든 사람만 들어가 있다가 초대한다 (기본 방은 members 없음)
+            && (channelId == 'main'
+              ? !('members' in request.resource.data)
+              : (!('members' in request.resource.data) || request.resource.data.members == {(request.auth.uid): true})))
           // 기본 방은 문서가 없을 수 있다: 배경 스티커를 처음 붙일 때 생긴다.
           || (channelId == 'main' && isMember(teamId)
             && request.resource.data.keys().hasOnly(['bgStk', 'stkLast']) && stkOk('bgStk'));
         allow update: if (validName() && onlyChanges(['name'])
             && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid)))
           // 🏷️ 채팅방 배경 스티커: 팀원 누구나 (자기 것만 떼기)
-          || (isMember(teamId) && onlyChanges(['bgStk', 'stkLast']) && stkOk('bgStk'));
+          || (isMember(teamId) && inRoom() && onlyChanges(['bgStk', 'stkLast']) && stkOk('bgStk'));
         allow delete: if channelId != 'main'
           && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid));
 
         // 읽음 표시: 방마다 팀원별 마지막으로 읽은 시각. 팀원 모두 보고, 자기 것만 쓴다 (지금보다 미래 시각은 안 됨).
         // (기본 방은 channels/main/reads, main 문서가 없어도 된다)
         match /reads/{readerUid} {
-          allow read: if isMember(teamId);
-          allow create, update: if isMember(teamId) && readerUid == request.auth.uid
+          allow read: if isMember(teamId) && inRoom();
+          allow create, update: if isMember(teamId) && inRoom() && readerUid == request.auth.uid
             && request.resource.data.keys().hasOnly(['at'])
             && request.resource.data.at is timestamp
             && request.resource.data.at <= request.time;
         }
 
         match /messages/{msgId} {
-          allow read: if isMember(teamId);
-          allow create: if canEdit(teamId)
+          allow read: if isMember(teamId) && inRoom();
+          allow create: if canEdit(teamId) && inRoom()
             && request.resource.data.authorUid == request.auth.uid;
-          allow update: if canUpdateMessage(teamId);
+          allow update: if canUpdateMessage(teamId) && inRoom();
           allow delete: if isMember(teamId)
             && resource.data.authorUid == request.auth.uid;
         }

@@ -149,17 +149,17 @@ export function previewOf(m: Record<string, unknown>) {
 export async function notifyChatMessage(teamId: string, channelId: string, m: Record<string, unknown>) {
   if (m.deleted === true || typeof m.authorUid !== 'string') return 0
   const db = getFirestore()
-  const team = await db.doc(`teams/${teamId}`).get()
-  const members = Object.keys((team.get('members') as Record<string, string>) ?? {})
+  const [team, room] = await Promise.all([db.doc(`teams/${teamId}`).get(), db.doc(`teams/${teamId}/channels/${channelId}`).get()])
+  const teamMembers = Object.keys((team.get('members') as Record<string, string>) ?? {})
+  // 👥 초대한 사람만 있는 방(members 있음, 2026-11-03)은 그 방 사람에게만
+  const roomMembers = channelId !== 'main' ? (room.get('members') as Record<string, unknown> | undefined) : undefined
+  const members = roomMembers ? teamMembers.filter((u) => roomMembers[u]) : teamMembers
   const author = m.authorUid
   const others = members.filter((u) => u !== author)
   if (others.length === 0) return 0
   const tokens = await tokensOf(others)
   if (tokens.length === 0) return 0
-  const [room, people] = await Promise.all([
-    db.doc(`teams/${teamId}/channels/${channelId}`).get(),
-    activeUsers([author, ...new Set(tokens.map((t) => t.uid))], teamId),
-  ])
+  const people = await activeUsers([author, ...new Set(tokens.map((t) => t.uid))], teamId)
   const roomName = String(room.get('name') ?? '') || (channelId === 'main' ? '전체 채팅' : '채팅방')
   const who = (await db.doc(`users/${author}`).get()).get('name') || '팀원'
   const mentions = new Set(Array.isArray(m.mentions) ? (m.mentions as string[]) : [])

@@ -69,7 +69,15 @@ const JPEG_QUALITY = 0.8
 export const MAIN_CHANNEL = 'main'
 export const MAIN_CHANNEL_NAME = '전체 채팅'
 
-export type Channel = { id: string; name: string; createdBy: string | null; createdAt: Timestamp | null; bgStk?: unknown }
+// members: 👥 초대한 사람만 보는 방이면 그 사람들의 uid (2026-11-03). null이면 팀원 모두(기본 방·예전 방).
+export type Channel = {
+  id: string
+  name: string
+  createdBy: string | null
+  createdAt: Timestamp | null
+  bgStk?: unknown
+  members?: string[] | null
+}
 
 export function messagesRef(teamId: string, channelId: string): CollectionReference {
   return channelId === MAIN_CHANNEL
@@ -77,8 +85,8 @@ export function messagesRef(teamId: string, channelId: string): CollectionRefere
     : collection(db, 'teams', teamId, 'channels', channelId, 'messages')
 }
 
-// 팀의 채팅방 목록 (기본 방이 맨 앞, 나머지는 만든 순서)
-export function useChannels(teamId: string | undefined) {
+// 팀의 채팅방 목록 (기본 방이 맨 앞, 나머지는 만든 순서). 내가 들어가 있지 않은 방은 뺀다.
+export function useChannels(teamId: string | undefined, uid: string) {
   const [channels, setChannels] = useState<Channel[] | null>(null)
   useEffect(() => {
     setChannels(null)
@@ -92,10 +100,11 @@ export function useChannels(teamId: string | undefined) {
           createdBy: (d.get('createdBy') as string) ?? null,
           createdAt: (d.get('createdAt') as Timestamp) ?? null,
           bgStk: d.get('bgStk') ?? null, // 🏷️ 채팅방 배경 스티커
+          members: d.get('members') ? Object.keys(d.get('members') as Record<string, unknown>) : null,
         }))
         const main = list.find((c) => c.id === MAIN_CHANNEL)
         const others = list
-          .filter((c) => c.id !== MAIN_CHANNEL)
+          .filter((c) => c.id !== MAIN_CHANNEL && (!c.members || c.members.includes(uid)))
           .sort((a, b) => (a.createdAt?.toMillis() ?? Infinity) - (b.createdAt?.toMillis() ?? Infinity))
         setChannels([
           { id: MAIN_CHANNEL, name: main?.name || MAIN_CHANNEL_NAME, createdBy: null, createdAt: null, bgStk: main?.bgStk ?? null },
@@ -104,13 +113,15 @@ export function useChannels(teamId: string | undefined) {
       },
       () => setChannels([{ id: MAIN_CHANNEL, name: MAIN_CHANNEL_NAME, createdBy: null, createdAt: null }]),
     )
-  }, [teamId])
+  }, [teamId, uid])
   return channels
 }
 
 export async function createChannel(teamId: string, name: string) {
   const ref = doc(collection(db, 'teams', teamId, 'channels'))
-  await setDoc(ref, { name: name.trim(), createdBy: auth.currentUser!.uid, createdAt: serverTimestamp() })
+  const me = auth.currentUser!.uid
+  // 새 방은 만든 사람만 들어가 있고, 같이 쓸 사람은 초대한다
+  await setDoc(ref, { name: name.trim(), createdBy: me, createdAt: serverTimestamp(), members: { [me]: true } })
   return ref.id
 }
 

@@ -65,6 +65,8 @@ export const api = {
     { fromTeamId: string; toTeamId: string; uid: string; role?: Role; newOwnerUid?: string },
     { ok: true; movedCustomers: number }
   >('moveMember'),
+  // 👥 채팅방 나가기·초대하기 (방에 있는 사람만)
+  roomMembers: call<{ teamId: string; channelId: string; action: 'leave' | 'invite'; uids?: string[] }, { members: string[] }>('roomMembers'),
   removeMember: call<{ teamId: string; uid: string }, { accountDeleted: boolean }>('removeMember'),
   resetMemberPassword: call<{ teamId: string; uid: string; password: string }, { ok: true }>(
     'resetMemberPassword',

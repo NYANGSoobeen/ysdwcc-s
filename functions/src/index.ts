@@ -306,6 +306,66 @@ async function protectSuperAdmin(uid: string) {
 }
 
 // 팀원 추가. 다른 팀에 이미 계정이 있으면 비밀번호는 그대로 두고 이 팀에만 추가한다.
+
+// ── 👥 초대한 사람만 보는 채팅방 (2026-11-03 사용자 요청) ─────────────────
+// 방 문서 channels/{id}.members = {uid: true}. 이 칸이 없는 예전 방은 팀원 모두가 본다.
+// 새 직원이 들어오기 전에 예전 방을 "지금 팀원 + 최고 관리자"로 굳혀서, 새 직원에게는 안 보이게 한다.
+// 기본 방(main, 전체 채팅)은 늘 팀원 모두.
+async function superAdminUids() {
+  const db = getFirestore()
+  const [supers, setup] = await Promise.all([db.collection('users').where('superAdmin', '==', true).get(), db.doc('meta/setup').get()])
+  const set = new Set(supers.docs.map((d) => d.id))
+  const owner = setup.get('ownerUid')
+  if (typeof owner === 'string' && owner) set.add(owner)
+  return [...set]
+}
+
+async function freezeRooms(teamId: string, members: Record<string, unknown>) {
+  const db = getFirestore()
+  const rooms = await db.collection(`teams/${teamId}/channels`).get()
+  const open = rooms.docs.filter((d) => d.id !== 'main' && !d.get('members'))
+  if (open.length === 0) return 0
+  const everyone: Record<string, true> = {}
+  for (const u of [...Object.keys(members), ...(await superAdminUids())]) everyone[u] = true
+  const batch = db.batch()
+  for (const d of open) batch.update(d.ref, { members: everyone })
+  await batch.commit()
+  return open.length
+}
+
+// 방 나가기·초대하기. 방에 있는 사람만 (최고 관리자·관리자도 방에 없으면 못 함).
+export const roomMembers = onCall(async (req) => {
+  const uid = requireUid(req)
+  const teamId = text(req.data?.teamId, '팀')
+  const channelId = text(req.data?.channelId, '채팅방')
+  const action = req.data?.action
+  if (action !== 'leave' && action !== 'invite') throw new HttpsError('invalid-argument', '할 일이 올바르지 않습니다.')
+  if (channelId === 'main') throw new HttpsError('failed-precondition', '전체 채팅은 팀원 모두가 있는 방이라 나가거나 초대할 수 없어요.')
+  const db = getFirestore()
+  const [team, room] = await Promise.all([db.doc(`teams/${teamId}`).get(), db.doc(`teams/${teamId}/channels/${channelId}`).get()])
+  if (!team.exists || !room.exists) throw new HttpsError('not-found', '채팅방을 찾을 수 없습니다.')
+  const teamMembers = (team.get('members') ?? {}) as Record<string, Role>
+  const supers = await superAdminUids()
+  const now: Record<string, true> = {}
+  const saved = room.get('members') as Record<string, unknown> | undefined
+  if (saved) for (const u of Object.keys(saved)) now[u] = true
+  else for (const u of [...Object.keys(teamMembers), ...supers]) now[u] = true
+  if (!now[uid]) throw new HttpsError('permission-denied', '이 방에 들어가 있는 사람만 할 수 있어요.')
+  if (!teamMembers[uid] && !supers.includes(uid)) throw new HttpsError('permission-denied', '팀원이 아닙니다.')
+  if (action === 'leave') {
+    delete now[uid]
+  } else {
+    const uids = Array.isArray(req.data?.uids) ? (req.data.uids as unknown[]) : []
+    if (uids.length === 0 || uids.length > 200) throw new HttpsError('invalid-argument', '초대할 사람을 고르세요.')
+    for (const u of uids) {
+      if (typeof u !== 'string' || !teamMembers[u]) throw new HttpsError('invalid-argument', '팀원만 초대할 수 있어요.')
+      now[u] = true
+    }
+  }
+  await room.ref.update({ members: now })
+  return { members: Object.keys(now) }
+})
+
 export const addMember = onCall(async (req) => {
   const { teamId, members } = await requireAdmin(req, req.data?.teamId)
   const name = text(req.data?.name, '이름')
@@ -333,6 +393,8 @@ export const addMember = onCall(async (req) => {
     }
   }
   if (members[uid]) throw new HttpsError('already-exists', '이미 팀원입니다.')
+  // 새 직원은 예전 방(수다방·업무방 등)이 안 보이게: 지금 팀원으로 방을 굳힌 뒤 넣는다
+  await freezeRooms(teamId, members)
 
   const batch = db.batch()
   batch.update(db.doc(`teams/${teamId}`), { [`members.${uid}`]: memberRole })
@@ -506,6 +568,9 @@ export const moveMember = onCall(async (req) => {
     newOwner = requireMember(fromMembers, req.data?.newOwnerUid)
     if (newOwner === uid) throw new HttpsError('invalid-argument', '담당 고객은 원래 부서에 남는 사람에게 넘겨야 합니다.')
   }
+
+  // 옮겨 오는 사람에게도 옮길 부서의 예전 방은 안 보이게 (초대받아야 들어감)
+  if (!toMembers[uid]) await freezeRooms(toId, toMembers)
 
   // 부서가 하나도 없는 순간이 생기면 그 사람 앱이 로그아웃되므로 소속은 한 번에 바꾼다.
   await db.runTransaction(async (tx) => {

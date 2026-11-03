@@ -52,7 +52,8 @@ import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
 import { MenuButton } from '../menu.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
-import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
+import { ask, askText, isTouchUi, Modal, toast } from '../ui/dialogs.tsx'
+import { api } from '../api.ts'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 
@@ -93,10 +94,17 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   const canWrite = myRole !== 'viewer'
   const isAdmin = myRole === 'admin'
   const canManage = room.id === MAIN_CHANNEL ? isAdmin : isAdmin || (canWrite && room.createdBy === uid)
-  const members = useMemo(
-    () => Object.keys(team.members).map((m) => ({ uid: m, name: profiles[m]?.name ?? '' })).filter((m) => m.name),
-    [team.members, profiles],
+  // 👥 이 방 사람: 초대한 사람만 있는 방이면 그 사람들(지금 팀원만), 아니면 팀원 모두 → @부르기·읽음 숫자
+  const roomUids = useMemo(
+    () => (room.members ? Object.keys(team.members).filter((m) => room.members!.includes(m)) : Object.keys(team.members)),
+    [team.members, room.members],
   )
+  const members = useMemo(
+    () => roomUids.map((m) => ({ uid: m, name: profiles[m]?.name ?? '' })).filter((m) => m.name),
+    [roomUids, profiles],
+  )
+  const [showPeople, setShowPeople] = useState(false)
+  const privateRoom = room.id !== MAIN_CHANNEL
   const memberNames = useMemo(() => members.map((m) => m.name), [members])
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
@@ -243,11 +251,30 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
     return false
   }
 
+  async function leaveRoom() {
+    const ok = await ask({
+      title: '채팅방 나가기',
+      message: `"${room.name}" 방에서 나갈까요?\n나가면 이 방이 메뉴에서 사라지고 대화도 볼 수 없어요. 다시 들어오려면 방에 있는 사람이 초대해 줘야 해요.`,
+      ok: '나가기',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await api.roomMembers({ teamId: team.id, channelId: room.id, action: 'leave' })
+      toast('방에서 나왔어요.')
+      onLeft()
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    }
+  }
+
   const roomActions = (): MenuAction[] => [
+    ...(privateRoom ? [{ icon: '👥', label: `참여자·초대 (${room.members ? members.length : '팀원 모두'})`, onSelect: () => setShowPeople(true) }] : []),
     { icon: '🖼️', label: '사진 모아보기', onSelect: () => setShowGallery(true) },
     { icon: '🏷️', label: '배경에 스티커 붙이기', onSelect: () => !full(room.bgStk) && setStickTarget({ kind: 'bg' }) },
     { icon: '🧹', label: `배경 스티커 보기·떼기 (${bgStickers.length})`, onSelect: () => setShowBgList(true) },
     ...(canManage ? [{ icon: '✏️', label: '방 이름 바꾸기', onSelect: () => void rename() }] : []),
+    ...(privateRoom ? [{ icon: '🚪', label: '이 방 나가기', danger: true, onSelect: () => void leaveRoom() }] : []),
     ...(canManage && room.id !== MAIN_CHANNEL
       ? [{ icon: '🗑️', label: '방 삭제', danger: true, onSelect: () => void removeRoom() }]
       : []),
@@ -372,7 +399,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   // 읽음 표시: 이 방을 보고 있고(앱이 앞에 있고) 맨 아래까지 봤으면, 남이 보낸 새 말이 있을 때 내 읽은 시각을 올린다.
   // 쓰기를 아끼려고 3초에 한 번까지만.
   const reads = useRoomReads(team.id, room.id)
-  const memberUids = useMemo(() => Object.keys(team.members), [team.members])
+  const memberUids = roomUids
   const lastMarked = useRef(0)
   const markTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const maybeMarkRead = useCallback(() => {
@@ -546,6 +573,14 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
       <p className="chat-hint">
         💡 메시지를 길게 누르거나(PC는 오른쪽 클릭) 답장·복사·수정·삭제할 수 있어요
       </p>
+      {privateRoom && room.members && room.members.length <= 1 && (
+        <div className="room-alone">
+          <span>👥 아직 나만 있는 방이에요. 같이 쓸 사람을 초대하세요.</span>
+          <button type="button" onClick={() => setShowPeople(true)}>
+            초대하기
+          </button>
+        </div>
+      )}
       {placing && (
         <div className="placing-bar" role="status">
           <span>
@@ -694,6 +729,20 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
         />
       )}
       {showGallery && <PhotoGallery messages={ref} profiles={profiles} onClose={() => setShowGallery(false)} />}
+      {showPeople && (
+        <RoomPeople
+          team={team}
+          room={room}
+          uid={uid}
+          inRoom={roomUids}
+          names={names}
+          onClose={() => setShowPeople(false)}
+          onLeave={() => {
+            setShowPeople(false)
+            void leaveRoom()
+          }}
+        />
+      )}
       {viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
     </div>
   )
@@ -1561,5 +1610,89 @@ export function EmojiButton({ onPick, onSticker }: { onPick: (emoji: string) => 
         </div>
       )}
     </div>
+  )
+}
+
+// 👥 참여자·초대 (초대한 사람만 보는 방, 2026-11-03): 지금 방에 있는 사람 + 아직 없는 팀원 골라 초대
+function RoomPeople(props: {
+  team: Team
+  room: Channel
+  uid: string
+  inRoom: string[]
+  names: Record<string, string>
+  onClose: () => void
+  onLeave: () => void
+}) {
+  const { team, room, inRoom, names } = props
+  const outside = Object.keys(team.members).filter((m) => !inRoom.includes(m))
+  const [picked, setPicked] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const nameOf = (m: string) => names[m] || '이름 없음'
+  async function invite() {
+    if (!picked.length) return
+    setBusy(true)
+    try {
+      await api.roomMembers({ teamId: team.id, channelId: room.id, action: 'invite', uids: picked })
+      toast(`${picked.map(nameOf).join(', ')}님을 초대했어요.`)
+      props.onClose()
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal onClose={() => !busy && props.onClose()} labelledBy="room-people-title">
+      <div className="form room-people">
+        <h3 id="room-people-title">👥 {room.name}</h3>
+        <p className="muted small">
+          이 방은 들어와 있는 사람만 보여요. 관리자도 방에 없으면 못 봐요. 새 직원은 여기서 초대해야 들어와요.
+        </p>
+        <h4>방에 있는 사람 {inRoom.length}명</h4>
+        <ul className="room-people-list">
+          {inRoom.map((m) => (
+            <li key={m}>
+              <Avatar uid={m} name={nameOf(m)} /> {nameOf(m)}
+              {m === props.uid ? ' (나)' : ''}
+            </li>
+          ))}
+        </ul>
+        {outside.length > 0 ? (
+          <>
+            <h4>초대할 사람 고르기</h4>
+            <ul className="room-people-list">
+              {outside.map((m) => (
+                <li key={m}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(m)}
+                      onChange={(e) => setPicked((p) => (e.target.checked ? [...p, m] : p.filter((x) => x !== m)))}
+                    />
+                    <Avatar uid={m} name={nameOf(m)} /> {nameOf(m)}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="muted small">팀원이 모두 이 방에 있어요.</p>
+        )}
+        <div className="modal-actions">
+          {inRoom.includes(props.uid) && (
+            <button type="button" className="ghost danger-text" onClick={props.onLeave} disabled={busy}>
+              🚪 나가기
+            </button>
+          )}
+          <button type="button" className="ghost" onClick={props.onClose} disabled={busy}>
+            닫기
+          </button>
+          {outside.length > 0 && (
+            <button type="button" onClick={() => void invite()} disabled={busy || !picked.length}>
+              {busy ? '초대하는 중…' : `초대하기${picked.length ? ` (${picked.length})` : ''}`}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
   )
 }
