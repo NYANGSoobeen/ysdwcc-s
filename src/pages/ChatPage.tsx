@@ -46,6 +46,8 @@ import { useMessages, type Message } from '../useMessages.ts'
 import { badgeText, markRead, unreadBy, useRoomReads } from '../reads.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { WebSearchPanel, webQueryOf } from './WebSearchPanel.tsx'
+import { chatFxOf } from '../chatfx.ts'
+import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
 import { MenuButton } from '../menu.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
@@ -205,6 +207,9 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   const [placing, setPlacing] = useState<{ target: { kind: 'msg'; id: string } | { kind: 'bg' }; choice: StickerChoice } | null>(null)
   const [showBgList, setShowBgList] = useState(false)
   const areaRef = useRef<HTMLDivElement>(null)
+  // 🎉 채팅 효과 (/축하 등, src/chatfx.ts): 방금 올라온 효과 말이면 대화 영역에 7초 애니메이션
+  const fxList = useMemo(() => messages.map((m) => ({ id: m.id, text: m.body, at: m.createdAt?.toMillis() ?? null, deleted: m.deleted })), [messages])
+  useChatFx(areaRef, fxList)
   const roomDoc = doc(db, 'teams', team.id, 'channels', room.id)
   const bgStickers = stuckList(room.bgStk)
   const names = useMemo(() => Object.fromEntries(Object.entries(profiles).map(([id, p]) => [id, p.name])), [profiles])
@@ -836,7 +841,7 @@ function MessageItem(props: {
                 </span>
               </button>
             ))}
-            {m.body && <p>{linkify(m.body, props.memberNames, props.myName)}</p>}
+            {m.body && (chatFxOf(m.body) ? <FxTag fx={chatFxOf(m.body)!} /> : <p>{linkify(m.body, props.memberNames, props.myName)}</p>)}
             {m.link && (
               <a className="link-card" href={m.link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {m.link.image && <img src={m.link.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
@@ -1354,6 +1359,15 @@ function Composer(props: {
             </li>
           ))}
         </ul>
+      )}
+      {!editing && (
+        <ChatFxPick
+          text={body}
+          onPick={(v) => {
+            setBody(v)
+            textarea.current?.focus()
+          }}
+        />
       )}
       <ClipboardChip inputRef={textarea} onPaste={(t) => insertText(t)} />
       <div className="composer-row">

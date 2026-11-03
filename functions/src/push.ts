@@ -115,9 +115,24 @@ const short = (text: string, n: number) => {
   return t.length > n ? `${t.slice(0, n)}…` : t
 }
 
+// 🎉 채팅 효과 말 (/축하 등, 앱 src/chatfx.ts·프론트 앱과 같은 목록): 알림엔 "🎉 승진 축하해요!"처럼
+const FX: [string[], string, string][] = [
+  [['축하', '경축', '폭죽', 'ㅊㅋ', '축하해'], '🎉', '축하해요!'], [['박수', '짝짝'], '👏', '짝짝짝!'], [['생일', '생축', '생일축하'], '🎂', '생일 축하해요!'],
+  [['하트', '사랑', 'love'], '💖', '사랑해요!'], [['감사', '고마워', '땡큐'], '🌸', '감사합니다!'], [['화이팅', '파이팅', '힘내'], '💪', '화이팅!'],
+  [['위로', '격려', '토닥'], '🤗', '토닥토닥, 괜찮아요'], [['수고', '고생', '수고했어'], '✨', '수고했어요!'], [['ㅠㅠ', 'ㅜㅜ', '눈물', '슬퍼'], '😭', 'ㅠㅠ'],
+  [['화', '불꽃', '극대노', '분노'], '😡', '화가 나요!!'], [['눈', '첫눈', '겨울'], '❄️', '눈이 와요!'],
+]
+export function fxText(t: string) {
+  const m = String(t || '').trim().match(/^\/(\S+)(?:\s+([\s\S]*))?$/)
+  if (!m) return null
+  const f = FX.find((x) => x[0].includes(m[1].toLowerCase()))
+  if (!f) return null
+  return `${f[1]} ${(m[2] || '').trim() || f[2]}`
+}
+
 export function previewOf(m: Record<string, unknown>) {
   const body = typeof m.body === 'string' ? m.body : ''
-  if (body.trim()) return short(body, 100)
+  if (body.trim()) return short(fxText(body) ?? body, 100)
   const photos = Array.isArray(m.attachments) ? m.attachments.length : 0
   if (photos) return photos > 1 ? `📷 사진 ${photos}장` : '📷 사진'
   if (m.video) return '🎬 동영상'

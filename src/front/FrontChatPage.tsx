@@ -7,6 +7,8 @@ import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
 import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { Avatar, rememberedPerson, showProfileCard } from '../ui/Avatar.tsx'
+import { chatFxOf } from '../chatfx.ts'
+import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
 import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import {
@@ -124,6 +126,9 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   const accounts = useFrontAccounts(true)
   const reads = useFrontRoomReads(room.id)
   const listRef = useRef<HTMLDivElement>(null)
+  // 🎉 채팅 효과 (/축하 등): 프론트 앱과 같은 글이라 양쪽 다 효과가 나온다
+  const fxList = useMemo(() => messages.map((m) => ({ id: m.id, text: m.text, at: m.createdAt || null, deleted: m.deleted })), [messages])
+  useChatFx(listRef, fxList)
   const stickToBottom = useRef(true)
   const restore = useRef<{ height: number; top: number } | null>(null)
   const [replyTo, setReplyTo] = useState<FrontMessage | null>(null)
@@ -551,7 +556,7 @@ function FrontMessageItem(props: {
                 </span>
               </button>
             )}
-            {m.text && <p>{linkify(m.text)}</p>}
+            {m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(m.text)}</p>)}
             {link?.url && (
               <a className="link-card" href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {link.thumb && /^https?:/.test(link.thumb) && (
@@ -675,6 +680,15 @@ function FrontComposer(props: {
             ✕
           </button>
         </div>
+      )}
+      {!props.editing && (
+        <ChatFxPick
+          text={body}
+          onPick={(v) => {
+            setBody(v)
+            textarea.current?.focus()
+          }}
+        />
       )}
       <ClipboardChip inputRef={textarea} onPaste={(t) => insertAt(textarea.current, body, t, setBody)} />
       <div className="composer-row">

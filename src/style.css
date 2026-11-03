@@ -6478,3 +6478,80 @@ html.keyboard-open .sms-composer {
   color: #2b5f9e;
   font-weight: 700;
 }
+
+/* 🎉 채팅 효과 (/축하 등, src/chatfx.ts · 프론트 앱 chatfx.css를 우리 앱 이름·색으로) */
+.chat-fx-canvas {
+  position: fixed;
+  pointer-events: none;
+  z-index: 15;
+}
+.fx-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.fx-tag .fx-icon {
+  font-size: 22px;
+  line-height: 1;
+  animation: fx-pop 0.6s ease-out;
+}
+.fx-tag .fx-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@keyframes fx-pop {
+  0% { transform: scale(0.3) rotate(-20deg); }
+  60% { transform: scale(1.3) rotate(8deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.fx-pick {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 0 8px;
+  scrollbar-width: none;
+}
+.fx-pick::-webkit-scrollbar {
+  display: none;
+}
+.fx-pick button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.fx-pick button span {
+  font-size: 16px;
+}
+/* 😡 /화: 채팅 화면이 부르르 */
+.fx-shake {
+  animation: fx-shake 0.8s ease-in-out;
+}
+@keyframes fx-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-6px); }
+  30%, 70% { transform: translateX(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-tag .fx-icon,
+  .fx-shake {
+    animation: none;
+  }
+}
