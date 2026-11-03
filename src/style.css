@@ -6486,18 +6486,30 @@ html.keyboard-open .sms-composer {
   z-index: 15;
 }
 .fx-tag {
+  /* 말풍선 글(.bubble p)과 같은 여백·크기, 프론트 앱처럼 굵게 (2026-11-03 "프론트처럼 보이게") */
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
   min-height: 0;
-  padding: 0;
+  margin: 0;
+  padding: 8px 14px;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: inherit;
-  font: inherit;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.55;
   text-align: left;
+  white-space: normal;
+  flex-shrink: 1;
   cursor: pointer;
+}
+.fx-tag:hover,
+.fx-tag:active {
+  background: transparent;
 }
 .fx-tag .fx-icon {
   font-size: 22px;
