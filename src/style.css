@@ -6595,3 +6595,17 @@ html.keyboard-open .sms-composer {
 .shell.desktop .page-header:has(> .game-button):not(.chat-header) {
   padding-right: 32px;
 }
+
+/* 좁은 PC 창(마우스 컴퓨터 760~1099px, 모니터 반쪽 창): 2열은 한 줄로, 고객 목록 칸은 좁게 */
+@media (max-width: 1099px) {
+  .shell.desktop .page-body.two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell.desktop .split {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+  /* 고객 목록 머리줄은 칸이 좁아 "📇 고객" 글자가 잘려서 🎮은 숨김 (다른 화면 머리줄에는 그대로) */
+  .shell.desktop .split-list .page-header > .game-button {
+    display: none;
+  }
+}
