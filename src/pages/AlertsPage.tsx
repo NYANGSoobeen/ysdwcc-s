@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { GameButton } from '../games/GameButton.tsx'
 import { api } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import { isIOS } from '../download.ts'
@@ -53,6 +54,7 @@ export function AlertsPage({ unread, workSms }: { unread: number; workSms: numbe
         <MenuButton />
         <h2>🔔 알림 설정</h2>
         <span />
+        <GameButton />
       </header>
       <div className="page-body">
         {hasPhoneNative || oldAndroidApp ? <GalaxyAlerts workSms={workSms} /> : <WebAlerts unread={unread} />}

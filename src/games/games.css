@@ -1,0 +1,114 @@
+/* 🎮 게임 화면 (2026-11-03, 프론트 앱 css/style.css 의 게임 부분을 그대로 뽑아 .fgame 안으로 가둠 — 우리 앱 .modal 과 안 섞이게).
+   프론트 색 이름(--card, --line, --sub …)을 우리 앱 색으로 이어 준다. 프론트에서 게임 모양을 고치면 여기도 다시 뽑기. */
+.fgame {
+  --card: var(--surface);
+  --line: var(--border);
+  --sub: var(--muted);
+  --accent2: var(--rock);
+  --bubble: var(--chat-bg);
+  font-family: var(--font-sans);
+}
+.fgame.modal-bg { position: fixed; inset: 0; background: rgba(11, 30, 42, 0.4); display: none; align-items: center; justify-content: center; z-index: 50; }
+.fgame .modal { background: var(--card); color: var(--text); border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); padding: 22px; width: min(360px, 90vw); max-height: 80vh; overflow-y: auto; }
+.fgame button { min-height: 0; white-space: normal; flex-shrink: 1; font-family: inherit; }
+.fgame .golfModal{width:min(440px,96vw); max-height:96vh; max-height:96dvh; padding:12px 12px 10px; display:flex; flex-direction:column; align-items:center; gap:8px; overflow-y:auto; overflow-x:hidden; box-sizing:border-box;}
+.fgame .golfModal *{box-sizing:border-box; min-width:0;}
+.fgame .gfTop{display:flex; align-items:center; gap:8px; width:100%;}
+.fgame .gfTop b{color:var(--accent); font-size:16px;}
+.fgame .gfBest{flex:1; font-size:12px; color:var(--sub);}
+.fgame .modal .gfNew{padding:5px 12px; font-size:12.5px; margin:0;}
+.fgame .modal .gfX{background:var(--bubble); color:var(--text); padding:5px 11px; margin:0;}
+.fgame #gfCv{border-radius:16px; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; display:block; cursor:crosshair; box-shadow:0 3px 10px rgba(0,0,0,.15);}
+.fgame .gfCard{display:grid; grid-template-columns:repeat(10,1fr); gap:3px; width:100%;}
+.fgame .gfCell{background:var(--bg); border:1px solid var(--line); border-radius:8px; text-align:center; padding:3px 0; display:flex; flex-direction:column; line-height:1.25;}
+.fgame .gfCell span{font-size:11px; font-weight:700;}
+.fgame .gfCell i{font-size:9.5px; color:var(--sub); font-style:normal;}
+.fgame .gfCell b{font-size:14px; min-height:18px;}
+.fgame .gfCell.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
+.fgame .gfCell.tot{background:var(--accent2);}
+.fgame .gfCell b.under{color:#1a73e8;}
+.fgame .gfCell b.par{color:#008a3e;}
+.fgame .gfCell b.over{color:#d9534f;}
+.fgame .gfHelp{font-size:11.5px; color:var(--sub); text-align:center; line-height:1.45;}
+.fgame .modal .gfRankBtn{padding:5px 12px; font-size:12.5px; margin:0; background:#f2b64b;}
+.fgame .gfPlay{display:flex; flex-direction:column; align-items:center; gap:8px; width:100%;}
+.fgame .gfRank{width:100%; display:flex; flex-direction:column; gap:6px; min-height:300px;}
+.fgame .gfEmpty{text-align:center; color:var(--sub); padding:60px 10px; line-height:1.7; font-size:14px;}
+.fgame .gfSec{font-weight:700; font-size:13.5px; color:var(--accent); margin-top:6px;}
+.fgame .gfSec span{font-weight:400; font-size:11px; color:var(--sub);}
+.fgame .gfRecent{background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:8px;}
+.fgame .gfRecentHd,.fgame .gfDHd{font-size:12.5px; margin:0 0 6px;}
+.fgame .gfRecentHd span,.fgame .gfDHd span{color:var(--sub); font-size:11px;}
+.fgame .gfDHd{margin-top:8px;}
+.fgame .gfDHd2{font-size:11px; color:var(--sub); text-align:right; margin-top:6px;}
+.fgame .gfList{display:flex; flex-direction:column; gap:4px;}
+.fgame .gfRow{display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:8px 10px; cursor:pointer;}
+.fgame .gfRow.me{border-color:var(--accent); background:var(--accent2);}
+.fgame .gfRow.open{border-bottom-left-radius:4px; border-bottom-right-radius:4px;}
+.fgame .gfMedal{width:30px; text-align:center; font-size:15px; font-weight:700; flex:none;}
+.fgame .gfNm{flex:1; min-width:0; font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.fgame .gfBestCol{font-size:14px; flex:none;}
+.fgame .gfBestCol i{font-style:normal; font-size:11px; color:var(--sub);}
+.fgame .gfLastCol{font-size:11.5px; text-align:right; color:var(--text); flex:none; line-height:1.3;}
+.fgame .gfLastCol i{font-style:normal; font-size:10px; color:var(--sub);}
+.fgame #golfBg{animation:gfBgIn .2s ease;}
+.fgame #golfBg .golfModal{animation:gfPop .24s cubic-bezier(.2,.9,.3,1.2);}
+.fgame #golfBg.gfClosing{animation:gfBgOut .2s ease forwards;}
+.fgame #golfBg.gfClosing .golfModal{animation:gfPopOut .2s ease forwards;}
+.fgame .gfFadeIn{animation:gfFade .25s ease;}
+.fgame .gfFoldWrap{display:flex; flex-direction:column;}
+.fgame .gfDetail{display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows .28s ease, opacity .22s ease, margin .28s ease; margin-top:0;}
+.fgame .gfDetail.open{grid-template-rows:1fr; opacity:1; margin-top:-4px;}
+.fgame .gfDetailIn{overflow:hidden; min-height:0;}
+.fgame .gfDetail.open .gfDetailIn{background:var(--card); border:1px solid var(--line); border-top:none; border-radius:0 0 14px 14px; padding:6px 8px 8px;}
+.fgame .gfChev{flex:none; color:var(--sub); font-size:12px; transition:transform .25s ease;}
+.fgame .gfRow.open .gfChev{transform:rotate(180deg);}
+.fgame .gfHist .gfNm i{font-style:normal; font-weight:400; font-size:11.5px; color:var(--sub);}
+.fgame .gfEmptySm{font-size:12.5px; color:var(--sub); padding:10px 4px; text-align:center;}
+@media (prefers-reduced-motion:reduce){.fgame #golfBg,.fgame #golfBg .golfModal,.fgame .gfFadeIn{animation:none !important;}}
+@media (prefers-reduced-motion:reduce){.fgame .gfDetail,.fgame .gfChev{transition:none;}}
+.fgame .gfWind{font-size:12px; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:4px 10px; text-align:center; width:100%;}
+.fgame .gfCell span{white-space:nowrap; letter-spacing:-.3px;}
+.fgame #gardenBg.gfClosing{animation:gfBgOut .2s ease forwards;}
+.fgame #gardenBg.gfClosing .gardenModal{animation:gfPopOut .2s ease forwards;}
+.fgame .modal .gdBtns button,.fgame .modal .bkNav button,.fgame .modal .bkCard,.fgame .gfCell,.fgame #gfCv{-webkit-tap-highlight-color:transparent;}
+.fgame .modal .gdBtns button,.fgame .modal .gfRankBtn,.fgame .modal .gfNew{white-space:nowrap;}
+.fgame .gfTop b{white-space:nowrap;}
+@media (max-width:375px){.fgame .gfTop{gap:5px;}}
+@media (max-width:375px){.fgame .gfTop b{font-size:14.5px;}}
+@media (max-width:375px){.fgame .gfBest{font-size:11px;}}
+@media (max-width:375px){.fgame .modal .gfRankBtn,.fgame .modal .gfNew{padding:5px 8px; font-size:11.5px;}}
+.fgame .gfBest{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+.fgame .gfTitleBox{flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.25;}
+.fgame .gfTitleBox .gfBest{flex:none; font-size:11px;}
+.fgame #gameBg,.fgame #boarBg{animation:gfBgIn .2s ease;}
+.fgame #gameBg .gamePick,.fgame #boarBg .golfModal{animation:gfPop .24s cubic-bezier(.2,.9,.3,1.2);}
+.fgame #gameBg.gfClosing,.fgame #boarBg.gfClosing{animation:gfBgOut .2s ease forwards;}
+.fgame #gameBg.gfClosing .gamePick,.fgame #boarBg.gfClosing .golfModal{animation:gfPopOut .2s ease forwards;}
+.fgame .gamePick{width:min(380px,92vw); padding:14px; display:flex; flex-direction:column; gap:10px; box-sizing:border-box;}
+.fgame .modal .gpCard{display:flex; align-items:center; gap:12px; width:100%; margin:0; padding:14px; text-align:left; border-radius:18px; background:linear-gradient(135deg,#e9f7df,#cfeec0); color:#24421b; border:1px solid #b9dfa5; box-shadow:0 2px 6px rgba(0,0,0,.06); -webkit-tap-highlight-color:transparent; transition:transform .12s ease;}
+.fgame .modal .gpCard.boar{background:linear-gradient(135deg,#fbecd9,#f2d2ab); color:#4a2d16; border-color:#e6bf92;}
+.fgame .modal .gpCard:active{transform:scale(.97);}
+.fgame .gpIc{font-size:34px; line-height:1; flex:none;}
+.fgame .gpTx{display:flex; flex-direction:column; gap:3px; min-width:0;}
+.fgame .gpTx b{font-size:16px;}
+.fgame .gpTx i{font-style:normal; font-size:12px; opacity:.8; line-height:1.4;}
+@media (prefers-reduced-motion:reduce){.fgame #gameBg,.fgame #gameBg .gamePick,.fgame #boarBg,.fgame #boarBg .golfModal{animation:none !important;}}
+.fgame .brLvRow{display:flex; gap:6px; width:100%;}
+.fgame .modal .brLv{flex:1; margin:0; padding:6px 4px; font-size:13px; border-radius:12px; background:var(--bg); color:var(--text); border:1px solid var(--line); white-space:nowrap; -webkit-tap-highlight-color:transparent;}
+.fgame .modal .brLv.on{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700;}
+.fgame .modal .gpCard.cart{background:linear-gradient(135deg,#e1effc,#c4def6); color:#173a5e; border-color:#a9cbec;}
+.fgame .modal .gpCard.lost{background:linear-gradient(135deg,#f3f6ee,#dde6d2); color:#2c3a22; border-color:#c6d3b6;}
+.fgame .mgBg{animation:gfBgIn .2s ease;}
+.fgame .mgBg .golfModal{animation:gfPop .24s cubic-bezier(.2,.9,.3,1.2);}
+.fgame .mgBg.gfClosing{animation:gfBgOut .2s ease forwards;}
+.fgame .mgBg.gfClosing .golfModal{animation:gfPopOut .2s ease forwards;}
+.fgame .mgCv{border-radius:16px; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; display:block; cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.15); -webkit-tap-highlight-color:transparent;}
+.fgame .gamePick{max-height:92vh; max-height:92dvh; overflow-y:auto;}
+@media (prefers-reduced-motion:reduce){.fgame .mgBg,.fgame .mgBg .golfModal{animation:none !important;}}
+.fgame .modal .gpCard.stress{background:linear-gradient(135deg,#fde3e1,#f7c6c1); color:#5a1f1a; border-color:#eeb0a8;}
+@keyframes gfBgIn{from{opacity:0}to{opacity:1}}
+@keyframes gfBgOut{from{opacity:1}to{opacity:0}}
+@keyframes gfPop{from{opacity:0; transform:translateY(14px) scale(.94)}to{opacity:1; transform:none}}
+@keyframes gfPopOut{from{opacity:1; transform:none}to{opacity:0; transform:translateY(10px) scale(.96)}}
+@keyframes gfFade{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}

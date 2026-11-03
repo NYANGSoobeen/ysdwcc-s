@@ -1,4 +1,5 @@
 import { doc } from 'firebase/firestore'
+import { GameButton } from '../games/GameButton.tsx'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
 import type { Attachment } from '../chat.ts'
@@ -191,6 +192,7 @@ export function NoticesPage({ team, uid }: { team: Team; uid: string }) {
         <MenuButton />
         <h2>📢 공지</h2>
         <SearchBar placeholder="검색" label="공지 제목, 내용 검색" inline />
+        <GameButton />
       </header>
       {placing && (
         <div className="placing-bar" role="status">

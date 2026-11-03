@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { GameButton } from '../games/GameButton.tsx'
 import { api, ROLE_LABELS, type Role } from '../api.ts'
 import { errorMessage, toEmail, toLoginId } from '../auth.ts'
 import { useMemberProfiles, useTeamNames, type Profile, type Team } from '../hooks.ts'
@@ -39,6 +40,7 @@ export function StaffPage({ team, uid, teamIds }: Props) {
         <MenuButton />
         <h2>👥 직원 관리</h2>
         <SearchBar placeholder="검색" label="직원 이름, 아이디 검색" inline />
+        <GameButton />
       </header>
       <div className="page-body staff-body">
         <div className="staff-top">

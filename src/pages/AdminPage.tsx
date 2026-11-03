@@ -1,4 +1,5 @@
 import { doc, updateDoc } from 'firebase/firestore'
+import { GameButton } from '../games/GameButton.tsx'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ROLE_LABELS, type Role } from '../api.ts'
 import { errorMessage, toLoginId } from '../auth.ts'
@@ -37,6 +38,7 @@ export function AdminPage({ team, superAdmin, teamIds, onSelectTeam, onOpenUsage
         <MenuButton />
         <h2>🛡️ 관리자 설정</h2>
         <span />
+        <GameButton />
       </header>
       <div className="page-body two-col">
         <p className="notice small">

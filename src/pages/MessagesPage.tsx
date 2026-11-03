@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { GameButton } from '../games/GameButton.tsx'
 import { errorMessage } from '../auth.ts'
 import { addNote, formatPhone, type Customer } from '../customers.ts'
 import type { Team } from '../hooks.ts'
@@ -129,6 +130,7 @@ export function MessagesPage({ team, onOpenCustomer }: Props) {
         <button type="button" className="ghost" onClick={() => setComposing('')} aria-label="새 문자">
           ✏️ 새 문자
         </button>
+        <GameButton />
       </header>
       <div className="page-body">
         {oldAndroidApp && <OldAppCard />}

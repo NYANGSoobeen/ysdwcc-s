@@ -1,4 +1,5 @@
 import { ClipboardChip } from '../ui/ClipboardChip.tsx'
+import { GameButton } from '../games/GameButton.tsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { doc } from 'firebase/firestore'
 import { db } from '../firebase.ts'
@@ -517,6 +518,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
           <MoreButton actions={roomActions} title={room.name} label="채팅방 메뉴" />
           <SearchBar inline placeholder="검색" label="대화 내용 검색" onEnter={() => void older()} />
         </div>
+        <GameButton />
       </header>
       {q && (
         <div className="search-results" aria-live="polite">

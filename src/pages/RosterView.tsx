@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { GameButton } from '../games/GameButton.tsx'
 import { errorMessage } from '../auth.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { readTableFile } from '../importCustomers.ts'
@@ -112,6 +113,7 @@ export function RosterView({ team, uid, tabs }: { team: Team; uid: string; tabs:
         ) : (
           <span />
         )}
+        <GameButton />
       </header>
       {tabs}
       <div className="page-body roster-body">

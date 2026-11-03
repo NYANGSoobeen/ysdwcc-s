@@ -1,4 +1,5 @@
 import type { User } from 'firebase/auth'
+import { GameButton } from '../games/GameButton.tsx'
 import { useState } from 'react'
 import { ROLE_LABELS } from '../api.ts'
 import { logOutAndWipe, toLoginId } from '../auth.ts'
@@ -27,6 +28,7 @@ export function ProfilePage({ user, profile, team, onOpenAlerts }: Props & { onO
         <MenuButton />
         <h2>⚙️ 설정 · 내 정보</h2>
         <span />
+        <GameButton />
       </header>
       <div className="page-body two-col">
         <div className="col">

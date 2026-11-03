@@ -1,4 +1,5 @@
 import { ROLE_LABELS } from '../api.ts'
+import { GameButton } from '../games/GameButton.tsx'
 import { toLoginId } from '../auth.ts'
 import { useMemberProfiles, type Team } from '../hooks.ts'
 import { MenuButton } from '../menu.tsx'
@@ -19,6 +20,7 @@ export function MembersPage({ team, uid, onOpenAdmin }: { team: Team; uid: strin
         <MenuButton />
         <h2>👥 팀원 {Object.keys(team.members).length}명</h2>
         <span />
+        <GameButton />
       </header>
       <SearchBar placeholder="팀원 이름, 아이디 검색" />
       <div className="page-body">

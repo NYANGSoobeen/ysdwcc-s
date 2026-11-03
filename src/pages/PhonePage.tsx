@@ -1,4 +1,5 @@
 import { isAndroidBrowser } from '../native.ts'
+import { GameButton } from '../games/GameButton.tsx'
 import { RecentMemos } from './RecentMemos.tsx'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase.ts'
@@ -86,6 +87,7 @@ export function PhonePage({ team, uid, onOpenCustomer, onOpenSms, onOpenSettings
         <MenuButton />
         <h2>📞 전화</h2>
         <span />
+        <GameButton />
       </header>
       <nav className="phone-tabs" aria-label="전화 화면">
         {(

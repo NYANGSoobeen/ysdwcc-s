@@ -15,6 +15,7 @@ import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './
 import { useNativeContactsAutoOn, useNativeContactsSync } from './native.ts'
 import { isPcDevice, usePhoneBadges, usePrefetchPhoneNames } from './phone.ts'
 import { useAlertKinds, useAlertsSync } from './phoneAlerts.ts'
+import { setGameUser } from './games/GameButton.tsx'
 import { normalizePhone } from './customers.ts'
 import { useOffDaySync } from './offday.ts'
 import { AdminPage } from './pages/AdminPage.tsx'
@@ -103,6 +104,8 @@ function SignedIn({ user }: { user: User }) {
   const myTeamIds = profile?.teamIds ?? []
   // 👑 최고 관리자는 속하지 않아도 모든 팀을 본다 (로그인 토큰 표시가 준비된 뒤)
   const isSuper = profile?.superAdmin === true
+  // 🎮 게임(src/games)이 쓸 내 정보 (순위표 이름)
+  setGameUser(profile ? { uid: user.uid, name: profile.name || '', superAdmin: isSuper } : null)
   const superReady = useSuperClaim(user, isSuper)
   const allTeamIds = useAllTeamIds(isSuper && superReady)
   const teamIds = isSuper && allTeamIds ? allTeamIds : myTeamIds

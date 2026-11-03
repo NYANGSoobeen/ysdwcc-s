@@ -1,4 +1,5 @@
 import { addDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { GameButton } from '../games/GameButton.tsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { StorageImage } from '../components/StorageImage.tsx'
@@ -88,6 +89,7 @@ function JoinPage() {
         <MenuButton />
         <h2>🏌️ 프론트 채팅</h2>
         <span />
+        <GameButton />
       </header>
       <div className="page-body">
         <form className="card form" onSubmit={submit}>
@@ -289,6 +291,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
             label="채팅방 메뉴"
           />
         </div>
+        <GameButton />
       </header>
       <div
         className="messages"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { GameButton } from '../games/GameButton.tsx'
 import { api, type DataCount, type Usage } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
@@ -80,6 +81,7 @@ export function UsagePage({ team }: { team: Team }) {
         <MenuButton />
         <h2>💾 용량 관리</h2>
         <span />
+        <GameButton />
       </header>
       <div className="page-body storage-view">
         {error && <p className="st-empty">사용량을 불러오지 못했어요. 잠시 후 다시 시도해 주세요. ({error})</p>}

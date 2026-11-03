@@ -1,4 +1,5 @@
 import { onSnapshot } from 'firebase/firestore'
+import { GameButton } from '../games/GameButton.tsx'
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { errorMessage } from '../auth.ts'
 import type { Team } from '../hooks.ts'
@@ -218,6 +219,7 @@ function ImageSchedule({ team, tabs }: { team: Team; uid: string; tabs: ReactNod
         ) : (
           <span />
         )}
+        <GameButton />
       </header>
       {tabs}
 

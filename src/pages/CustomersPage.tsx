@@ -1,4 +1,5 @@
 import { isIOS } from '../download.ts'
+import { GameButton } from '../games/GameButton.tsx'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
@@ -107,6 +108,7 @@ export function CustomersPage({ team, uid, desktop, onOpenSms }: { team: Team; u
         ) : (
           <span />
         )}
+        <GameButton />
       </header>
       {importing && customers && <ImportCustomers teamId={team.id} customers={customers} onClose={() => setImporting(false)} />}
       <SearchBar placeholder="이름, 회사, 전화번호 검색" />

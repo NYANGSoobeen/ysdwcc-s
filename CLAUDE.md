@@ -60,7 +60,7 @@
   - 채팅 화면은 늘 방 하나를 보여 준다(고른 방이 없으면 기본 방, 휴대폰 "방 목록" 화면은 없앰). 머리줄: ☰ · 💬 방 이름 · ⋯(방 메뉴) · 🔍 검색칸(머리줄 안, 휴대폰은 누르면 넓어짐, 찾은 결과 "1 / 3건 ▲ ▼"는 머리줄 아래 줄). 그 아래 안내줄 "💡 메시지를 길게 누르거나(PC는 오른쪽 클릭) …"(키보드 열리면 숨김), 빈 방은 "아직 메시지가 없어요 🎈".
   - **📋 붙여넣기 칩 · 😊 이모지 (2026-10-30, 사용자 요청 "입력창 누르면 클립보드에서 불러오기"):** 우리 채팅·🏌️ 프론트 채팅·✉️ 문자 입력칸을 누르면 입력칸 위에 "📋 복사한 글 붙여넣기" 칩(`src/ui/ClipboardChip.tsx`), 누르면 커서 자리에 넣고 키보드는 그대로. 갤럭시 앱(1.6.3)은 `Phone.readClipboard({peek:true})`로 글이 있을 때만 칩을 보이고(내용은 안 읽어서 안드로이드 12+ "클립보드에서 붙여넣음" 안내가 누를 때만 뜸), 누르면 네이티브로 읽는다. 아이폰·갤럭시 크롬은 칩을 늘 보이고 누를 때 `navigator.clipboard.readText`(아이폰은 "붙여넣기" 확인 말풍선). PC(마우스)는 Ctrl+V가 있어 안 띄움. ✉️ 문자 입력칸에도 😊 `EmojiButton`(이모지만, 커서 자리, `insertAt`).
   - 입력칸: 둥근 ＋(사진·파일) · 😊(자주 쓰는 이모지 고르기, `EmojiButton`) · 둥근 입력칸(PC 안내 "Enter 전송 · Ctrl+Enter 줄바꿈") · 둥근 ↑ 보내기(수정 중엔 ✓). 프론트 채팅방도 같은 입력칸(＋ 없음).
-  - 색은 우리 앱 색 그대로(메뉴 Venice Blue, 채팅 바탕 `--chat-bg`). 프론트 앱 오른쪽 위 게임·씨앗 버튼은 만들지 않는다.
+  - 색은 우리 앱 색 그대로(메뉴 Venice Blue, 채팅 바탕 `--chat-bg`). 프론트 앱 오른쪽 위 씨앗 버튼은 만들지 않는다. 🎮 게임 버튼은 2026-11-03 사용자 요청으로 넣음(아래 🎮 게임).
   - 관리자 화면(그 팀 관리자만), 용량 관리(최고 관리자만), 팀원 화면(보기 전용 목록)은 그대로.
 - **화면 기본 틀 (공통 기능 2번):**
   - 브라우저 기본 `alert/confirm/prompt`는 쓰지 않는다. `src/ui/dialogs.tsx`의 `ask()`(확인), `askText()`(입력), `tell()`(꼭 읽어야 할 알림), `toast()`(잠깐 뜨는 알림, 오류는 `{ error: true }`)를 쓴다. 창 틀은 `Modal`.
@@ -121,6 +121,9 @@
   - 기존 4-2의 "스티커(공감)"는 메뉴 이름을 "👍 공감 표시"로 바꿨다(👍 ❤️ … 개수 표시는 그대로).
   - 휴대폰 채팅 머리줄: 예전에는 머리줄 안 아무 버튼에 포커스가 가도(`:focus-within`) 검색칸이 넓어져, ⋯을 누르면 검색칸이 그 자리로 밀려와 메뉴가 안 열렸다(갤럭시 크롬) → 검색칸에 포커스가 있을 때만 넓힌다(`:has(.header-search:focus-within)`).
 - **🎉 채팅 효과 (2026-11-03, 프론트 앱 `js/chatfx.js`를 그대로 옮김 — 사용자가 준 chatfx.js·css·README, `src/chatfx.ts`, 화면 `src/ui/ChatFx.tsx`):** "/축하", "/생일"처럼 /명령어로 시작하는 말을 보내면 그 방을 보고 있는 모두의 대화 영역에 7초 애니메이션(투명 그림판 `.chat-fx-canvas`, 누르는 건 아래로 통과). 메시지는 **글 그대로 저장**(새 항목 없음) → 🏌️ 프론트 방도 프론트 앱과 같은 글이라 양쪽 다 효과. 명령어 11가지 `CHAT_FX`(축하·박수·생일·하트·감사·화이팅·위로·수고·ㅠㅠ·화·눈, 괄호 말 포함), 뒤에 말을 붙이면 말풍선에 그 말(`FxTag`: "🎉 승진 축하해요!" — 보통 말풍선과 같은 여백·14.5px에 굵게, 2026-11-03 "프론트처럼", 누르면 다시 재생), **20초 안에 올라온 말만 저절로 재생**(`chatFxCheck`, 방을 열 때 예전 효과가 한꺼번에 안 터지게, 방금 보낸 내 말은 서버 시각 전이라 지금으로 봄), 입력칸에 "/"만 치면 위에 효과 고르는 줄(`ChatFxPick`, 누르면 "/축하 " 채우고 미리 보기, 수정 중엔 없음), 😡 /화는 대화 영역 부르르 3번(`.fx-shake`), 동작 줄이기면 짧고 약하게, 앱을 내리면 멈춤. 푸시 알림 글은 `functions/src/push.ts` `fxText`("🎉 승진 축하해요!"). **명령어를 바꾸면 `CHAT_FX`·서버 `FX`·프론트 앱 셋을 같이.**
+- **🎮 게임 (2026-11-03, 사용자 요청 "프론트 게임을 가져와서 랭킹", 고른 것: 5개 전부 · 순위는 프론트와 같이 · 버튼은 머리줄 오른쪽):** 프론트 앱 `js/minigame.js`·`golf.js`·`boar.js`·`cart.js`·`lostball.js`·`jinsang.js`를 **고치지 않고 그대로** `src/games/legacy/`에 복사(프론트가 고치면 다시 복사). 🎮 버튼(`src/games/GameButton.tsx`, 머리줄 맨 오른쪽, 모든 화면)을 처음 누를 때만 `src/games/index.ts`가 스크립트를 불러 한 덩어리로 넣고 `openGames()`. 프론트 전역(`db`, `myAccount`, `toast`, `uiConfirm`, `firebase.auth()`)은 흉내 객체(`makeDb`)로 맞춤: `myAccount.loginId` = 우리 uid, `firebase.auth().currentUser.uid` = `legacy-uid`(골프의 예전 기록 옮기기가 우리 기록을 지우지 않게). CSS는 프론트 규칙을 `.fgame` 아래로 가둬 `src/games/games.css`(색은 우리 토큰).
+  - 게임: ⛳ 골프(`golfScores`, 내 기록 `golfMine`), 🐗 멧돼지 사냥(`boarScores`, 0~500), 🚗 카트 배차왕(`cartScores`), ⛳ 로스트볼 찾기(`lostScores`), 😤 진상 손님(`stressScores`)(0~1,000,000). 문서 id = 내 uid, 쉬움·보통·어려움 `b1~b3`/`n1~n3`. 규칙: 팀에 속한 직원(또는 최고 관리자)은 모두 보고, 자기 문서만 정해진 칸·범위로 쓰고, 지우기는 본인·최고 관리자. 테스트 `tests/rules.test.mjs` 🎮.
+  - **프론트와 같은 순위:** 순위표를 열면 우리 기록 + (🏌️ 프론트 채팅에 들어가 있으면) 프론트 프로젝트의 같은 컬렉션을 읽어 합친다(프론트 사람 이름 뒤 " 🏌️", 프론트 쪽 `g_` 문서는 빼서 중복 없음). 기록을 저장하면 프론트 `{컬렉션}/g_{우리 uid}`에도 같이 적는다(실패해도 조용히). **프론트 규칙이 게스트에게 이 컬렉션 읽기·자기 `g_` 문서 쓰기를 허락해야 동작**(프론트 저장소는 우리가 못 고침 → 사용자가 프론트 세션에 요청). 허락 전에는 우리 앱 안 순위만.
 - **링크 미리보기와 @멘션 (공통 기능 4-4):**
   - 링크: 보낸 뒤 앱이 서버 함수 `linkPreview`(`functions/src/linkPreview.ts`)를 불러 그 페이지의 og:title·description·image(없으면 <title>)를 읽어 메시지 `link {url, title, desc, image, site}`에 붙인다. 팀원만 부를 수 있고, 같은 주소는 7일 동안 `linkPreviews/{sha1}`(앱 접근 불가)에 저장해 다시 쓴다. 내부망·서버 주소(localhost, 10.x, 192.168.x, 169.254.x 등)와 80/443 외 포트는 읽지 않고(넘겨 주는 주소도 매번 검사), 6초·512KB까지만 읽는다. euc-kr 페이지도 읽는다.
   - @멘션: 입력칸에서 "@"를 치면 직원 목록(맨 위 @모두)이 뜨고 글자로 걸러진다. ↑↓·Enter·Tab·Esc, 휴대폰은 눌러서 고른다. 보낼 때 글 속 "@이름"/"@모두"로 `mentions[uid]`를 만든다(@모두 = 나를 뺀 팀원 전부). 말풍선의 @이름은 색칠, 나를 부른 말은 노란 테두리와 내 이름 노란 칠.
@@ -290,6 +293,7 @@ users/{uid}/customerNotes/{id}   customerId, kind, body, createdAt, editedAt   (
 pushTokens/{sha256(token)}      uid, token, platform, mode('all'|'mentions'), kinds{chat,mention,notice,front}, pc, seenAt, updatedAt   (푸시 받을 기기, 본인만)
 meta/frontLink                   secret, updatedAt, updatedBy   (프론트 알림 비밀값, 앱에서 접근 불가)
 meta/kakaoSearch                 key, updatedAt, updatedBy   (채팅 #검색 카카오 키, 앱에서 접근 불가)
+golfScores·boarScores·cartScores·lostScores·stressScores/{uid}   게임 순위(프론트와 같은 모양), golfMine/{uid} 내 골프 기록
 stickerPacks/{id}                name, order, createdAt   (😊 이모티콘 테마, 모든 팀 공용, 최고 관리자만 씀)
 stickers/{id}                    packId, assetId(stickers/{id}.png|gif), name, order, createdAt
 meta/setup                       firstTeamId, ownerUid(최고 관리자). 첫 관리자를 만들었는지 표시 (앱에서 접근 불가)

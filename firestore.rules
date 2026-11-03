@@ -96,6 +96,35 @@ service cloud.firestore {
       return isSuper() || (signedIn() && isActive() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && me().get('superAdmin', false) == true);
     }
+    // 🎮 게임 순위 (2026-11-03, 프론트 앱 게임을 그대로 옮김, src/games/): 지원팀 앱 전체 한 순위표, 각자 최고 기록 한 줄(문서 이름 = 내 uid)
+    // 모양은 프론트 앱 규칙과 같다. 플레이 시각은 기록하지 않는다.
+    match /golfScores/{id} {
+      allow read: if inSomeTeam();
+      allow create, update: if inSomeTeam() && id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['cv', 'name', 'best', 'bestD', 'bestCard', 'bestPars', 'bestNos', 'bestWind', 'bestWx']);
+      allow delete: if inSomeTeam() && (id == request.auth.uid || isSuperAdmin());
+    }
+    match /golfMine/{id} {
+      allow read, write: if inSomeTeam() && id == request.auth.uid;
+    }
+    match /boarScores/{id} {
+      allow read: if inSomeTeam();
+      allow create, update: if inSomeTeam() && id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['v', 'name', 'b1', 'n1', 'b2', 'n2', 'b3', 'n3'])
+        && (!('b1' in request.resource.data) || (request.resource.data.b1 is int && request.resource.data.b1 >= 0 && request.resource.data.b1 <= 500))
+        && (!('b2' in request.resource.data) || (request.resource.data.b2 is int && request.resource.data.b2 >= 0 && request.resource.data.b2 <= 500))
+        && (!('b3' in request.resource.data) || (request.resource.data.b3 is int && request.resource.data.b3 >= 0 && request.resource.data.b3 <= 500));
+      allow delete: if inSomeTeam() && (id == request.auth.uid || isSuperAdmin());
+    }
+    match /{col}/{id} {
+      allow read: if (col == 'cartScores' || col == 'lostScores' || col == 'stressScores') && inSomeTeam();
+      allow create, update: if (col == 'cartScores' || col == 'lostScores' || col == 'stressScores') && inSomeTeam() && id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['v', 'name', 'b1', 'n1', 'b2', 'n2', 'b3', 'n3'])
+        && (!('b1' in request.resource.data) || (request.resource.data.b1 is int && request.resource.data.b1 >= 0 && request.resource.data.b1 <= 1000000))
+        && (!('b2' in request.resource.data) || (request.resource.data.b2 is int && request.resource.data.b2 >= 0 && request.resource.data.b2 <= 1000000))
+        && (!('b3' in request.resource.data) || (request.resource.data.b3 is int && request.resource.data.b3 >= 0 && request.resource.data.b3 <= 1000000));
+      allow delete: if (col == 'cartScores' || col == 'lostScores' || col == 'stressScores') && inSomeTeam() && (id == request.auth.uid || isSuperAdmin());
+    }
     match /stickerPacks/{packId} {
       allow read: if inSomeTeam();
       allow create, update: if isSuperAdmin()

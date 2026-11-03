@@ -383,3 +383,23 @@ test('🌙 휴무일 자동 응답 문구는 내 settings에', async () => {
   await assertSucceeds(updateDoc(doc(fs('ed'), 'users/ed'), { 'settings.offDayReply.enabled': true, 'settings.offDayReply.message': '휴무입니다' }))
   await assertFails(updateDoc(doc(fs('ed'), 'users/viewer'), { 'settings.offDayReply.enabled': true }))
 })
+
+test('🎮 게임 순위: 팀 직원은 모두의 순위를 보고, 자기 기록만 정해진 칸·범위로 쓴다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/ed'), { name: '편집', email: 'ed@x.com', teamIds: ['t1'] })
+    await setDoc(doc(ctx.firestore(), 'users/ed2'), { name: '편집2', email: 'ed2@x.com', teamIds: ['t1'] })
+    await setDoc(doc(ctx.firestore(), 'cartScores/ed2'), { v: 1, name: '편집2', b1: 10 })
+  })
+  await assertSucceeds(getDoc(doc(fs('ed'), 'cartScores/ed2')))
+  await assertFails(getDoc(doc(fs('nobody'), 'cartScores/ed2')))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'cartScores/ed'), { v: 1, name: '편집', b1: 1200 }))
+  await assertFails(setDoc(doc(fs('ed'), 'cartScores/ed2'), { v: 1, name: '편집', b1: 1 }))
+  await assertFails(setDoc(doc(fs('ed'), 'cartScores/ed'), { v: 1, name: '편집', b1: 2000000 }))
+  await assertFails(setDoc(doc(fs('ed'), 'cartScores/ed'), { v: 1, name: '편집', hack: 1 }))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'boarScores/ed'), { v: 1, name: '편집', b1: 30 }))
+  await assertFails(setDoc(doc(fs('ed'), 'boarScores/ed'), { v: 1, name: '편집', b1: 900 }))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'golfScores/ed'), { cv: 1, name: '편집', best: 72 }))
+  await assertSucceeds(setDoc(doc(fs('ed'), 'golfMine/ed'), { any: 1 }))
+  await assertFails(getDoc(doc(fs('ed2'), 'golfMine/ed')))
+  await assertFails(setDoc(doc(fs('ed'), 'otherThing/ed'), { v: 1 }))
+})

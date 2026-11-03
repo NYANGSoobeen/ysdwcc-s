@@ -54,7 +54,7 @@ const ydrApp = initializeApp(
   'ydr',
 )
 // 로그인 유지를 끈 컴퓨터는 프론트 로그인도 브라우저를 닫으면 사라진다.
-const ydrAuth = initializeAuth(ydrApp, {
+export const ydrAuth = initializeAuth(ydrApp, {
   persistence: keepSignedIn() ? [indexedDBLocalPersistence, browserLocalPersistence] : browserSessionPersistence,
 })
 export const ydrDb = initializeFirestore(ydrApp, { localCache: memoryLocalCache() })

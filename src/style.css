@@ -6567,3 +6567,31 @@ html.keyboard-open .sms-composer {
     animation: none;
   }
 }
+
+/* 🎮 게임 버튼: 머리줄 오른쪽 끝 (프론트 앱처럼, src/games/GameButton.tsx) — 머리줄을 칸 나누기 대신 한 줄로 */
+.page-header:has(> .game-button):not(.chat-header) {
+  display: flex;
+  gap: 10px;
+  padding-right: 12px;
+}
+.page-header:has(> .game-button) > h2 {
+  flex: 1;
+  min-width: 0;
+}
+.page-header:has(> .game-button) > span:empty {
+  display: none;
+}
+.page-header > .game-button {
+  flex: none;
+  min-width: 40px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 18px;
+  line-height: 1;
+}
+.shell.desktop .page-header:has(> .game-button):not(.chat-header) {
+  padding-right: 32px;
+}
