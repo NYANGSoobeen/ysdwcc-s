@@ -7,6 +7,7 @@
 // 🏌️ 프론트와 같이 겨루기: 프론트 채팅에 게스트로 들어가 있으면(프론트 로그인) 순위표를 읽을 때 프론트 순위도 합쳐 보여 주고,
 //   내 기록은 프론트에도 {col}/g_{내 uid} 로 같이 올린다. 프론트 보안 규칙이 게스트에게 허락해야 동작한다(GAMES_LINK.md, 안 되면 조용히 우리 순위만).
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -41,17 +42,62 @@ type Ref = {
   onSnapshot: (cb: (s: Snap) => void, err?: () => void) => () => void
 }
 
+// 🌤️ 골프의 바람·비·눈 = 프론트 날씨(meta/weather, 프론트 서버가 기상청에서 받아 둔 것).
+// 프론트 채팅에 들어가 있고 프론트 규칙이 게스트에게 읽기를 허락할 때만, 아니면 바람 없이(예전과 같음).
+// 자료가 10분 넘게 묵었으면 골프가 wxAsk 로 새로 받아 달라고 함 → 프론트 weatherReq 에 요청(허락 안 되면 바로 포기, 8초 안 기다림)
+let lastAsk: Promise<boolean> = Promise.resolve(false)
+function wxAsk(uid: string) {
+  lastAsk = frontOn()
+    ? addDoc(collection(ydrDb, 'weatherReq'), { by: `g_${uid}`, at: Date.now(), force: false }).then(
+        () => true,
+        () => false,
+      )
+    : Promise.resolve(false)
+}
+function weatherRef(id: string): Ref {
+  const r = doc(ydrDb, 'meta', id)
+  return {
+    _r: r,
+    _col: 'meta',
+    _id: id,
+    get: async () => {
+      if (id !== 'weather' || !frontOn()) return NO_DOC(id)
+      try {
+        return wrapSnap(await getDoc(r))
+      } catch {
+        return NO_DOC(id)
+      }
+    },
+    set: async () => {},
+    delete: async () => {},
+    onSnapshot: (cb, err) => {
+      let un: (() => void) | null = null
+      let stopped = false
+      void lastAsk.then((ok) => {
+        if (stopped) return
+        if (!ok || id !== 'weather') return err ? err() : cb(NO_DOC(id))
+        un = onSnapshot(r, (s) => cb(wrapSnap(s)), () => err?.())
+      })
+      return () => {
+        stopped = true
+        un?.()
+      }
+    },
+  }
+}
+
 function makeDb(uid: string) {
   const ref = (fs: Firestore, col: string, id: string): Ref => {
+    if (col === 'meta') return weatherRef(id)
     const r = doc(fs, col, id)
     return {
       _r: r,
       _col: col,
       _id: id,
-      get: async () => (col === 'meta' ? NO_DOC(id) : wrapSnap(await getDoc(r))), // meta/weather(프론트 날씨)는 우리에게 없음 → 바람 없이
+      get: async () => wrapSnap(await getDoc(r)),
       set: (d) => setDoc(r, d),
       delete: () => deleteDoc(r),
-      onSnapshot: (cb, err) => (col === 'meta' ? (cb(NO_DOC(id)), () => {}) : onSnapshot(r, (s) => cb(wrapSnap(s)), () => err?.())),
+      onSnapshot: (cb, err) => onSnapshot(r, (s) => cb(wrapSnap(s)), () => err?.()),
     }
   }
   // 내 기록을 프론트에도 (프론트 규칙이 허락할 때만, 실패는 조용히)
@@ -119,10 +165,11 @@ export async function openGames(me: Me) {
   // 골프의 "예전 uid 기록 옮기기"가 내 기록을 지우지 않게 (우리는 처음부터 uid 가 문서 이름이라 옮길 것이 없음)
   w.firebase = { auth: () => ({ currentUser: { uid: `legacy-${me.uid}` } }) }
   w.toast = (text: string) => toast(String(text))
+  w.wxAsk = () => wxAsk(me.uid)
   w.uiConfirm = (message: string, okLabel?: string) => ask({ message, ok: okLabel || '확인' })
   if (!loaded) {
     const files = import.meta.glob('./legacy/*.js', { query: '?raw', import: 'default' })
-    const order = ['minigame', 'golf', 'boar', 'cart', 'lostball', 'jinsang']
+    const order = ['weather-core', 'minigame', 'golf', 'boar', 'cart', 'lostball', 'jinsang']
     const parts: string[] = []
     for (const name of order) parts.push(String(await files[`./legacy/${name}.js`]()))
     // 게임 창(modal-bg)에 .fgame 을 붙여 우리 앱 .modal 모양과 섞이지 않게 (games.css 가 .fgame 안에서만 적용)
