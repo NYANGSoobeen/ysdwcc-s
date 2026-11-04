@@ -6725,3 +6725,57 @@ html.keyboard-open .sms-composer {
   text-align: center;
   margin-top: 40px;
 }
+
+/* 스크롤바 (PC·마우스 기기, 2026-11-04 사용자 요청 "스크롤바 배경색을 불투명색으로"):
+   브라우저 기본은 바탕이 투명해서 뒤 화면이 비쳤다 → 바탕(트랙)은 불투명한 앱 색, 손잡이는 Rock Blue.
+   휴대폰(hover: none)은 위에서 숨긴 그대로. */
+@media (hover: hover) {
+  :root {
+    --scroll-track: #ece3cd;
+    --scroll-thumb: #9dbfd3;
+    --scroll-thumb-hover: #6f9fbb;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: var(--scroll-track);
+  }
+  *::-webkit-scrollbar-track {
+    background: var(--scroll-track);
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: 6px;
+    border: 2px solid var(--scroll-track);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scroll-thumb-hover);
+  }
+  *::-webkit-scrollbar-corner {
+    background: var(--scroll-track);
+  }
+  /* 왼쪽 메뉴(Venice Blue 바탕) 안은 짙은 남색 바탕 */
+  .sidebar {
+    --scroll-track: #0f3f59;
+    --scroll-thumb: #4f86a6;
+    --scroll-thumb-hover: #84b3ce;
+  }
+}
+@media (hover: hover) and (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --scroll-track: #0f3f59;
+    --scroll-thumb: #4f86a6;
+    --scroll-thumb-hover: #84b3ce;
+  }
+}
+@media (hover: hover) {
+  :root[data-theme='dark'] {
+    --scroll-track: #0f3f59;
+    --scroll-thumb: #4f86a6;
+    --scroll-thumb-hover: #84b3ce;
+  }
+}
