@@ -157,14 +157,17 @@ type AuthResult = { token: string; uid: string; channels: string[] }
 // 입장(초대 코드) 또는 다시 로그인. 초대 코드로 들어갈 때의 오류는 화면에 보여 주도록 던진다.
 // 내 프로필 사진 내려받기 주소 (GUEST_LINK 4-1, 2026-11-02): 들어갈 때·앱을 열 때마다 guestAuth에 같이 보내
 // 프론트 앱에서도 내 사진이 보이게 한다. 사진이 아니면(이름 글자·기본 그림) 안 보냄 → 프론트는 이름 첫 글자.
-async function myPhotoUrl(uid: string) {
+// 닉네임 (GUEST_LINK 4-1, 2026-11-04): 우리 앱은 따로 닉네임이 없어 내 정보의 이름을 보낸다(20자) →
+// 프론트에서 초대할 때 적은 이름 대신 "이름·부서"로 보임. 이름을 바꾸면 다음에 앱을 열 때 반영.
+async function myPhotoAndNick(uid: string) {
   try {
     const snap = await getDoc(doc(db, 'users', uid))
+    const nickname = String(snap.get('name') ?? '').trim().slice(0, 20)
     const avatar = String(snap.get('avatar') ?? '')
-    if (!avatar.startsWith('avatars/')) return null
-    return await getDownloadURL(ref(storage, avatar))
+    const photoUrl = avatar.startsWith('avatars/') ? await getDownloadURL(ref(storage, avatar)).catch(() => null) : null
+    return { photoUrl, nickname }
   } catch {
-    return null
+    return { photoUrl: null, nickname: '' }
   }
 }
 
@@ -174,11 +177,12 @@ export async function connectFront(code?: string) {
   // 앱을 열 때 다시 로그인하는 동안만 "연결하는 중" (초대 코드를 넣을 때는 입력 화면을 그대로 둔다)
   if (!code && state.status === 'off') set({ status: 'connecting' })
   try {
-    const [idToken, photoUrl] = await Promise.all([me.getIdToken(), myPhotoUrl(me.uid)])
-    const res = await httpsCallable<{ idToken: string; code?: string; photoUrl?: string }, AuthResult>(ydrFunctions, 'guestAuth')({
+    const [idToken, { photoUrl, nickname }] = await Promise.all([me.getIdToken(), myPhotoAndNick(me.uid)])
+    const res = await httpsCallable<{ idToken: string; code?: string; photoUrl?: string; nickname?: string }, AuthResult>(ydrFunctions, 'guestAuth')({
       idToken,
       ...(code ? { code: code.trim().toUpperCase() } : {}),
       ...(photoUrl ? { photoUrl } : {}),
+      ...(nickname ? { nickname } : {}),
     })
     await signInWithCustomToken(ydrAuth, res.data.token)
     setFlag(true)
