@@ -125,6 +125,15 @@ service cloud.firestore {
         && (!('b3' in request.resource.data) || (request.resource.data.b3 is int && request.resource.data.b3 >= 0 && request.resource.data.b3 <= 1000000));
       allow delete: if (col == 'cartScores' || col == 'lostScores' || col == 'stressScores') && inSomeTeam() && (id == request.auth.uid || isSuperAdmin());
     }
+    // 🍱 식단표 (2026-11-04): 문서 하나, 모든 팀 공용. 팀에 속한 직원(또는 최고 관리자)은 누구나 올리고 지운다.
+    match /meta/menu {
+      allow read, delete: if inSomeTeam();
+      allow create, update: if inSomeTeam()
+        && request.resource.data.keys().hasOnly(['assetIds', 'by', 'at'])
+        && request.resource.data.assetIds is list && request.resource.data.assetIds.size() <= 20
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.at is number;
+    }
     match /stickerPacks/{packId} {
       allow read: if inSomeTeam();
       allow create, update: if isSuperAdmin()

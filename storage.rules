@@ -44,6 +44,16 @@ service firebase.storage {
         && (isSuper() || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('superAdmin', false) == true);
     }
 
+    // 🍱 식단표 사진 (모든 팀 공용): 팀에 속한 직원은 보고, 올리고, 지운다 (앱이 긴 쪽 2000px JPEG로 줄여 올림).
+    match /menu/{fileName} {
+      allow read, delete: if request.auth != null && active()
+        && (isSuper() || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('teamIds', []).size() > 0);
+      allow create: if request.auth != null && active()
+        && (isSuper() || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('teamIds', []).size() > 0)
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size <= 4 * 1024 * 1024;
+    }
+
     // 근무표(스케줄): 쪽 그림(PNG/JPEG)과 원본 PDF(1MB 이하만). 교체·삭제 시 Functions가 폴더째 지운다.
     match /teams/{teamId}/schedule/{uploadId}/{fileName} {
       allow read: if request.auth != null

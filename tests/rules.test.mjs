@@ -429,3 +429,16 @@ test('👥 초대한 사람만 보는 방: 방에 없으면 관리자·최고 �
   await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/channels/new1'), { name: '새 방', createdBy: 'ed', createdAt: serverTimestamp(), members: { ed: true } }))
   await assertFails(setDoc(doc(fs('ed'), 'teams/t1/channels/new2'), { name: '새 방', createdBy: 'ed', createdAt: serverTimestamp(), members: { ed: true, ed2: true } }))
 })
+
+test('🍱 식단표: 팀 직원은 누구나(보기 권한도) 올리고 지우고, 팀 밖 사람은 못 본다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/viewer'), { name: '보기', email: 'v@x.com', teamIds: ['t1'] })
+  })
+  await assertSucceeds(setDoc(doc(fs('viewer'), 'meta/menu'), { assetIds: ['menu/1_0.jpg'], by: 'viewer', at: 1 }))
+  await assertSucceeds(getDoc(doc(fs('viewer'), 'meta/menu')))
+  await assertFails(getDoc(doc(fs('nobody'), 'meta/menu')))
+  await assertFails(setDoc(doc(fs('viewer'), 'meta/menu'), { assetIds: [], by: 'someone', at: 1 }))
+  await assertFails(getDoc(doc(fs('viewer'), 'meta/setup')))
+  // (Storage 규칙 menu/ 은 Firestore를 함께 보는데, 이 환경의 Storage 에뮬레이터에서는 그 조회가 안 돼(9번 시험도 같은 이유) 여기서 빼 둠)
+  await assertSucceeds(deleteDoc(doc(fs('viewer'), 'meta/menu')))
+})

@@ -33,6 +33,7 @@ import { PasswordForm } from './pages/PasswordForm.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
 import { AlertsPage } from './pages/AlertsPage.tsx'
 import { SchedulePage } from './pages/SchedulePage.tsx'
+import { MealPage } from './pages/MealPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 import { IDLE_NOTICE, rememberSignedIn, wasSignedIn, watchIdle } from './session.ts'
 import { SearchContext } from './ui/search.tsx'
@@ -50,7 +51,7 @@ function savedTeam() {
 
 // F5(새로 고침)를 눌러도 보던 화면을 유지한다. 앱을 새로 열면(세션이 바뀌면) 첫 화면부터.
 const TAB_KEY = 'current-tab'
-const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'members', 'staff', 'admin', 'usage', 'profile', 'alerts']
+const TABS: Tab[] = ['notices', 'customers', 'phone', 'messages', 'chat', 'front', 'schedule', 'meal', 'members', 'staff', 'admin', 'usage', 'profile', 'alerts']
 
 function savedTab(): Tab {
   try {
@@ -425,6 +426,7 @@ function SignedIn({ user }: { user: User }) {
               />
             )}
             {current === 'schedule' && <SchedulePage team={team} uid={user.uid} />}
+            {current === 'meal' && <MealPage uid={user.uid} />}
             {current === 'members' && <MembersPage team={team} uid={user.uid} onOpenAdmin={() => setTab('staff')} />}
             {current === 'staff' && <StaffPage team={team} uid={user.uid} teamIds={teamIds} />}
             {current === 'admin' && (
