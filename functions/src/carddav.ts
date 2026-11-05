@@ -386,7 +386,8 @@ async function profileResponse(req: DavRequest): Promise<DavResponse> {
 </plist>`
   return reply(200, xml, {
     'Content-Type': 'application/x-apple-aspen-config; charset=utf-8',
-    'Content-Disposition': 'attachment; filename="yangsan-support.mobileconfig"',
+    // attachment 로 보내면 사파리가 "파일" 앱 다운로드 폴더에 넣기만 하고 설치 화면으로 안 넘겼다(2026-11-05) → inline
+    'Content-Disposition': 'inline; filename="yangsan-support.mobileconfig"',
     'Cache-Control': 'no-store',
   })
 }
