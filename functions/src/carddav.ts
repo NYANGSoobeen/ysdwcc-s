@@ -259,7 +259,8 @@ function bookProps(prefix: string, ctag: string) {
     `<d:displayname>${BOOK_NAME}</d:displayname>` +
     `<cs:getctag>${xmlEscape(ctag)}</cs:getctag>` +
     `<d:getetag>${xmlEscape(ctag)}</d:getetag>` +
-    `<d:current-user-principal><d:href>${xmlEscape(`${prefix}/`)}</d:href></d:current-user-principal>` +
+    // 주소록도 나(principal)는 /principal/ 로 (예전 / 그대로면 아이폰이 주소록을 다시 처음부터 찾으며 맴돌 수 있음)
+    `<d:current-user-principal><d:href>${xmlEscape(principalHref(prefix))}</d:href></d:current-user-principal>` +
     '<d:supported-report-set>' +
     '<d:supported-report><d:report><card:addressbook-multiget/></d:report></d:supported-report>' +
     '<d:supported-report><d:report><card:addressbook-query/></d:report></d:supported-report>' +
