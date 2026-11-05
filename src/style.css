@@ -6779,3 +6779,13 @@ html.keyboard-open .sms-composer {
     --scroll-thumb-hover: #84b3ce;
   }
 }
+
+/* 채팅·문자 입력칸은 스크롤 막대를 숨긴다 (5줄 넘으면 밀어서 움직이는 건 그대로, 2026-11-05 사용자 요청) */
+.composer textarea,
+.sms-composer textarea {
+  scrollbar-width: none;
+}
+.composer textarea::-webkit-scrollbar,
+.sms-composer textarea::-webkit-scrollbar {
+  display: none;
+}
