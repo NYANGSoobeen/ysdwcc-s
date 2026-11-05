@@ -206,48 +206,24 @@ function NativeContactsSyncCard() {
   )
 }
 
-// 📲 아이폰: CardDAV 계정 설정 프로필(.mobileconfig)을 만들어 한 번에 설치 (서버·아이디·암호를 직접 넣지 않아도 됨).
-// 이 기기에서 바로 만들어 열 뿐, 어디에도 올리거나 저장하지 않는다.
+// 📲 아이폰: CardDAV 계정 설정 프로파일(.mobileconfig)로 한 번에 설치 (서버·아이디·암호를 직접 넣지 않아도 됨).
+// 앱 안에서 파일을 만들어 열면(blob·data:) 사파리가 안내를 안 띄워서(2026-11-05) → 접속 정보를 폼(POST, HTTPS)으로
+// CardDAV 서버에 보내면 서버가 맞는지 확인하고 프로파일을 돌려준다. 서버는 암호를 저장하지 않는다.
 function installIPhoneProfile(server: string, username: string, password: string) {
-  const u = new URL(server)
-  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const id = () => crypto.randomUUID().toUpperCase()
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>PayloadContent</key>
-  <array>
-    <dict>
-      <key>CardDAVAccountDescription</key><string>지원팀 고객</string>
-      <key>CardDAVHostName</key><string>${esc(u.hostname)}</string>
-      <key>CardDAVPort</key><integer>${u.port ? Number(u.port) : 443}</integer>
-      <key>CardDAVPrincipalURL</key><string>${esc(`${u.pathname.replace(/\/+$/, '')}/principal/`)}</string>
-      <key>CardDAVUseSSL</key><true/>
-      <key>CardDAVUsername</key><string>${esc(username)}</string>
-      <key>CardDAVPassword</key><string>${esc(password)}</string>
-      <key>PayloadDisplayName</key><string>지원팀 고객 연락처</string>
-      <key>PayloadIdentifier</key><string>kr.yangsan.support.carddav</string>
-      <key>PayloadType</key><string>com.apple.carddav.account</string>
-      <key>PayloadUUID</key><string>${id()}</string>
-      <key>PayloadVersion</key><integer>1</integer>
-    </dict>
-  </array>
-  <key>PayloadDescription</key><string>걸려 온 전화에 고객 이름("[업무] 이름")을 보여 주는 지원팀 연락처 계정</string>
-  <key>PayloadDisplayName</key><string>양산동원지원팀 고객 연락처</string>
-  <key>PayloadIdentifier</key><string>kr.yangsan.support.profile</string>
-  <key>PayloadRemovalDisallowed</key><false/>
-  <key>PayloadType</key><string>Configuration</string>
-  <key>PayloadUUID</key><string>${id()}</string>
-  <key>PayloadVersion</key><integer>1</integer>
-</dict>
-</plist>`
-  // 예전엔 파일 받기(blob + download)로 열었더니 "허용" 뒤 아무 안내가 안 떴다(2026-11-05) →
-  // 프로파일 주소(data:)로 바로 넘어가면 Safari가 "프로파일이 다운로드됨" 안내를 띄운다.
-  const bytes = new TextEncoder().encode(xml)
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  window.location.href = `data:application/x-apple-aspen-config;base64,${btoa(bin)}`
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = `${server}/profile`
+  form.target = '_self'
+  for (const [name, value] of [['u', username], ['p', password]]) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    form.append(input)
+  }
+  document.body.append(form)
+  form.submit()
+  form.remove()
 }
 
 function CardDavSync({ uid }: { uid: string }) {

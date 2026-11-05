@@ -202,3 +202,24 @@ test('아이폰 순서: / 의 주체는 /principal/ (같은 주소면 아이폰�
   const home = await (await propfind('/', '1', '<d:resourcetype/>')).text()
   assert.match(home, new RegExp(`<d:href>${PREFIX}/book/</d:href>.*?<card:addressbook/>`))
 })
+
+test('📲 아이폰 한 번에 설정: 접속 정보가 맞을 때만 서버가 구성 프로파일을 돌려준다', async () => {
+  const post = (u, p) =>
+    request('POST', `${PREFIX}/profile`, {
+      auth: null,
+      body: new URLSearchParams({ u, p }).toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+  // 앞 시험들이 예전 접속 정보를 껐으니 새로 하나 둔다 (서버에는 해시만)
+  const { hashSecret } = await import('../functions/lib/carddav.js')
+  const prof = { username: 'wpprofile01', password: 'secret-profile-1' }
+  await db.doc(`carddavTokens/${prof.username}`).set({ uid: 'ed', secretHash: hashSecret(prof.password), disabled: false })
+  const ok = await post(prof.username, prof.password)
+  assert.equal(ok.status, 200)
+  assert.match(ok.headers.get('content-type'), /application\/x-apple-aspen-config/)
+  const xml = await ok.text()
+  assert.match(xml, /com\.apple\.carddav\.account/)
+  assert.ok(xml.includes(`<string>${PREFIX}/principal/</string>`), xml)
+  assert.ok(xml.includes(`<string>${prof.username}</string>`))
+  assert.equal((await post(prof.username, 'wrong')).status, 403)
+})

@@ -61,8 +61,10 @@ async function authenticate(req: DavRequest): Promise<Session | null> {
   const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8')
   const sep = decoded.indexOf(':')
   if (sep < 1) return null
-  const username = decoded.slice(0, sep)
-  const password = decoded.slice(sep + 1)
+  return checkLogin(decoded.slice(0, sep), decoded.slice(sep + 1))
+}
+
+async function checkLogin(username: string, password: string): Promise<Session | null> {
   if (!/^[a-z0-9]{4,40}$/.test(username)) return null
 
   const ref = getFirestore().doc(`carddavTokens/${username}`)
@@ -334,8 +336,64 @@ export async function handleCardDav(req: DavRequest): Promise<DavResponse> {
   return res
 }
 
+// 📲 아이폰 "한 번에 설정하기" (2026-11-05): 앱이 접속 정보를 폼(POST)으로 보내면, 맞는지 확인한 뒤
+// 구성 프로파일(.mobileconfig)을 돌려준다. 앱 안에서 파일을 만들어 열면(blob·data:) 사파리가
+// "프로파일 다운로드" 안내를 안 띄우거나 허용 뒤 아무 일이 없었다 → 서버 응답으로 받아야 설치 화면이 뜬다.
+// 암호는 저장하지 않고 이 응답에만 담긴다 (HTTPS, 캐시 금지).
+async function profileResponse(req: DavRequest): Promise<DavResponse> {
+  const form = new URLSearchParams(req.body)
+  const username = form.get('u') ?? ''
+  const password = form.get('p') ?? ''
+  const session = await checkLogin(username, password)
+  if (!session || session.disabled) {
+    return reply(403, '접속 정보가 맞지 않아요. 지원팀 앱에서 접속 정보를 새로 만든 뒤 다시 눌러 주세요.', {
+      'Content-Type': 'text/plain; charset=utf-8',
+    })
+  }
+  const host = String(header(req, 'x-forwarded-host') ?? header(req, 'host') ?? '').split(',')[0].trim()
+  const prefix = parsePath(req.path.replace(/\/profile\/?$/, '/')).prefix
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const uuid = () => randomBytes(16).toString('hex').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5').toUpperCase()
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>CardDAVAccountDescription</key><string>지원팀 고객</string>
+      <key>CardDAVHostName</key><string>${esc(host)}</string>
+      <key>CardDAVPort</key><integer>443</integer>
+      <key>CardDAVPrincipalURL</key><string>${esc(`${prefix}/principal/`)}</string>
+      <key>CardDAVUseSSL</key><true/>
+      <key>CardDAVUsername</key><string>${esc(username)}</string>
+      <key>CardDAVPassword</key><string>${esc(password)}</string>
+      <key>PayloadDisplayName</key><string>지원팀 고객 연락처</string>
+      <key>PayloadIdentifier</key><string>kr.yangsan.support.carddav</string>
+      <key>PayloadType</key><string>com.apple.carddav.account</string>
+      <key>PayloadUUID</key><string>${uuid()}</string>
+      <key>PayloadVersion</key><integer>1</integer>
+    </dict>
+  </array>
+  <key>PayloadDescription</key><string>걸려 온 전화에 고객 이름("[업무] 이름")을 보여 주는 지원팀 연락처 계정</string>
+  <key>PayloadDisplayName</key><string>양산동원지원팀 고객 연락처</string>
+  <key>PayloadIdentifier</key><string>kr.yangsan.support.profile</string>
+  <key>PayloadRemovalDisallowed</key><false/>
+  <key>PayloadType</key><string>Configuration</string>
+  <key>PayloadUUID</key><string>${uuid()}</string>
+  <key>PayloadVersion</key><integer>1</integer>
+</dict>
+</plist>`
+  return reply(200, xml, {
+    'Content-Type': 'application/x-apple-aspen-config; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="yangsan-support.mobileconfig"',
+    'Cache-Control': 'no-store',
+  })
+}
+
 async function handleRequest(req: DavRequest, ctx: { session?: Session }): Promise<DavResponse> {
   const method = req.method.toUpperCase()
+  if (method === 'POST' && /\/profile\/?$/.test(req.path.split('?')[0])) return profileResponse(req)
   const route = parsePath(req.path)
   const { prefix } = route
   const bookHref = `${prefix}/book/`

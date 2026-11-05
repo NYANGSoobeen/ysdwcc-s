@@ -17,6 +17,8 @@ export const CHAT_FX = [
   { key: 'cry', cmd: ['ㅠㅠ', 'ㅜㅜ', '눈물', '슬퍼'], icon: '😭', say: 'ㅠㅠ' },
   { key: 'angry', cmd: ['화', '불꽃', '극대노', '분노'], icon: '😡', say: '화가 나요!!' },
   { key: 'snow', cmd: ['눈', '첫눈', '겨울'], icon: '❄️', say: '눈이 와요!' },
+  // 🤣 2026-11-05 프론트 요청: ㅋ 2개 이상이면 모두 (/ㅋㅋ, /ㅋㅋㅋㅋㅋ…)
+  { key: 'lol', cmd: ['ㅋㅋㅋㅋ', 'ㅋㅋ', 'ㅋㅋㅋ', '웃겨'], icon: '🤣', say: 'ㅋㅋㅋㅋㅋ' },
 ] as const
 export type ChatFx = (typeof CHAT_FX)[number] & { rest: string }
 const CHAT_FX_RECENT = 20000
@@ -27,7 +29,7 @@ export function chatFxOf(text: string | null | undefined): ChatFx | null {
   if (t[0] !== '/') return null
   const m = t.slice(1).match(/^(\S+)(?:\s+([\s\S]*))?$/)
   if (!m) return null
-  const word = m[1].toLowerCase()
+  const word = /^ㅋ{2,}$/.test(m[1]) ? 'ㅋㅋㅋㅋ' : m[1].toLowerCase()
   const fx = CHAT_FX.find((f) => (f.cmd as readonly string[]).includes(word))
   if (!fx) return null
   return { ...fx, rest: (m[2] || '').trim() }
@@ -224,6 +226,15 @@ export function chatFxPlay(key: string) {
         if (f % 25 === 0) emo('❄️', { x: R(0, W), y: -25, vy: R(1, 1.8), s: R(18, 28), swA: 1 })
       },
     },
+    // 🤣 알록달록 'ㅋ'가 아래에서 튀어 올랐다 바닥에서 한 번 통통 + 웃는 이모지
+    lol: {
+      big: 'giggle',
+      spawn(_t, f) {
+        if (f % 3 === 0)
+          add({ t: 'k', x: R(10, W - 10), y: H + 20, vx: R(-2.5, 2.5), vy: -R(9, 15), g: 0.2, s: R(18, 40), rot: R(-0.4, 0.4), vr: R(-0.08, 0.08), col: pick(COLORS), b: 0 })
+        if (f % 11 === 0) emo(pick(['🤣', '😂', '😆', '😹', '🤣']), { x: R(20, W - 20), y: H + 25, vx: R(-2, 2), vy: -R(9, 14), g: 0.17, s: R(26, 42), vr: R(-0.06, 0.06) })
+      },
+    },
   }
   const S = specs[key]
   S.init?.()
@@ -409,6 +420,29 @@ export function chatFxPlay(key: string) {
         g.arc(p.x, p.y, p.r, 0, Math.PI * 2)
         g.fill()
         g.restore()
+      } else if (p.t === 'k') {
+        p.vy += p.g
+        p.x += p.vx
+        p.y += p.vy
+        p.rot += p.vr
+        if (p.y > H - p.s * 0.4 && p.vy > 0 && p.b < 1) {
+          p.vy *= -0.55
+          p.b++
+        }
+        dead = p.y > H + 60 || p.x < -60 || p.x > W + 60
+        g.save()
+        g.globalAlpha = fade
+        g.translate(p.x, p.y)
+        g.rotate(p.rot)
+        g.font = `900 ${p.s}px 'Noto Sans KR', sans-serif`
+        g.textAlign = 'center'
+        g.textBaseline = 'middle'
+        g.lineWidth = 3
+        g.strokeStyle = 'rgba(255,255,255,.85)'
+        g.strokeText('ㅋ', 0, 0)
+        g.fillStyle = p.col
+        g.fillText('ㅋ', 0, 0)
+        g.restore()
       } else if (p.t === 'pop') {
         p.age++
         dead = p.age > 40
@@ -440,6 +474,10 @@ export function chatFxPlay(key: string) {
         dx = Math.sin(t / 28) * 6
         rot = Math.sin(t / 40) * 0.08
       } else if (m === 'wobble') rot = Math.sin(s * 5) * 0.15
+      else if (m === 'giggle') {
+        dy += -Math.abs(Math.sin(s * 9)) * 10
+        rot = Math.sin(s * 4.5) * 0.12
+      }
       else if (m === 'sway') {
         rot = Math.sin(s * 2.2) * 0.12
         dy += Math.sin(s * 2.2) * 6
