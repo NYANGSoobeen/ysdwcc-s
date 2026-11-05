@@ -127,8 +127,11 @@ async function memberTeams(session: Session) {
 }
 
 // 주소록이 바뀌었는지 폰이 확인하는 값. 고객이 바뀌면 팀의 contactsVersion이 올라간다.
+const CTAG_SALT = 'v2'
+const syncTokenOf = (ctag: string) => `data:,${ctag.replace(/"/g, '')}`
 function ctagOf(teams: { id: string; version: number }[]) {
-  const key = JSON.stringify(teams.map((t) => [t.id, t.version]).sort())
+  // CTAG_SALT: 서버가 보내는 내용이 바뀌었을 때 올리면 폰이 전부 다시 받는다 (v2: 아이폰 multiget 고침)
+  const key = CTAG_SALT + JSON.stringify(teams.map((t) => [t.id, t.version]).sort())
   return `"${createHash('sha1').update(key).digest('hex')}"`
 }
 
@@ -258,6 +261,8 @@ function bookProps(prefix: string, ctag: string) {
     '<d:resourcetype><d:collection/><card:addressbook/></d:resourcetype>' +
     `<d:displayname>${BOOK_NAME}</d:displayname>` +
     `<cs:getctag>${xmlEscape(ctag)}</cs:getctag>` +
+    // 아이폰은 주소록이 바뀌었는지 sync-token으로 본다 (없으면 처음 받은 빈 목록을 그대로 둠)
+    `<d:sync-token>${xmlEscape(syncTokenOf(ctag))}</d:sync-token>` +
     `<d:getetag>${xmlEscape(ctag)}</d:getetag>` +
     // 주소록도 나(principal)는 /principal/ 로 (예전 / 그대로면 아이폰이 주소록을 다시 처음부터 찾으며 맴돌 수 있음)
     `<d:current-user-principal><d:href>${xmlEscape(principalHref(prefix))}</d:href></d:current-user-principal>` +
@@ -281,7 +286,8 @@ function cardProps(card: Card, withData: boolean) {
 
 // REPORT addressbook-multiget에서 요청한 주소들을 꺼낸다.
 function requestedHrefs(body: string) {
-  return [...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?href>([^<]+)<\/(?:[A-Za-z0-9_-]+:)?href>/g)].map((m) =>
+  // 아이폰은 <href xmlns="DAV:">처럼 속성을 붙여 보낸다 → 예전 식은 하나도 못 찾아 빈 답(고객 0명)을 줬다 (2026-11-05)
+  return [...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?href(?:\s[^>]*)?>([^<]+)<\/(?:[A-Za-z0-9_-]+:)?href>/g)].map((m) =>
     decodeURIComponent(m[1].trim()),
   )
 }
@@ -478,7 +484,7 @@ async function handleRequest(req: DavRequest, ctx: { session?: Session }): Promi
     // 지금과 다르면 처음부터 다시 받게 하고(valid-sync-token 오류, 빠진 고객도 지워지게), 처음이면 전부 보낸다.
     if (/sync-collection/.test(req.body)) {
       const token = req.body.match(/<(?:[A-Za-z0-9_-]+:)?sync-token>([^<]*)</)?.[1]?.trim() ?? ''
-      const current = `data:,${ctag.replace(/"/g, '')}`
+      const current = syncTokenOf(ctag)
       if (token && token !== current) {
         return reply(
           403,

@@ -203,6 +203,27 @@ test('아이폰 순서: / 의 주체는 /principal/ (같은 주소면 아이폰�
   assert.match(home, new RegExp(`<d:href>${PREFIX}/book/</d:href>.*?<card:addressbook/>`))
 })
 
+test('아이폰 multiget: <href xmlns="DAV:"> 처럼 속성이 붙어도 고객을 돌려준다 + sync-token', async () => {
+  creds = await fn.enableContactsSync.run(as('ed')) // 앞 시험이 껐으니 다시 켬
+  const list = await (await request('PROPFIND', `${PREFIX}/book/`, {
+    headers: { Depth: '1' },
+    body: '<?xml version="1.0"?><A:propfind xmlns:A="DAV:"><A:prop><A:getetag/></A:prop></A:propfind>',
+  })).text()
+  const hrefs = [...list.matchAll(/<d:href>([^<]+\.vcf)<\/d:href>/g)].map((m) => m[1])
+  assert.ok(hrefs.length > 0)
+  const body =
+    '<?xml version="1.0" encoding="UTF-8"?>\n<C:addressbook-multiget xmlns:C="urn:ietf:params:xml:ns:carddav"><A:prop xmlns:A="DAV:"><A:getetag/><C:address-data/></A:prop>' +
+    hrefs.map((h) => `<href xmlns="DAV:">${h}</href>`).join('') +
+    '</C:addressbook-multiget>'
+  const rep = await (await request('REPORT', `${PREFIX}/book/`, { headers: { Depth: '1' }, body })).text()
+  assert.equal((rep.match(/<card:address-data>/g) ?? []).length, hrefs.length)
+  const tok = await (await request('PROPFIND', `${PREFIX}/book/`, {
+    headers: { Depth: '0' },
+    body: '<?xml version="1.0"?><A:propfind xmlns:A="DAV:"><A:prop><A:sync-token/></A:prop></A:propfind>',
+  })).text()
+  assert.match(tok, /<d:sync-token>data:,[0-9a-f]+<\/d:sync-token>/)
+})
+
 test('📲 아이폰 한 번에 설정: 접속 정보가 맞을 때만 서버가 구성 프로파일을 돌려준다', async () => {
   const post = (u, p) =>
     request('POST', `${PREFIX}/profile`, {
