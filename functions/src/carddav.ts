@@ -2,7 +2,9 @@
 // 별도 연락처 계정으로 넣어, 전화가 오면 기본 전화 앱이 고객 이름을 보여 주게 한다.
 //
 // 경로 (함수 주소 기준)
-//   /                       주체(principal)이자 주소록 모음(addressbook-home)
+//   /                       주소록 모음(addressbook-home). current-user-principal → /principal/
+//   /principal/             나(principal). 아이폰은 처음 주소(/)와 주체 주소가 같으면 다음 단계로 안 넘어가고
+//                           같은 질문만 되풀이했다(2026-11-05 점검 기록: PROPFIND / ×6 후 멈춤) → 따로 둔다.
 //   /book/                  주소록 하나 ("지원팀 고객")
 //   /book/{customerId}.vcf  고객 한 명
 //   /.well-known/carddav    → / 로 안내
@@ -175,7 +177,7 @@ export function toVCard(id: string, data: FirebaseFirestore.DocumentData) {
 
 // ── 경로 ─────────────────────────────────────────────────────
 
-type Route = { prefix: string; kind: 'root' | 'book' | 'card' | 'wellknown' | 'unknown'; cardId?: string }
+type Route = { prefix: string; kind: 'root' | 'principal' | 'book' | 'card' | 'wellknown' | 'unknown'; cardId?: string }
 
 // 함수가 어떤 주소 아래에서 호출되든(에뮬레이터, run.app, 다른 경로) 같은 구조로 동작하게 한다.
 export function parsePath(rawPath: string): Route {
@@ -187,6 +189,8 @@ export function parsePath(rawPath: string): Route {
   const book = path.match(/^(.*)\/book\/?$/)
   if (book) return { prefix: book[1], kind: 'book' }
   if (/\/book\//.test(path)) return { prefix: '', kind: 'unknown' }
+  const principal = path.match(/^(.*)\/principal\/?$/)
+  if (principal) return { prefix: principal[1], kind: 'principal' }
   return { prefix: path.replace(/\/+$/, ''), kind: 'root' }
 }
 
@@ -220,14 +224,29 @@ function notFound(href: string) {
 const READ_ONLY_PRIVILEGES =
   '<d:current-user-privilege-set><d:privilege><d:read/></d:privilege></d:current-user-privilege-set>'
 
+const principalHref = (prefix: string) => `${prefix}/principal/`
+
+// 처음 주소(/): 주소록 모음. 나(principal)는 /principal/ 로 따로 알려 준다.
 function rootProps(prefix: string) {
-  const self = `${prefix}/`
   return (
-    '<d:resourcetype><d:collection/><d:principal/></d:resourcetype>' +
+    '<d:resourcetype><d:collection/></d:resourcetype>' +
     `<d:displayname>양산동원 지원팀</d:displayname>` +
-    `<d:current-user-principal><d:href>${xmlEscape(self)}</d:href></d:current-user-principal>` +
-    `<d:principal-URL><d:href>${xmlEscape(self)}</d:href></d:principal-URL>` +
-    `<card:addressbook-home-set><d:href>${xmlEscape(self)}</d:href></card:addressbook-home-set>` +
+    `<d:current-user-principal><d:href>${xmlEscape(principalHref(prefix))}</d:href></d:current-user-principal>` +
+    `<card:addressbook-home-set><d:href>${xmlEscape(`${prefix}/`)}</d:href></card:addressbook-home-set>` +
+    READ_ONLY_PRIVILEGES
+  )
+}
+
+// 나(principal): 주소록 모음은 / (아이폰은 여기서 addressbook-home-set을 받아 / 를 Depth 1로 다시 묻는다)
+function principalProps(prefix: string, displayName: string) {
+  const me = principalHref(prefix)
+  return (
+    '<d:resourcetype><d:principal/></d:resourcetype>' +
+    `<d:displayname>${xmlEscape(displayName)}</d:displayname>` +
+    `<d:current-user-principal><d:href>${xmlEscape(me)}</d:href></d:current-user-principal>` +
+    `<d:principal-URL><d:href>${xmlEscape(me)}</d:href></d:principal-URL>` +
+    `<card:addressbook-home-set><d:href>${xmlEscape(`${prefix}/`)}</d:href></card:addressbook-home-set>` +
+    `<d:principal-collection-set><d:href>${xmlEscape(`${prefix}/`)}</d:href></d:principal-collection-set>` +
     READ_ONLY_PRIVILEGES
   )
 }
@@ -356,6 +375,10 @@ async function handleRequest(req: DavRequest, ctx: { session?: Session }): Promi
       if (depth !== '0') items.push(response(bookHref, bookProps(prefix, ctag)))
       await recordUse(session, req, 'find', null)
       return reply(207, multistatus(items), XML_HEADERS)
+    }
+    if (route.kind === 'principal') {
+      await recordUse(session, req, 'find', null)
+      return reply(207, multistatus([response(principalHref(prefix), principalProps(prefix, '양산동원 지원팀'))]), XML_HEADERS)
     }
     if (route.kind === 'book') {
       const items = [response(bookHref, bookProps(prefix, ctag))]

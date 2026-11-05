@@ -183,3 +183,22 @@ test('끄거나 새로 만들면 예전 접속 정보는 빈 주소록이 된다
   assert.equal((await fetchCards(creds)).cards.length, 0)
   assert.equal((await db.doc('users/ed/private/contactsSync').get()).get('enabled'), false)
 })
+
+test('아이폰 순서: / 의 주체는 /principal/ (같은 주소면 아이폰이 되풀이만 함) → 주소록 모음 / → /book/', async () => {
+  const propfind = (path, depth, props) =>
+    request('PROPFIND', `${PREFIX}${path}`, {
+      headers: { Depth: depth },
+      body: `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:carddav"><d:prop>${props}</d:prop></d:propfind>`,
+    })
+  const root = await (await propfind('/', '0', '<d:current-user-principal/><d:principal-URL/><d:resourcetype/>')).text()
+  const principal = root.match(/<d:current-user-principal><d:href>([^<]+)</)[1]
+  assert.equal(principal, `${PREFIX}/principal/`)
+  assert.doesNotMatch(root.match(/<d:resourcetype>.*?<\/d:resourcetype>/)[0], /principal/)
+  const me = await propfind('/principal/', '0', '<c:addressbook-home-set/><d:displayname/>')
+  assert.equal(me.status, 207)
+  const body = await me.text()
+  assert.match(body, /<d:resourcetype><d:principal\/><\/d:resourcetype>/)
+  assert.equal(body.match(/<card:addressbook-home-set><d:href>([^<]+)</)[1], `${PREFIX}/`)
+  const home = await (await propfind('/', '1', '<d:resourcetype/>')).text()
+  assert.match(home, new RegExp(`<d:href>${PREFIX}/book/</d:href>.*?<card:addressbook/>`))
+})

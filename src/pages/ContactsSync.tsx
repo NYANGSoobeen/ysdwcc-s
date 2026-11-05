@@ -222,7 +222,7 @@ function installIPhoneProfile(server: string, username: string, password: string
       <key>CardDAVAccountDescription</key><string>지원팀 고객</string>
       <key>CardDAVHostName</key><string>${esc(u.hostname)}</string>
       <key>CardDAVPort</key><integer>${u.port ? Number(u.port) : 443}</integer>
-      <key>CardDAVPrincipalURL</key><string>${esc(u.pathname || '/')}</string>
+      <key>CardDAVPrincipalURL</key><string>${esc(`${u.pathname.replace(/\/+$/, '')}/principal/`)}</string>
       <key>CardDAVUseSSL</key><true/>
       <key>CardDAVUsername</key><string>${esc(username)}</string>
       <key>CardDAVPassword</key><string>${esc(password)}</string>
@@ -242,15 +242,12 @@ function installIPhoneProfile(server: string, username: string, password: string
   <key>PayloadVersion</key><integer>1</integer>
 </dict>
 </plist>`
-  const blob = new Blob([xml], { type: 'application/x-apple-aspen-config' })
-  const href = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = href
-  a.download = '지원팀-고객연락처.mobileconfig'
-  document.body.append(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(href), 60_000)
+  // 예전엔 파일 받기(blob + download)로 열었더니 "허용" 뒤 아무 안내가 안 떴다(2026-11-05) →
+  // 프로파일 주소(data:)로 바로 넘어가면 Safari가 "프로파일이 다운로드됨" 안내를 띄운다.
+  const bytes = new TextEncoder().encode(xml)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  window.location.href = `data:application/x-apple-aspen-config;base64,${btoa(bin)}`
 }
 
 function CardDavSync({ uid }: { uid: string }) {
@@ -334,7 +331,7 @@ function CardDavSync({ uid }: { uid: string }) {
                 📲 아이폰에 한 번에 설정하기
               </button>
               <p className="muted small">
-                누르면 "구성 프로파일을 다운로드"한다고 물어요 → <strong>허용</strong> → 아이폰 <strong>설정</strong> 앱 맨 위 <strong>"프로파일이 다운로드됨"</strong> →{' '}
+                누르면 "구성 프로파일을 다운로드"한다고 물어요 → <strong>허용</strong> → <strong>닫기</strong> → 아이폰 <strong>설정</strong> 앱을 열면 맨 위에 <strong>"프로파일이 다운로드됨"</strong>(안 보이면 설정 → 일반 → VPN 및 기기 관리) →{' '}
                 <strong>설치</strong>(기기 암호 입력, "서명되지 않음" 안내는 그대로 설치). 아래 순서대로 직접 넣어도 돼요. 홈 화면 앱에서 안 되면 Safari로 열어 주세요.
               </p>
             </>

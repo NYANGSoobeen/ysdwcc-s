@@ -182,6 +182,8 @@ function MenuList(props: MenuListProps) {
             {!adminClosed && adminItems.map((item) => itemButton(item, true))}
           </ul>
         )}
+        {/* ⚙️ 설정은 메뉴 맨 아래 (2026-11-05 사용자 요청, 내 프로필을 눌러도 같은 화면) */}
+        <ul className="drawer-list">{itemButton({ tab: 'profile', icon: '⚙️', label: '설정', section: 'main' })}</ul>
       </div>
       {/* 맨 아래: 로그인 상태 · 앱 이름 · 팀 · 버전 */}
       <div className="menu-foot app-version">
