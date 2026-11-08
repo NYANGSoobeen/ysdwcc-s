@@ -7,6 +7,7 @@ import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
 import { frontGames, gameMenu, GameCardView } from '../chatgame/index.tsx'
+import { frontPins, PinBar, useFrontPin } from '../chatpin/index.tsx'
 import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { Avatar, rememberedPerson, showProfileCard } from '../ui/Avatar.tsx'
 import { chatFxOf } from '../chatfx.ts'
@@ -138,6 +139,19 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   const [editing, setEditing] = useState<FrontMessage | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
+  // 📌 채팅방 위 고정: 프론트 방 문서의 pin 을 띠로 (게스트는 보기·이동만, 고정·내리기는 프론트 직원)
+  const pin = useFrontPin(room.id)
+  const pinBar = useRef<HTMLDivElement>(null)
+  const pins = frontPins({
+    roomId: room.id,
+    pin,
+    myId: uid,
+    nameOf: (id) => (id === uid ? myName || '나' : authorName(id, uid, accounts)),
+    copyText: (t) => void copyText(t),
+    bar: () => pinBar.current,
+    list: () => listRef.current,
+    findPin: (id) => jumpTo(id),
+  })
   // 🎲 미니 게임: 프론트 메시지 그대로 (게스트 = 내 id g_{우리 uid}), 말풍선 카드가 그려지기 전에 이어 준다
   const games = frontGames({
     channelId: room.id,
@@ -308,6 +322,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
         </div>
         <GameButton />
       </header>
+      <PinBar api={pins} pin={pin} roomId={room.id} barRef={pinBar} />
       <div
         className="messages"
         ref={listRef}
@@ -344,7 +359,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
           const groupedWithPrev = !showDay && sameGroup(prev, m)
           const mine = m.authorId === uid
           return (
-            <div key={m.id} data-msg={m.id} className={groupedWithPrev ? 'msg-wrap grouped' : 'msg-wrap'}>
+            <div key={m.id} data-msg={m.id} data-mid={m.id} className={groupedWithPrev ? 'msg-wrap msgRow grouped' : 'msg-wrap msgRow'}>
               {showDay && <div className="day">{day}</div>}
               <FrontMessageItem
                 m={m}

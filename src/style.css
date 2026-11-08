@@ -6841,3 +6841,25 @@ html.keyboard-open .sms-composer {
 .game-form .formListDel {
   min-width: 32px;
 }
+
+/* 📌 채팅방 위 고정 (src/chatpin/chatpin.css 는 프론트 파일 그대로): 그 파일의 색 이름을 우리 색으로, 반짝임은 우리 말풍선(.bubble)에 */
+.chatPinBar {
+  --card: var(--surface);
+  --line: var(--border);
+  --sub: var(--muted);
+  --bubble: color-mix(in srgb, var(--rock) 25%, transparent);
+  --shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  color: var(--text);
+  box-shadow: 0 2px 10px rgb(22 88 123 / 0.12);
+}
+.chatPinBar .cpBtn {
+  min-height: 0;
+  box-shadow: none;
+}
+.chatPinBar .cpPill {
+  min-height: 0;
+  font-weight: 500;
+}
+.msgRow.pinFlash .bubble {
+  animation: pinFlash 1.8s ease;
+}

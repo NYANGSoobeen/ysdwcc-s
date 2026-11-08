@@ -1,3 +1,4 @@
+import type { Pin } from './chatpin/index.tsx'
 import {
   collection,
   deleteDoc,
@@ -77,6 +78,7 @@ export type Channel = {
   createdAt: Timestamp | null
   bgStk?: unknown
   members?: string[] | null
+  pin?: Pin | null // 📌 채팅방 위 고정 (src/chatpin)
 }
 
 export function messagesRef(teamId: string, channelId: string): CollectionReference {
@@ -101,13 +103,14 @@ export function useChannels(teamId: string | undefined, uid: string) {
           createdAt: (d.get('createdAt') as Timestamp) ?? null,
           bgStk: d.get('bgStk') ?? null, // 🏷️ 채팅방 배경 스티커
           members: d.get('members') ? Object.keys(d.get('members') as Record<string, unknown>) : null,
+          pin: (d.get('pin') as Pin | undefined)?.mid ? (d.get('pin') as Pin) : null,
         }))
         const main = list.find((c) => c.id === MAIN_CHANNEL)
         const others = list
           .filter((c) => c.id !== MAIN_CHANNEL && (!c.members || c.members.includes(uid)))
           .sort((a, b) => (a.createdAt?.toMillis() ?? Infinity) - (b.createdAt?.toMillis() ?? Infinity))
         setChannels([
-          { id: MAIN_CHANNEL, name: main?.name || MAIN_CHANNEL_NAME, createdBy: null, createdAt: null, bgStk: main?.bgStk ?? null },
+          { id: MAIN_CHANNEL, name: main?.name || MAIN_CHANNEL_NAME, createdBy: null, createdAt: null, bgStk: main?.bgStk ?? null, pin: main?.pin ?? null },
           ...others,
         ])
       },

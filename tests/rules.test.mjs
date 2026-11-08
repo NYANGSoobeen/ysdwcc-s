@@ -465,3 +465,15 @@ test('🎲 채팅 미니 게임: 편집 이상이 게임 메시지를 만들고,
   await assertSucceeds(updateDoc(doc(fs('ed'), p), { game: { ...game, closed: true } }))
   await assertSucceeds(updateDoc(doc(fs('ed'), p), { deleted: true, body: '', game: null, votes: null }))
 })
+
+test('📌 채팅방 위 고정: 편집 이상이 고정·내리기, 보기 권한·팀 밖은 못 함, 기본 방은 문서가 없어도 됨', async () => {
+  const pin = { mid: 'm1', text: '내일 회의 10시', authorId: 'ed', by: 'ed2', at: 1, msgAt: 1 }
+  await assertSucceeds(setDoc(doc(fs('ed2'), 'teams/t1/channels/main'), { pin }, { merge: true }))
+  await assertFails(setDoc(doc(fs('viewer'), 'teams/t1/channels/main'), { pin: { ...pin, mid: 'm2' } }, { merge: true }))
+  await assertFails(setDoc(doc(fs('outsider'), 'teams/t1/channels/main'), { pin }, { merge: true }))
+  await assertFails(setDoc(doc(fs('ed2'), 'teams/t1/channels/main'), { pin: { ...pin, evil: 1 } }, { merge: true }))
+  await assertFails(setDoc(doc(fs('ed2'), 'teams/t1/channels/main'), { pin: { ...pin, text: 'x'.repeat(201) } }, { merge: true }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { 'pin.text': '내일 회의 11시' }))
+  await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { pin: deleteField(), name: '바꿈' }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { pin: deleteField() }))
+})

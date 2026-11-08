@@ -305,6 +305,15 @@ service cloud.firestore {
             && request.resource.data.name.size() <= 30;
         }
 
+        // 📌 채팅방 위 고정 (프론트와 같은 모양): pin = {mid, text(200자), authorId, by, at, msgAt}, 없으면 고정 없음
+        function pinOk() {
+          let p = request.resource.data.get('pin', null);
+          return p == null || (p is map
+            && p.keys().hasOnly(['mid', 'text', 'authorId', 'by', 'at', 'msgAt'])
+            && p.mid is string && p.mid.size() > 0
+            && p.get('text', '') is string && p.get('text', '').size() <= 200);
+        }
+
         allow read: if isMember(teamId);
         allow create: if (canEdit(teamId) && validName()
             && request.resource.data.createdBy == request.auth.uid
@@ -315,11 +324,16 @@ service cloud.firestore {
               : (!('members' in request.resource.data) || request.resource.data.members == {(request.auth.uid): true})))
           // 기본 방은 문서가 없을 수 있다: 배경 스티커를 처음 붙일 때 생긴다.
           || (channelId == 'main' && isMember(teamId)
-            && request.resource.data.keys().hasOnly(['bgStk', 'stkLast']) && stkOk('bgStk'));
+            && request.resource.data.keys().hasOnly(['bgStk', 'stkLast']) && stkOk('bgStk'))
+          // 📌 기본 방은 문서가 없을 수 있다: 처음 고정할 때 생긴다
+          || (channelId == 'main' && canEdit(teamId)
+            && request.resource.data.keys().hasOnly(['pin']) && pinOk());
         allow update: if (validName() && onlyChanges(['name'])
             && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid)))
           // 🏷️ 채팅방 배경 스티커: 팀원 누구나 (자기 것만 떼기)
-          || (isMember(teamId) && inRoom() && onlyChanges(['bgStk', 'stkLast']) && stkOk('bgStk'));
+          || (isMember(teamId) && inRoom() && onlyChanges(['bgStk', 'stkLast']) && stkOk('bgStk'))
+          // 📌 고정·내리기·고정된 말 고친 내용 반영: 편집 이상, 그 방 사람
+          || (canEdit(teamId) && inRoom() && onlyChanges(['pin']) && pinOk());
         allow delete: if channelId != 'main'
           && (isAdmin(teamId) || (canEdit(teamId) && resource.data.createdBy == request.auth.uid));
 

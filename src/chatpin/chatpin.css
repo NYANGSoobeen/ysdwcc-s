@@ -1,0 +1,12 @@
+/* 📌 채팅방 위 고정 (js/chatpin.js) */
+.chatPinBar{flex:none; display:flex; align-items:flex-start; gap:8px; margin:8px 14px 2px; padding:9px 8px 9px 12px; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 2px 10px rgba(190,140,130,.12); position:relative; z-index:2;}
+.chatPinBar .cpIc{font-size:16px; line-height:1.4; flex:none;}
+.chatPinBar .cpBody{flex:1; min-width:0; cursor:pointer;}
+.chatPinBar .cpText{font-size:13.5px; font-weight:600; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere;}
+.chatPinBar .cpSub{font-size:11px; color:var(--sub); margin-top:2px;}
+.chatPinBar .cpBtn{flex:none; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border:none; background:none; color:var(--sub); font-size:15px; cursor:pointer; border-radius:50%; padding:0; margin:0;}
+.chatPinBar .cpBtn:hover{background:var(--bubble);}
+.chatPinBar.folded{align-self:flex-end; padding:0; background:none; border:none; box-shadow:none; margin:6px 14px 0;}
+.cpPill{border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:14px; padding:4px 12px; font-size:12px; cursor:pointer; box-shadow:var(--shadow);}
+.msgRow.pinFlash .msg{animation:pinFlash 1.8s ease;}
+@keyframes pinFlash{0%,60%{box-shadow:0 0 0 3px var(--accent);}100%{box-shadow:0 0 0 0 transparent;}}

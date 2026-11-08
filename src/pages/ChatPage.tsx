@@ -49,6 +49,7 @@ import { PhotoGallery } from './PhotoGallery.tsx'
 import { WebSearchPanel, webQueryOf } from './WebSearchPanel.tsx'
 import { chatFxOf } from '../chatfx.ts'
 import { gameMenu, GameCardView, ourGames } from '../chatgame/index.tsx'
+import { ourPins, PinBar, pinMenu } from '../chatpin/index.tsx'
 import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
 import { MenuButton } from '../menu.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
@@ -113,6 +114,18 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   const restore = useRef<{ height: number; top: number } | null>(null)
   // 답장할 말 / 고치는 중인 내 말 (입력칸 위에 표시)
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null)
+  // 📌 채팅방 위 고정 (src/chatpin): 방 문서의 pin, 띠를 누르면 그 말을 가운데로 붙잡는다(pinTo, 휴대폰 키보드가 닫혀도 안 튕김)
+  const pinBar = useRef<HTMLDivElement>(null)
+  const pins = ourPins(team.id, {
+    roomId: room.id,
+    pin: room.pin ?? null,
+    myId: uid,
+    nameOf: (id) => profiles[id]?.name ?? '나간 팀원',
+    copyText: (t) => void copyText(t),
+    bar: () => pinBar.current,
+    list: () => listRef.current,
+    findPin: (id) => pinTo(id),
+  })
   // 🎲 미니 게임 (src/chatgame): 이 방 정보를 그때그때 이어 준다 (말풍선 카드가 그려지기 전에)
   const games = ourGames({
     teamId: team.id,
@@ -466,6 +479,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
     if (!ok) return
     try {
       await deleteMessage(team.id, room.id, message)
+      pins.chatPinOnDelete(message) // 고정된 말이면 고정도 내림
     } catch (err) {
       toast(errorMessage(err), { error: true })
     }
@@ -605,6 +619,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
           </button>
         </div>
       )}
+      <PinBar api={pins} pin={room.pin ?? null} roomId={room.id} barRef={pinBar} />
       <div className={placing ? 'messages-area placing' : 'messages-area'} ref={areaRef} onClickCapture={place}>
       {/* 🏷️ 채팅방 배경 스티커: 대화 뒤에 깔린다 (누르는 건 ⋯ → 배경 스티커 보기·떼기) */}
       <StuckLayer stickers={bgStickers} className="bg" />
@@ -650,7 +665,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
           const groupedWithNext = sameGroup(m, next)
           const mine = m.authorUid === uid
           return (
-            <div key={m.id} data-msg={m.id} className={groupedWithPrev ? 'msg-wrap grouped' : 'msg-wrap'}>
+            <div key={m.id} data-msg={m.id} data-mid={m.id} className={groupedWithPrev ? 'msg-wrap msgRow grouped' : 'msg-wrap msgRow'}>
               {showDay && <div className="day">{day}</div>}
               <MessageItem
                 message={m}
@@ -672,6 +687,21 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
                 memberNames={memberNames}
                 myName={profiles[uid]?.name ?? ''}
                 games={games}
+                pinItems={() =>
+                  canWrite
+                    ? pinMenu(pins, {
+                        id: m.id,
+                        text: m.body,
+                        authorId: m.authorUid,
+                        createdAt: m.createdAt?.toMillis() ?? 0,
+                        imgs: m.attachments.map((a) => a.path),
+                        video: m.video,
+                        file: m.files[0] ?? null,
+                        stickerAssetId: m.stickerAssetId,
+                        link: m.link,
+                      })
+                    : []
+                }
                 onOpenPhoto={(i) => openPhoto(m, i)}
                 onDelete={() => void remove(m)}
                 onReply={() => {
@@ -717,6 +747,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
             setReplyTo(null)
             setEditing(null)
           }}
+          onEdited={(id, text) => pins.chatPinOnEdit({ id }, text)}
           registerAdd={registerAdd}
           members={members}
           me={uid}
@@ -794,6 +825,7 @@ function MessageItem(props: {
   onStick: () => void
   onStickerTap: (s: StuckSticker) => void
   games: ReturnType<typeof ourGames>
+  pinItems: () => MenuAction[] // 📌 채팅방 위에 고정 / 고정 내리기
 }) {
   const { message: m, mine, uid, profiles } = props
   const links = m.body.match(URL_RE) ?? []
@@ -845,6 +877,7 @@ function MessageItem(props: {
             : []),
           { icon: '👍', label: myReaction ? `공감 바꾸기 (${myReaction})` : '공감 표시', onSelect: () => setTimeout(() => pickSticker(point.current.x, point.current.y), 0) },
           { icon: '🏷️', label: '스티커 붙이기', onSelect: props.onStick },
+          ...props.pinItems(),
           ...(mine ? [{ icon: '🗑️', label: '삭제', danger: true, onSelect: props.onDelete }] : []),
         ]
   const menu = useItemMenu(actions)
@@ -1119,6 +1152,7 @@ function Composer(props: {
   members: { uid: string; name: string }[]
   me: string
   gameItems: MenuAction[] // 🎲 미니 게임 (투표·사다리·주사위·돌림판·제비뽑기)
+  onEdited: (id: string, text: string) => void // 📌 고정된 말을 고치면 띠도
 }) {
   const { teamId, channelId, replyTo, editing, onSent } = props
   const [body, setBody] = useState('')
@@ -1294,6 +1328,7 @@ function Composer(props: {
       if (text === target.body) return
       try {
         await editMessage(teamId, channelId, target.id, text)
+        props.onEdited(target.id, text)
       } catch (err) {
         toast(errorMessage(err), { error: true })
       }
