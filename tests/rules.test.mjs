@@ -442,3 +442,26 @@ test('🍱 식단표: 팀 직원은 누구나(보기 권한도) 올리고 지우
   // (Storage 규칙 menu/ 은 Firestore를 함께 보는데, 이 환경의 Storage 에뮬레이터에서는 그 조회가 안 돼(9번 시험도 같은 이유) 여기서 빼 둠)
   await assertSucceeds(deleteDoc(doc(fs('viewer'), 'meta/menu')))
 })
+
+test('🎲 채팅 미니 게임: 편집 이상이 게임 메시지를 만들고, 투표는 팀원 누구나(보기 권한도) 자기 칸만, 마감은 만든 사람만', async () => {
+  const game = { type: 'poll', q: '점심?', opts: ['김치찌개', '돈까스'], multi: false, anon: false, until: 0, closed: false }
+  const p = 'teams/t1/messages/g1'
+  await assertSucceeds(setDoc(doc(fs('ed'), p), { authorUid: 'ed', body: '📊 투표: 점심?', game, createdAt: serverTimestamp() }))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/messages/g2'), { authorUid: 'ed', body: 'x', game: { type: 'bomb' }, createdAt: serverTimestamp() }))
+  await assertFails(setDoc(doc(fs('ed'), 'teams/t1/messages/g3'), { authorUid: 'ed', body: 'x', game, votes: { ed2: [0] }, createdAt: serverTimestamp() }))
+  await assertFails(setDoc(doc(fs('viewer'), 'teams/t1/messages/g4'), { authorUid: 'viewer', body: 'x', game, createdAt: serverTimestamp() }))
+  // 투표: 자기 칸만
+  await assertSucceeds(updateDoc(doc(fs('viewer'), p), { 'votes.viewer': [1] }))
+  await assertSucceeds(updateDoc(doc(fs('ed2'), p), { 'votes.ed2': [0] }))
+  await assertFails(updateDoc(doc(fs('ed2'), p), { 'votes.viewer': [0] }))
+  await assertFails(updateDoc(doc(fs('ed2'), p), { 'votes.ed2': [1], body: '남의 글 고치기' }))
+  await assertFails(updateDoc(doc(fs('outsider'), p), { 'votes.outsider': [0] }))
+  await assertSucceeds(updateDoc(doc(fs('ed2'), p), { 'votes.ed2': deleteField() }))
+  // 투표가 아닌 게임(주사위)에는 투표 못 함
+  await assertSucceeds(setDoc(doc(fs('ed'), 'teams/t1/messages/g5'), { authorUid: 'ed', body: '🎲 주사위: 3', game: { type: 'dice', vals: [3] }, createdAt: serverTimestamp() }))
+  await assertFails(updateDoc(doc(fs('ed2'), 'teams/t1/messages/g5'), { 'votes.ed2': [0] }))
+  // 마감·삭제는 만든 사람
+  await assertFails(updateDoc(doc(fs('ed2'), p), { game: { ...game, closed: true } }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), p), { game: { ...game, closed: true } }))
+  await assertSucceeds(updateDoc(doc(fs('ed'), p), { deleted: true, body: '', game: null, votes: null }))
+})

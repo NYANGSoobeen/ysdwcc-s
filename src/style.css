@@ -6789,3 +6789,55 @@ html.keyboard-open .sms-composer {
 .sms-composer textarea::-webkit-scrollbar {
   display: none;
 }
+
+/* 🎲 채팅 미니 게임 (src/chatgame/chatgame.css 는 프론트 파일 그대로): 그 파일이 쓰는 색 이름을 우리 앱 색으로 잇고,
+   프론트의 .msg.game(흰 카드 말풍선)을 우리 말풍선 .bubble.game 으로 옮긴다 */
+.bubble.game,
+.game-form {
+  --card: var(--surface);
+  --line: var(--border);
+  --sub: var(--muted);
+  --bg: var(--merino);
+  --accent2: color-mix(in srgb, var(--rock) 45%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  .bubble.game,
+  .game-form {
+    --bg: #0f2433;
+  }
+}
+.bubble.game {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  width: 300px;
+  max-width: 100%;
+}
+.bubble.game .photos {
+  margin-bottom: 8px;
+}
+.bubble.game button {
+  font: inherit;
+  min-height: 0;
+  box-shadow: none;
+}
+.bubble.game .pollOpt {
+  color: var(--text);
+}
+.bubble.game .gmBtn,
+.bubble.game .gmReplay {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.game-form .field-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: -6px;
+}
+.game-form .formListRow input {
+  flex: 1;
+}
+.game-form .formListDel {
+  min-width: 32px;
+}

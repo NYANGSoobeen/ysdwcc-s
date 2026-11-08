@@ -48,6 +48,7 @@ import { badgeText, markRead, unreadBy, useRoomReads } from '../reads.ts'
 import { PhotoGallery } from './PhotoGallery.tsx'
 import { WebSearchPanel, webQueryOf } from './WebSearchPanel.tsx'
 import { chatFxOf } from '../chatfx.ts'
+import { gameMenu, GameCardView, ourGames } from '../chatgame/index.tsx'
 import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
 import { MenuButton } from '../menu.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
@@ -112,6 +113,19 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
   const restore = useRef<{ height: number; top: number } | null>(null)
   // 답장할 말 / 고치는 중인 내 말 (입력칸 위에 표시)
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null)
+  // 🎲 미니 게임 (src/chatgame): 이 방 정보를 그때그때 이어 준다 (말풍선 카드가 그려지기 전에)
+  const games = ourGames({
+    teamId: team.id,
+    channelId: room.id,
+    uid,
+    nameOf: (id) => profiles[id]?.name ?? '',
+    recent: messages.map((m) => ({ authorId: m.authorUid, createdAt: m.createdAt?.toMillis() ?? 0 })),
+    takeReply: () => {
+      const r = replyTo
+      if (r) setReplyTo(null)
+      return r
+    },
+  })
   const [editing, setEditing] = useState<Message | null>(null)
   // 답장 원문으로 이동했을 때 잠깐 반짝일 말
   const [flashId, setFlashId] = useState<string | null>(null)
@@ -657,6 +671,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
                 original={m.replyTo ? messages.find((x) => x.id === m.replyTo!.id) : undefined}
                 memberNames={memberNames}
                 myName={profiles[uid]?.name ?? ''}
+                games={games}
                 onOpenPhoto={(i) => openPhoto(m, i)}
                 onDelete={() => void remove(m)}
                 onReply={() => {
@@ -705,6 +720,7 @@ function ChatRoom({ team, uid, room, onLeft }: { team: Team; uid: string; room: 
           registerAdd={registerAdd}
           members={members}
           me={uid}
+          gameItems={gameMenu(games)}
         />
       ) : (
         <p className="composer muted small">보기 권한은 메시지를 보낼 수 없습니다.</p>
@@ -777,6 +793,7 @@ function MessageItem(props: {
   onJump: (id: string) => void
   onStick: () => void
   onStickerTap: (s: StuckSticker) => void
+  games: ReturnType<typeof ourGames>
 }) {
   const { message: m, mine, uid, profiles } = props
   const links = m.body.match(URL_RE) ?? []
@@ -815,7 +832,7 @@ function MessageItem(props: {
       : [
           ...(props.canWrite ? [{ icon: '↩️', label: '답장', onSelect: props.onReply }] : []),
           ...(m.body ? [{ icon: '📋', label: '복사', onSelect: () => void copyText(m.body) }] : []),
-          ...(mine && m.body ? [{ icon: '✏️', label: '수정', onSelect: props.onEdit }] : []),
+          ...(mine && m.body && !m.game ? [{ icon: '✏️', label: '수정', onSelect: props.onEdit }] : []),
           ...(m.attachments.length
             ? [{ icon: '💾', label: m.attachments.length > 1 ? `사진 ${m.attachments.length}장 저장` : '사진 저장', onSelect: () => void savePhotos() }]
             : []),
@@ -854,7 +871,7 @@ function MessageItem(props: {
           // 🏷️ 붙인 스티커는 말풍선 위에 겹쳐 그린다 (stk-anchor = 붙일 자리 기준)
           <div className="stk-anchor">
           <div
-            className={m.stickerAssetId && !m.body && !reply ? 'bubble has-menu emoticon-bubble' : 'bubble has-menu'}
+            className={m.game ? 'bubble has-menu game' : m.stickerAssetId && !m.body && !reply ? 'bubble has-menu emoticon-bubble' : 'bubble has-menu'}
             {...menu}
             onPointerDownCapture={(e) => (point.current = { x: e.clientX, y: e.clientY })}
           >
@@ -892,7 +909,12 @@ function MessageItem(props: {
                 </span>
               </button>
             ))}
-            {m.body && (chatFxOf(m.body) ? <FxTag fx={chatFxOf(m.body)!} /> : <p>{linkify(m.body, props.memberNames, props.myName)}</p>)}
+            {m.game ? (
+              <GameCardView
+                api={props.games}
+                msg={{ id: m.id, game: m.game, votes: m.votes, authorId: m.authorUid, createdAt: m.createdAt?.toMillis() ?? Date.now(), text: m.body }}
+              />
+            ) : m.body && (chatFxOf(m.body) ? <FxTag fx={chatFxOf(m.body)!} /> : <p>{linkify(m.body, props.memberNames, props.myName)}</p>)}
             {m.link && (
               <a className="link-card" href={m.link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {m.link.image && <img src={m.link.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
@@ -1096,6 +1118,7 @@ function Composer(props: {
   registerAdd: (add: (files: File[]) => void) => void
   members: { uid: string; name: string }[]
   me: string
+  gameItems: MenuAction[] // 🎲 미니 게임 (투표·사다리·주사위·돌림판·제비뽑기)
 }) {
   const { teamId, channelId, replyTo, editing, onSent } = props
   const [body, setBody] = useState('')
@@ -1219,6 +1242,7 @@ function Composer(props: {
         { icon: '🎬', label: '동영상 (50MB까지)', onSelect: () => videoInput.current?.click() },
         ...(isTouchUi() ? [{ icon: '📷', label: '사진 찍기', onSelect: () => cameraInput.current?.click() }] : []),
         { icon: '📁', label: '파일 선택', onSelect: () => fileInput.current?.click() },
+        ...props.gameItems,
       ],
       r.left,
       r.top - 8,

@@ -1,3 +1,4 @@
+import type { Game, Votes } from './chatgame/index.tsx'
 import {
   getDocs,
   limit,
@@ -36,6 +37,8 @@ export type Message = {
   reactions: Record<string, string>
   mentions: string[]
   link: LinkPreview | null
+  game: Game | null // 🎲 미니 게임 (src/chatgame)
+  votes: Votes | null
 }
 
 function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
@@ -57,6 +60,8 @@ function toMessage(d: QueryDocumentSnapshot<DocumentData>): Message {
     reactions: data.reactions ?? {},
     mentions: data.mentions ?? [],
     link: data.link ?? null,
+    game: data.game && typeof data.game === 'object' && typeof data.game.type === 'string' ? (data.game as Game) : null,
+    votes: data.votes && typeof data.votes === 'object' ? (data.votes as Votes) : null,
   }
 }
 

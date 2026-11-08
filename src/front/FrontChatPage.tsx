@@ -6,11 +6,12 @@ import { StorageImage } from '../components/StorageImage.tsx'
 import { saveFile } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
+import { frontGames, gameMenu, GameCardView } from '../chatgame/index.tsx'
 import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { Avatar, rememberedPerson, showProfileCard } from '../ui/Avatar.tsx'
 import { chatFxOf } from '../chatfx.ts'
 import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
-import { MoreButton, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
+import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
 import {
   assetLink,
@@ -137,6 +138,19 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   const [editing, setEditing] = useState<FrontMessage | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
+  // 🎲 미니 게임: 프론트 메시지 그대로 (게스트 = 내 id g_{우리 uid}), 말풍선 카드가 그려지기 전에 이어 준다
+  const games = frontGames({
+    channelId: room.id,
+    myId: uid,
+    nameOf: (id) => (id === uid ? myName : authorName(id, uid, accounts)),
+    recent: messages.filter((m) => !m.system).map((m) => ({ authorId: m.authorId, createdAt: m.createdAt })),
+    takeReply: () => {
+      const r = replyTo
+      if (!r) return null
+      setReplyTo(null)
+      return { id: r.id, authorId: r.authorId, ...replySnippet(r) }
+    },
+  })
 
   useEffect(() => {
     return onSnapshot(
@@ -249,7 +263,8 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
     const ok = await ask({ message: '이 메시지를 삭제할까요? "삭제된 메시지입니다"로 보입니다.', ok: '삭제', danger: true })
     if (!ok) return
     try {
-      await updateDoc(doc(messagesCol(room.id), m.id), { deleted: true, text: '' })
+      // 🎲 게임 메시지는 게임도 지운다 (프론트 규칙: 게스트는 text·edited·deleted·game 만 바꿀 수 있음)
+      await updateDoc(doc(messagesCol(room.id), m.id), { deleted: true, text: '', ...(m.game ? { game: null } : {}) })
     } catch {
       toast('삭제하지 못했어요.', { error: true })
     }
@@ -353,12 +368,14 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 onDelete={() => void remove(m)}
                 onJump={jumpTo}
                 onOpenPhoto={(i) => openPhoto(m, i)}
+                games={games}
               />
             </div>
           )
         })}
       </div>
       <FrontComposer
+        gameItems={gameMenu(games)}
         room={room}
         uid={uid}
         replyTo={replyTo}
@@ -480,6 +497,7 @@ function FrontMessageItem(props: {
   onDelete: () => void
   onJump: (id: string) => void
   onOpenPhoto: (index: number) => void
+  games: ReturnType<typeof frontGames>
 }) {
   const { m, mine } = props
   // 게스트는 글만 쓸 수 있어 내 말도 글뿐이다.
@@ -489,7 +507,7 @@ function FrontMessageItem(props: {
       : [
           { icon: '↩️', label: '답장', onSelect: props.onReply },
           ...(m.text ? [{ icon: '📋', label: '복사', onSelect: () => void copyText(m.text) }] : []),
-          ...(mine && m.text ? [{ icon: '✏️', label: '수정', onSelect: props.onEdit }] : []),
+          ...(mine && m.text && !m.game ? [{ icon: '✏️', label: '수정', onSelect: props.onEdit }] : []),
           ...(mine ? [{ icon: '🗑️', label: '삭제', danger: true, onSelect: props.onDelete }] : []),
         ]
   const menu = useItemMenu(actions)
@@ -505,7 +523,7 @@ function FrontMessageItem(props: {
             <p>삭제된 메시지입니다</p>
           </div>
         ) : (
-          <div className="bubble has-menu" {...menu}>
+          <div className={m.game ? 'bubble has-menu game' : 'bubble has-menu'} {...menu}>
             {reply && (
               <button type="button" className="reply-quote" onClick={() => props.onJump(reply.id)}>
                 <strong>↩ {props.replyName}에게 답장</strong>
@@ -559,7 +577,9 @@ function FrontMessageItem(props: {
                 </span>
               </button>
             )}
-            {m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(m.text)}</p>)}
+            {m.game ? (
+              <GameCardView api={props.games} msg={{ id: m.id, game: m.game, votes: m.votes, authorId: m.authorId, createdAt: m.createdAt, text: m.text }} />
+            ) : m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(m.text)}</p>)}
             {link?.url && (
               <a className="link-card" href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {link.thumb && /^https?:/.test(link.thumb) && (
@@ -599,6 +619,7 @@ function hostOf(url: string) {
 }
 
 function FrontComposer(props: {
+  gameItems: MenuAction[] // 🎲 미니 게임 (게스트는 사진 없는 투표만)
   room: FrontRoom
   uid: string
   replyTo: FrontMessage | null
@@ -695,6 +716,18 @@ function FrontComposer(props: {
       )}
       <ClipboardChip inputRef={textarea} onPaste={(t) => insertAt(textarea.current, body, t, setBody)} />
       <div className="composer-row">
+        <button
+          type="button"
+          className="round-button attach-button"
+          aria-label="미니 게임"
+          disabled={Boolean(editing)}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            openMenu(props.gameItems, r.left, r.top - 8)
+          }}
+        >
+          ＋
+        </button>
         <EmojiButton
           onPick={(emoji) => {
             const el = textarea.current

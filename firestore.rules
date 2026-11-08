@@ -75,7 +75,21 @@ service cloud.firestore {
             .diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])
           && (!(request.auth.uid in request.resource.data.reactions)
             || request.resource.data.reactions[request.auth.uid] in ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅']))
-        || (isMember(teamId) && onlyChanges(['stk', 'stkLast']) && stkOk('stk'));
+        || (isMember(teamId) && onlyChanges(['stk', 'stkLast']) && stkOk('stk'))
+        // 🎲 투표: 팀원은 누구나(보기 권한 포함) votes 안의 자기 칸만 바꾼다 (프론트와 같은 규칙)
+        || (isMember(teamId)
+          && resource.data.get('game', {}).get('type', '') == 'poll'
+          && onlyChanges(['votes'])
+          && request.resource.data.get('votes', {}).diff(resource.data.get('votes', {})).affectedKeys().hasOnly([request.auth.uid])
+          && (!(request.auth.uid in request.resource.data.get('votes', {}))
+            || (request.resource.data.votes[request.auth.uid] is list && request.resource.data.votes[request.auth.uid].size() <= 10)));
+    }
+
+    // 🎲 채팅 미니 게임: game 은 없거나 정해진 종류, votes 는 처음엔 없음
+    function gameOk() {
+      return (!('game' in request.resource.data) || request.resource.data.game == null
+          || (request.resource.data.game is map && request.resource.data.game.type in ['poll', 'ladder', 'dice', 'wheel', 'draw']))
+        && !('votes' in request.resource.data);
     }
 
     // 이름 표시를 위해 로그인한 사용자는 서로의 프로필을 읽을 수 있다.
@@ -239,7 +253,7 @@ service cloud.firestore {
       match /messages/{msgId} {
         allow read: if isMember(teamId);
         allow create: if canEdit(teamId)
-          && request.resource.data.authorUid == request.auth.uid;
+          && request.resource.data.authorUid == request.auth.uid && gameOk();
         allow update: if canUpdateMessage(teamId);
         // 삭제는 작성자만, 그리고 바로 영구 삭제한다 (첨부 사진은 Functions가 지운다).
         allow delete: if isMember(teamId)
@@ -322,7 +336,7 @@ service cloud.firestore {
         match /messages/{msgId} {
           allow read: if isMember(teamId) && inRoom();
           allow create: if canEdit(teamId) && inRoom()
-            && request.resource.data.authorUid == request.auth.uid;
+            && request.resource.data.authorUid == request.auth.uid && gameOk();
           allow update: if canUpdateMessage(teamId) && inRoom();
           allow delete: if isMember(teamId)
             && resource.data.authorUid == request.auth.uid;

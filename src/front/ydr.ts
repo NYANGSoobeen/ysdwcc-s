@@ -1,3 +1,4 @@
+import type { Game, Votes } from '../chatgame/index.tsx'
 import { initializeApp } from 'firebase/app'
 import {
   browserLocalPersistence,
@@ -334,6 +335,8 @@ export type FrontMessage = {
   deleted: boolean
   edited: boolean
   system: boolean
+  game: Game | null // 🎲 미니 게임 (src/chatgame, 프론트와 같은 모양)
+  votes: Votes | null
 }
 
 export const messagesCol = (ch: string) => collection(ydrDb, 'channels', ch, 'messages')
@@ -361,6 +364,8 @@ export function toFrontMessage(id: string, d: Record<string, unknown>): FrontMes
     deleted: d.deleted === true,
     edited: d.edited === true,
     system: d.system === true,
+    game: d.game && typeof d.game === 'object' && typeof (d.game as Game).type === 'string' ? (d.game as Game) : null,
+    votes: d.votes && typeof d.votes === 'object' ? (d.votes as Votes) : null,
   }
 }
 

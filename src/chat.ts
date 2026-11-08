@@ -167,6 +167,7 @@ export async function sendMessage(
   files: File[] = [],
   onProgress?: (done: number, total: number) => void,
   mentions: string[] = [],
+  extra: Record<string, unknown> = {}, // 🎲 미니 게임 {game} 등 메시지에 같이 넣을 것
 ) {
   const uid = auth.currentUser!.uid
   const messageRef = doc(messagesRef(teamId, channelId))
@@ -221,6 +222,7 @@ export async function sendMessage(
       hasPhotos: attachments.length > 0,
       createdAt: serverTimestamp(),
       editedAt: null,
+      ...extra,
     })
   } catch (error) {
     await Promise.allSettled(uploaded.map((path) => deleteObject(ref(storage, path))))
@@ -386,7 +388,7 @@ export async function editMessage(teamId: string, channelId: string, messageId: 
 export async function deleteMessage(
   teamId: string,
   channelId: string,
-  message: { id: string; attachments: Attachment[]; files: ChatFile[]; video?: ChatVideo | null },
+  message: { id: string; attachments: Attachment[]; files: ChatFile[]; video?: ChatVideo | null; game?: unknown },
 ) {
   await updateDoc(doc(messagesRef(teamId, channelId), message.id), {
     deleted: true,
@@ -401,6 +403,8 @@ export async function deleteMessage(
     customerTags: [],
     link: null,
     editedAt: null,
+    // 🎲 미니 게임 메시지는 게임·투표도 지운다
+    ...(message.game ? { game: null, votes: null } : {}),
   })
   // 사진 파일은 올린 사람이 지울 수 있다 (Storage 규칙).
   await Promise.allSettled([
