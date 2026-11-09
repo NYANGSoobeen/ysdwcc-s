@@ -113,7 +113,7 @@
   - 그림: PNG·JPG·WebP는 긴 쪽 256px PNG로 줄여(투명 유지), **움직이는 GIF는 원본 그대로 1MB까지**(`EMOTICON_MAX_BYTES` = storage.rules).
   - 관리: 관리자 화면 최고 관리자 묶음 "😊 이모티콘" 카드(`EmoticonAdminCard`): 새 테마, 이름 바꾸기, ▲▼ 순서, 테마 삭제, ＋ 추가(여러 장), ✕ 지우기.
   - 보내기: 입력칸 😊 창 위쪽 탭 🕘 최근 · 😊 이모지 · 테마들. 이모티콘을 누르면 바로 메시지 `{stickerAssetId}`로 보낸다(`sendStickerMessage`, 답장 중이면 답장). 최근 보낸 이모티콘은 이 기기 localStorage `recent-emoticons`(24개). 목록은 실시간 구독 없이 😊 창을 처음 열 때 한 번 읽는다(`loadEmoticons`). 휴대폰은 😊 창이 입력칸 줄 전체 너비.
-  - 말풍선: 바탕 없이 그림만 120px(`emoticon-bubble`, 답장·글이 있으면 보통 말풍선). 푸시·답장 미리보기 "😊 이모티콘". 수정 중엔 이모티콘 탭 없음. 🏌️ 프론트 방 입력칸은 이모지만(프론트 규칙상 게스트는 글만).
+  - 말풍선: 바탕 없이 그림만 120px(`emoticon-bubble`, 답장·글이 있으면 보통 말풍선). 푸시·답장 미리보기 "😊 이모티콘". 수정 중엔 이모티콘 탭 없음. **🏌️ 프론트 방에서도 우리 이모티콘(2026-11-09 사용자 요청):** 게스트는 프론트 Storage에 못 올려서 우리 Storage 그림(`stickers/…`)의 내려받기 주소를 `{text:'', authorId, createdAt, stickerUrl, replyTo?}`로 보낸다(`sendSticker` in `FrontChatPage.tsx`). 우리 앱은 `stickerUrl`이 `https://firebasestorage.googleapis.com/`일 때만 그림(`STICKER_URL_RE`). **프론트 규칙(게스트 만들기 칸에 `stickerUrl`)과 프론트 화면(`stickerUrl` 그리기·푸시·답장 미리보기 "😊 이모티콘")이 받아야 동작** — 사용자가 프론트 세션에 요청, 그 전엔 "프론트 앱 업데이트 뒤에 보낼 수 있어요" 안내.
   - 용량 관리: `stickers/` 파일은 팀 폴더 밖이라 막대(프로젝트 전체)에만 들어간다.
 - **🏷️ 붙이는 스티커 (6번, 2026-10-28, `src/stuck.ts`, 화면 `src/ui/Stuck.tsx`):**
   - 채팅 말풍선·채팅방 배경(공지는 7번에서)에 이모지(유니코드 전체 1,898개, Win + . 과 같은 9묶음, `src/emojiData.ts`는 고르는 창을 열 때만 불러옴)나 😊 이모티콘(모든 테마)을 붙였다 뗀다. 끌어 옮기기 없음.

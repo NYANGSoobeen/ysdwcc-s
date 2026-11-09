@@ -8,6 +8,7 @@ import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
 import { frontGames, gameMenu, GameCardView } from '../chatgame/index.tsx'
 import { frontPins, PinBar, useFrontPin } from '../chatpin/index.tsx'
+import { photoUrl } from '../chat.ts'
 import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { Avatar, rememberedPerson, showProfileCard } from '../ui/Avatar.tsx'
 import { chatFxOf } from '../chatfx.ts'
@@ -471,7 +472,7 @@ function sameGroup(a: FrontMessage | undefined, b: FrontMessage | undefined) {
 function replySnippet(m: FrontMessage) {
   if (m.text) return { text: m.text.replace(/\s+/g, ' ').slice(0, 80), kind: 'text' }
   if (m.images.length) return { text: m.images.length > 1 ? `사진 ${m.images.length}장` : '사진', kind: 'image' }
-  if (m.sticker) return { text: '이모티콘', kind: 'sticker' }
+  if (m.sticker || m.stickerUrl) return { text: '이모티콘', kind: 'sticker' }
   if (m.video) return { text: '🎬 동영상', kind: 'text' }
   if (m.file) return { text: `📎 ${m.file.name.slice(0, 60)}`, kind: 'text' }
   if (m.link) return { text: `🔎 ${(m.link.title || m.link.site || '링크').slice(0, 60)}`, kind: 'text' }
@@ -538,7 +539,12 @@ function FrontMessageItem(props: {
             <p>삭제된 메시지입니다</p>
           </div>
         ) : (
-          <div className={m.game ? 'bubble has-menu game' : 'bubble has-menu'} {...menu}>
+          <div
+            className={
+              m.game ? 'bubble has-menu game' : (m.sticker || m.stickerUrl) && !m.text && !reply ? 'bubble has-menu emoticon-bubble' : 'bubble has-menu'
+            }
+            {...menu}
+          >
             {reply && (
               <button type="button" className="reply-quote" onClick={() => props.onJump(reply.id)}>
                 <strong>↩ {props.replyName}에게 답장</strong>
@@ -570,6 +576,7 @@ function FrontMessageItem(props: {
                 }}
               />
             )}
+            {m.stickerUrl && <img src={m.stickerUrl} alt="이모티콘" className="front-sticker chat-emoticon" loading="lazy" />}
             {m.sticker && <StorageImage path={`ydr/${m.sticker}`} load={() => assetUrl(m.sticker!)} alt="이모티콘" className="front-sticker" />}
             {m.file && (
               <button
@@ -671,6 +678,22 @@ function FrontComposer(props: {
 
   const preview = useMemo(() => (replyTo ? replySnippet(replyTo) : null), [replyTo])
 
+  // 😊 우리 앱 이모티콘 보내기 (2026-11-09 사용자 요청 "프론트&지원팀 방에서도"): 게스트는 프론트 Storage에 못 올리므로
+  // 우리 Storage 그림(stickers/…)의 내려받기 주소를 stickerUrl 로 보낸다. 프론트 규칙·화면이 stickerUrl 을 받아야 동작.
+  async function sendSticker(assetId: string) {
+    const reply = replyTo && preview ? { id: replyTo.id, authorId: replyTo.authorId, ...preview } : null
+    if (replyTo) onSent()
+    try {
+      const stickerUrl = await photoUrl(assetId)
+      await addDoc(messagesCol(room.id), { text: '', authorId: uid, createdAt: Date.now(), stickerUrl, ...(reply ? { replyTo: reply } : {}) })
+    } catch (err) {
+      const denied = (err as { code?: string }).code === 'permission-denied'
+      toast(denied ? '프론트 앱이 아직 우리 이모티콘을 받지 못해요. 프론트 앱 업데이트 뒤에 보낼 수 있어요.' : '이모티콘을 보내지 못했어요.', {
+        error: true,
+      })
+    }
+  }
+
   async function send() {
     const text = body.trim()
     if (!text) return
@@ -744,6 +767,7 @@ function FrontComposer(props: {
           ＋
         </button>
         <EmojiButton
+          onSticker={editing ? undefined : (assetId) => void sendSticker(assetId)}
           onPick={(emoji) => {
             const el = textarea.current
             const a = el?.selectionStart ?? body.length
