@@ -19,6 +19,10 @@ export const CHAT_FX = [
   { key: 'snow', cmd: ['눈', '첫눈', '겨울'], icon: '❄️', say: '눈이 와요!' },
   // 🤣 2026-11-05 프론트 요청: ㅋ 2개 이상이면 모두 (/ㅋㅋ, /ㅋㅋㅋㅋㅋ…)
   { key: 'lol', cmd: ['ㅋㅋㅋㅋ', 'ㅋㅋ', 'ㅋㅋㅋ', '웃겨'], icon: '🤣', say: 'ㅋㅋㅋㅋㅋ' },
+  // 2026-11-09 프론트 최신본: 🫠 녹초 · 🤮 토 · 🤬 시발
+  { key: 'tired', cmd: ['녹초', '피곤', '지침', '졸려'], icon: '🫠', say: '녹초가 됐어요…' },
+  { key: 'puke', cmd: ['토', '우엑', '웩', '토나와'], icon: '🤮', say: '우웩…' },
+  { key: 'swear', cmd: ['시발', '씨발', 'ㅅㅂ', '젠장'], icon: '🤬', say: '#@$%&!!' },
 ] as const
 export type ChatFx = (typeof CHAT_FX)[number] & { rest: string }
 const CHAT_FX_RECENT = 20000
@@ -117,7 +121,7 @@ export function chatFxPlay(key: string) {
     }
   }
   // 효과마다: init = 처음 한 번, spawn(t, f) = 매 프레임 (처음 5초 동안), tint = 바탕 색, big = 가운데 아이콘 움직임
-  type Spec = { big: string; tint?: string; init?: () => void; spawn?: (t: number, f: number) => void }
+  type Spec = { big: string; tint?: string; shake?: boolean; init?: () => void; spawn?: (t: number, f: number) => void }
   const specs: Record<string, Spec> = {
     party: {
       big: 'pop',
@@ -235,6 +239,38 @@ export function chatFxPlay(key: string) {
         if (f % 11 === 0) emo(pick(['🤣', '😂', '😆', '😹', '🤣']), { x: R(20, W - 20), y: H + 25, vx: R(-2, 2), vy: -R(9, 14), g: 0.17, s: R(26, 42), vr: R(-0.06, 0.06) })
       },
     },
+    // 🫠 녹초: 회색빛 바탕에 💤가 느릿느릿 올라가고, 땀방울이 주르륵 · 가운데 아이콘은 흐물흐물 녹아내림
+    tired: {
+      big: 'melt',
+      tint: '150,150,165',
+      spawn(_t, f) {
+        if (f % 9 === 0) emo(pick(['💤', '💤', '😪', '🥱']), { x: R(15, W - 15), y: H + 25, vx: R(-0.3, 0.3), vy: -R(0.9, 1.6), s: R(20, 34), swA: 1.3 })
+        if (f % 4 === 0) add({ t: 'd', x: R(0, W), y: -20, vy: R(2.5, 4.5), l: R(8, 14), a: R(0.3, 0.6), col: 'rgba(140,150,170,.9)' })
+        if (f % 40 === 0) emo('💦', { x: R(20, W - 20), y: -25, vy: R(1.5, 2.5), s: R(18, 26) })
+      },
+    },
+    // 🤮 토: 가운데서 초록 물방울이 콸콸 쏟아지고 🤢🤮 가 굴러다님
+    puke: {
+      big: 'wobble',
+      tint: '120,190,70',
+      spawn(_t, f) {
+        for (let i = 0; i < 3 * dens + 1; i++)
+          add({ t: 'f', x: W / 2 + R(-12, 12), y: H * 0.48, vx: R(-4.5, 4.5), vy: R(-3, 2), g: 0.22, col: pick(['#7cc243', '#9bd35a', '#c3d84a', '#6aa83a']), a: 1, r: R(2.5, 5.5) })
+        if (f % 13 === 0) emo(pick(['🤢', '🤮', '🤢', '🥴']), { x: R(20, W - 20), y: H + 25, vx: R(-1.8, 1.8), vy: -R(8, 12), g: 0.16, s: R(24, 38), vr: R(-0.06, 0.06) })
+      },
+    },
+    // 🤬 시발: 화면이 흔들리고 '#@$%&!' 가 마구 튀어나옴 (욕은 가려서)
+    swear: {
+      big: 'shake',
+      tint: '120,20,30',
+      shake: true,
+      spawn(_t, f) {
+        if (f % 2 === 0)
+          add({ t: 'k', ch: pick(['#', '@', '$', '%', '&', '!', '*', '?']), x: R(10, W - 10), y: H + 20, vx: R(-3, 3), vy: -R(10, 16), g: 0.22, s: R(22, 44), rot: R(-0.5, 0.5), vr: R(-0.12, 0.12), col: pick(['#d63a3a', '#2b2321', '#e2776e', '#8a1f1f', '#f6a33b']), b: 0 })
+        if (f % 10 === 0) emo(pick(['🤬', '💢', '🤬', '😤', '💥']), { x: R(20, W - 20), y: H + 25, vx: R(-1.5, 1.5), vy: -R(7, 11), g: 0.1, s: R(26, 44) })
+        if (f % 24 === 0) add({ t: 'pop', e: pick(['💢', '💥', '🤬']), x: R(30, W - 30), y: R(30, H * 0.7), s: R(30, 50), age: 0 })
+      },
+    },
   }
   const S = specs[key]
   S.init?.()
@@ -250,7 +286,7 @@ export function chatFxPlay(key: string) {
   }
   fxRun = { c, stop }
   // 😡 /화: 채팅 화면이 부르르 (3번)
-  if (key === 'angry' && !reduce) {
+  if ((key === 'angry' || S.shake) && !reduce) {
     const shake = () => {
       if (!fxRun || fxRun.c !== c) return
       box.classList.remove('fx-shake')
@@ -272,7 +308,7 @@ export function chatFxPlay(key: string) {
     g.clearRect(0, 0, W, H)
     // 바탕 색 (아래에서 번지는 빛)
     if (S.tint) {
-      const k = Math.min(1, t / 500) * fade * (key === 'angry' ? 0.75 + 0.25 * Math.sin(t / 180) : 1)
+      const k = Math.min(1, t / 500) * fade * (key === 'angry' || S.shake ? 0.75 + 0.25 * Math.sin(t / 180) : 1)
       const gr = g.createRadialGradient(W / 2, H, 0, W / 2, H, Math.max(W, H) * 1.1)
       gr.addColorStop(0, `rgba(${S.tint},${0.32 * k})`)
       gr.addColorStop(1, `rgba(${S.tint},0)`)
@@ -395,7 +431,7 @@ export function chatFxPlay(key: string) {
         dead = p.y > H + 20
         g.save()
         g.globalAlpha = p.a * fade
-        g.strokeStyle = 'rgba(100,150,225,.9)'
+        g.strokeStyle = p.col || 'rgba(100,150,225,.9)'
         g.lineWidth = 2
         g.lineCap = 'round'
         g.beginPath()
@@ -439,9 +475,9 @@ export function chatFxPlay(key: string) {
         g.textBaseline = 'middle'
         g.lineWidth = 3
         g.strokeStyle = 'rgba(255,255,255,.85)'
-        g.strokeText('ㅋ', 0, 0)
+        g.strokeText(p.ch || 'ㅋ', 0, 0)
         g.fillStyle = p.col
-        g.fillText('ㅋ', 0, 0)
+        g.fillText(p.ch || 'ㅋ', 0, 0)
         g.restore()
       } else if (p.t === 'pop') {
         p.age++
@@ -464,6 +500,7 @@ export function chatFxPlay(key: string) {
       const inK = t < 350 ? (t / 350) * 1.25 : t < 550 ? 1.25 - ((t - 350) / 200) * 0.25 : 1
       const outK = t > 3000 ? Math.max(0, (3800 - t) / 800) : 1
       let sc = inK
+      let meltY = 1
       let rot = 0
       let dx = 0
       let dy = -(t > 3000 ? ((t - 3000) / 800) * 30 : 0)
@@ -474,6 +511,12 @@ export function chatFxPlay(key: string) {
         dx = Math.sin(t / 28) * 6
         rot = Math.sin(t / 40) * 0.08
       } else if (m === 'wobble') rot = Math.sin(s * 5) * 0.15
+      else if (m === 'melt') {
+        const k = Math.min(1, Math.max(0, (t - 500) / 2200))
+        dy += k * BIG * 0.18
+        rot = Math.sin(s * 1.5) * 0.05
+        meltY = 1 - 0.38 * k
+      }
       else if (m === 'giggle') {
         dy += -Math.abs(Math.sin(s * 9)) * 10
         rot = Math.sin(s * 4.5) * 0.12
@@ -487,7 +530,7 @@ export function chatFxPlay(key: string) {
       g.globalAlpha = outK * 0.95
       g.translate(W / 2 + dx, H * 0.42 + dy)
       g.rotate(rot)
-      g.scale(sc, sc)
+      g.scale(sc * (1 + (1 - meltY) * 0.7), sc * meltY) // melt: 아래로 퍼지며 납작해짐
       g.shadowColor = 'rgba(0,0,0,.18)'
       g.shadowBlur = 18
       g.shadowOffsetY = 6
