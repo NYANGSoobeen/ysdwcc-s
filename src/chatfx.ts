@@ -121,7 +121,7 @@ export function chatFxPlay(key: string) {
     }
   }
   // 효과마다: init = 처음 한 번, spawn(t, f) = 매 프레임 (처음 5초 동안), tint = 바탕 색, big = 가운데 아이콘 움직임
-  type Spec = { big: string; tint?: string; shake?: boolean; init?: () => void; spawn?: (t: number, f: number) => void }
+  type Spec = { big: string; tint?: string; shake?: boolean; bigEnd?: number; init?: () => void; spawn?: (t: number, f: number) => void }
   const specs: Record<string, Spec> = {
     party: {
       big: 'pop',
@@ -251,6 +251,7 @@ export function chatFxPlay(key: string) {
     },
     // 🤮 토: 가운데서 초록 물방울이 콸콸 쏟아지고 🤢🤮 가 굴러다님
     puke: {
+      bigEnd: FX_SPAWN + 1000, // 🤮 물방울이 그치는 5초 뒤 1초 동안 사라짐 (2026-11-09 프론트)
       big: 'wobble',
       tint: '120,190,70',
       spawn(_t, f) {
@@ -502,14 +503,17 @@ export function chatFxPlay(key: string) {
       if (dead) ps.splice(i, 1)
     }
     // 가운데 큰 아이콘: 0.35초 '팡' → 효과마다 움직임 → 3초부터 사라짐
-    if (t < 3800) {
+    // 가운데 아이콘이 사라지는 때: 효과마다 bigEnd(기본 3.8초), 마지막 0.8초 동안 스르르
+    const bigEnd = S.bigEnd || 3800
+    const bigOut = bigEnd - 800
+    if (t < bigEnd) {
       const inK = t < 350 ? (t / 350) * 1.25 : t < 550 ? 1.25 - ((t - 350) / 200) * 0.25 : 1
-      const outK = t > 3000 ? Math.max(0, (3800 - t) / 800) : 1
+      const outK = t > bigOut ? Math.max(0, (bigEnd - t) / 800) : 1
       let sc = inK
       let meltY = 1
       let rot = 0
       let dx = 0
-      let dy = -(t > 3000 ? ((t - 3000) / 800) * 30 : 0)
+      let dy = -(t > bigOut ? ((t - bigOut) / 800) * 30 : 0)
       const m = S.big
       const s = t / 1000
       if (m === 'beat') sc *= 1 + 0.12 * Math.max(0, Math.sin(s * Math.PI * 2.4)) ** 3
