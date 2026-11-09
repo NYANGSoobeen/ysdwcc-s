@@ -20,12 +20,41 @@ export const CHAT_FX = [
   // 🤣 2026-11-05 프론트 요청: ㅋ 2개 이상이면 모두 (/ㅋㅋ, /ㅋㅋㅋㅋㅋ…)
   { key: 'lol', cmd: ['ㅋㅋㅋㅋ', 'ㅋㅋ', 'ㅋㅋㅋ', '웃겨'], icon: '🤣', say: 'ㅋㅋㅋㅋㅋ' },
   // 2026-11-09 프론트 최신본: 🫠 녹초 · 🤮 토 · 🤬 시발
-  { key: 'tired', cmd: ['녹초', '피곤', '지침', '졸려'], icon: '🫠', say: '녹초가 됐어요…' },
+  { key: 'tired', cmd: ['녹초', '피곤', '지침', '졸려'], icon: '🫠', icon2: '😩', say: '녹초가 됐어요…' },
   { key: 'puke', cmd: ['토', '우엑', '웩', '토나와'], icon: '🤮', say: '우웩…' },
   { key: 'swear', cmd: ['시발', '씨발', 'ㅅㅂ', '젠장'], icon: '🤬', say: '#@$%&!!' },
 ] as const
 export type ChatFx = (typeof CHAT_FX)[number] & { rest: string }
 const CHAT_FX_RECENT = 20000
+
+// 새 이모지(🫠 2021년)는 윈도우 10 등 오래된 기기에 글꼴이 없어 빈칸 → 이 기기에서 색 있게 그려지는지 보고, 안 되면 icon2 (2026-11-09 프론트)
+const fxEmojiCache: Record<string, boolean> = {}
+function fxEmojiOk(e: string) {
+  if (e in fxEmojiCache) return fxEmojiCache[e]
+  let ok = true
+  try {
+    const c = document.createElement('canvas')
+    c.width = c.height = 24
+    const g = c.getContext('2d', { willReadFrequently: true })!
+    g.fillStyle = '#000'
+    g.textBaseline = 'top'
+    g.font = '20px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'
+    g.fillText(e, 0, 0)
+    const d = g.getImageData(0, 0, 24, 24).data
+    ok = false
+    for (let i = 0; i < d.length; i += 4) {
+      // 색이 있으면 이모지로 그려진 것
+      if (d[i + 3] > 0 && (Math.abs(d[i] - d[i + 1]) > 20 || Math.abs(d[i + 1] - d[i + 2]) > 20)) {
+        ok = true
+        break
+      }
+    }
+  } catch {
+    ok = true
+  }
+  return (fxEmojiCache[e] = ok)
+}
+export const fxIcon = (f: { icon: string; icon2?: string }) => (f.icon2 && !fxEmojiOk(f.icon) ? f.icon2 : f.icon)
 
 // "/축하 승진 축하해요" → {key, icon, say, rest:'승진 축하해요'} · 명령어 뒤엔 띄어쓰기나 끝이어야 함
 export function chatFxOf(text: string | null | undefined): ChatFx | null {
@@ -42,7 +71,7 @@ export function chatFxOf(text: string | null | undefined): ChatFx | null {
 // 답장 미리보기·검색 등 글로 보일 때: "🎉 승진 축하해요!"
 export function chatFxText(text: string) {
   const fx = chatFxOf(text)
-  return fx ? `${fx.icon} ${fx.rest || fx.say}` : text
+  return fx ? `${fxIcon(fx)} ${fx.rest || fx.say}` : text
 }
 
 // 효과를 그릴 곳: 지금 보고 있는 채팅방의 대화 영역 (방 화면이 등록/해제)
@@ -276,7 +305,7 @@ export function chatFxPlay(key: string) {
   const S = specs[key]
   S.init?.()
   const BIG = Math.min(W, H) * 0.3
-  const icon = fx.icon
+  const icon = fxIcon(fx)
   let raf = 0
   let frame = 0
   const stop = () => {

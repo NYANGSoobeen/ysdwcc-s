@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react'
-import { CHAT_FX, chatFxCheck, chatFxPlay, setChatFxHost, type ChatFx } from '../chatfx.ts'
+import { CHAT_FX, chatFxCheck, chatFxPlay, fxIcon, setChatFxHost, type ChatFx } from '../chatfx.ts'
 
 // 🎉 채팅 효과 화면 조각 (src/chatfx.ts). 우리 채팅방(ChatPage)과 🏌️ 프론트 방(FrontChatPage)이 같이 쓴다.
 
@@ -16,7 +16,7 @@ export function FxTag({ fx }: { fx: ChatFx }) {
       }}
     >
       <span className="fx-icon" aria-hidden="true">
-        {fx.icon}
+        {fxIcon(fx)}
       </span>
       <span className="fx-text">{fx.rest || fx.say}</span>
     </button>
@@ -43,14 +43,14 @@ export function ChatFxPick({ text, onPick }: { text: string; onPick: (value: str
         <button
           key={f.key}
           type="button"
-          title={`${f.say} (보내면 모두의 채팅 배경에 ${f.icon} 효과)`}
+          title={`${f.say} (보내면 모두의 채팅 배경에 ${fxIcon(f)} 효과)`}
           onPointerDown={(e) => e.preventDefault()} // 입력칸 포커스(휴대폰 키보드) 유지
           onClick={() => {
             onPick(`/${f.cmd[0]} `)
             chatFxPlay(f.key)
           }}
         >
-          <span aria-hidden="true">{f.icon}</span>/{f.cmd[0]}
+          <span aria-hidden="true">{fxIcon(f)}</span>/{f.cmd[0]}
         </button>
       ))}
     </div>
