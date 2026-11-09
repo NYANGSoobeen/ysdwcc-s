@@ -312,8 +312,12 @@ export function chatFxPlay(key: string) {
       const gr = g.createRadialGradient(W / 2, H, 0, W / 2, H, Math.max(W, H) * 1.1)
       gr.addColorStop(0, `rgba(${S.tint},${0.32 * k})`)
       gr.addColorStop(1, `rgba(${S.tint},0)`)
+      // 휴대폰은 캔버스 이모지에 fillStyle 투명도를 따라가서(2026-11-09 프론트 수정) 칠한 뒤 되돌림
+      g.save()
       g.fillStyle = gr
       g.fillRect(0, 0, W, H)
+      g.restore()
+      g.fillStyle = '#000'
     }
     for (let i = ps.length - 1; i >= 0; i--) {
       const p = ps[i]
@@ -343,6 +347,7 @@ export function chatFxPlay(key: string) {
         g.globalAlpha = fade
         g.translate(p.x, p.y)
         g.rotate(p.rot)
+        g.fillStyle = '#000'
         g.font = `${p.s}px ${EMOJI_FONT}`
         g.textAlign = 'center'
         g.textBaseline = 'middle'
@@ -487,6 +492,7 @@ export function chatFxPlay(key: string) {
         g.globalAlpha = (p.age > 28 ? (40 - p.age) / 12 : 1) * fade
         g.translate(p.x, p.y)
         g.scale(k, k)
+        g.fillStyle = '#000'
         g.font = `${p.s}px ${EMOJI_FONT}`
         g.textAlign = 'center'
         g.textBaseline = 'middle'
@@ -534,6 +540,7 @@ export function chatFxPlay(key: string) {
       g.shadowColor = 'rgba(0,0,0,.18)'
       g.shadowBlur = 18
       g.shadowOffsetY = 6
+      g.fillStyle = '#000'
       g.font = `${BIG}px ${EMOJI_FONT}`
       g.textAlign = 'center'
       g.textBaseline = 'middle'
