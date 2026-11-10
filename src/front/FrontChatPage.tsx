@@ -180,6 +180,24 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   }, [room.id, room.from, limitN])
 
   const nameOf = useCallback((id: string | null) => authorName(id, uid, accounts), [uid, accounts])
+  // 📣 @부를 수 있는 사람: 프론트 직원(사용 중) + 이 방에서 말한 적 있는 다른 지원팀 직원(g_…). 이름만(직급 없이) = 프론트 mention.js 와 같은 글자
+  const people = useMemo(() => {
+    const out: MentionPerson[] = []
+    for (const [id, a] of accounts) if (a.active && a.name) out.push({ id, name: a.name, sub: a.position || '프론트' })
+    const seen = new Set<string>()
+    for (const m of messages) {
+      const id = m.authorId ?? ''
+      if (!id.startsWith('g_') || id === uid || seen.has(id)) continue
+      seen.add(id)
+      const p = rememberedPerson(id.slice(2))
+      if (p?.name) out.push({ id, name: p.name, sub: '지원팀' })
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+  }, [accounts, messages, uid])
+  const plainName = useCallback(
+    (id: string) => (id === uid ? myName : people.find((p) => p.id === id)?.name ?? accounts.get(id)?.name ?? ''),
+    [uid, myName, people, accounts],
+  )
 
   useLayoutEffect(() => {
     const el = listRef.current
@@ -385,6 +403,9 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 onJump={jumpTo}
                 onOpenPhoto={(i) => openPhoto(m, i)}
                 games={games}
+                mentionNames={m.mentions.map(plainName).filter(Boolean)}
+                myName={myName}
+                mentionedMe={!mine && !m.deleted && (m.mentionAll || m.mentions.includes(uid))}
               />
             </div>
           )
@@ -394,6 +415,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
         gameItems={gameMenu(games)}
         room={room}
         uid={uid}
+        people={people}
         replyTo={replyTo}
         replyName={replyTo ? nameOf(replyTo.authorId) : ''}
         editing={editing}
@@ -481,21 +503,45 @@ function replySnippet(m: FrontMessage) {
 const replyIcon = (kind?: string) => (kind === 'image' ? '📷 ' : kind === 'sticker' ? '😊 ' : '')
 
 const URL_RE = /https?:\/\/[^\s<>"']+/g
-function linkify(text: string) {
+const MENTION_ALL = '모두'
+type MentionPerson = { id: string; name: string; sub: string }
+// 글 속 주소는 눌러서 열리게, 부른 "@이름"·"@모두"는 색칠 (나를 부른 건 더 진하게)
+function linkify(text: string, names: string[] = [], myName = '', mine = false) {
+  const words = [...new Set(names)].filter(Boolean).sort((a, b) => b.length - a.length)
+  const escaped = words.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = new RegExp(`${URL_RE.source}${escaped.length ? `|@(?:${escaped.join('|')})` : ''}`, 'g')
   const parts: (string | React.ReactElement)[] = []
   let last = 0
-  for (const match of text.matchAll(URL_RE)) {
-    parts.push(text.slice(last, match.index))
-    parts.push(
-      <a key={match.index} href={match[0]} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-        {match[0]}
-      </a>,
-    )
-    last = match.index + match[0].length
+  for (const match of text.matchAll(pattern)) {
+    const i = match.index ?? 0
+    parts.push(text.slice(last, i))
+    const token = match[0]
+    if (token.startsWith('@')) {
+      const who = token.slice(1)
+      const me = !mine && (who === MENTION_ALL || (!!myName && who === myName))
+      parts.push(
+        <span key={i} className={me ? 'mention me' : 'mention'}>
+          {token}
+        </span>,
+      )
+    } else
+      parts.push(
+        <a key={i} href={token} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+          {token}
+        </a>,
+      )
+    last = i + token.length
   }
   parts.push(text.slice(last))
   return parts
 }
+// 보낼 글에서 부른 사람: "@이름"이 들어 있는 사람, "@모두"
+function findFrontMentions(text: string, people: MentionPerson[], me: string) {
+  const ids = new Set<string>()
+  for (const p of people) if (p.id !== me && p.name && text.includes(`@${p.name}`)) ids.add(p.id)
+  return { mentions: [...ids].slice(0, 50), all: text.includes(`@${MENTION_ALL}`) }
+}
+let mentionDeniedTold = false
 
 function FrontMessageItem(props: {
   m: FrontMessage
@@ -514,6 +560,9 @@ function FrontMessageItem(props: {
   onJump: (id: string) => void
   onOpenPhoto: (index: number) => void
   games: ReturnType<typeof frontGames>
+  mentionNames: string[]
+  myName: string
+  mentionedMe: boolean
 }) {
   const { m, mine } = props
   // 게스트는 글만 쓸 수 있어 내 말도 글뿐이다.
@@ -530,7 +579,7 @@ function FrontMessageItem(props: {
   const reply = m.replyTo
   const link = m.link
   return (
-    <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}`}>
+    <div className={`message${mine ? ' mine' : ''}${props.highlight ? ' found' : ''}${props.mentionedMe ? ' mentioned-me' : ''}`}>
       {!mine && (props.showAuthor ? <FrontAvatar authorKey={props.authorKey} name={props.author} avatarAssetId={props.avatarAssetId} /> : <span className="avatar-space" />)}
       {props.showAuthor && <div className="author">{props.author}</div>}
       <div className="bubble-row">
@@ -601,7 +650,7 @@ function FrontMessageItem(props: {
             )}
             {m.game ? (
               <GameCardView api={props.games} msg={{ id: m.id, game: m.game, votes: m.votes, authorId: m.authorId, createdAt: m.createdAt, text: m.text }} />
-            ) : m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(m.text)}</p>)}
+            ) : m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(m.text, [...props.mentionNames, ...(m.mentionAll ? [MENTION_ALL] : [])], props.myName, mine)}</p>)}
             {link?.url && (
               <a className="link-card" href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {link.thumb && /^https?:/.test(link.thumb) && (
@@ -644,6 +693,7 @@ function FrontComposer(props: {
   gameItems: MenuAction[] // 🎲 미니 게임 (게스트는 사진 없는 투표만)
   room: FrontRoom
   uid: string
+  people: MentionPerson[]
   replyTo: FrontMessage | null
   replyName: string
   editing: FrontMessage | null
@@ -654,6 +704,37 @@ function FrontComposer(props: {
   const [body, setBody] = useState('')
   const draft = useRef('')
   const textarea = useRef<HTMLTextAreaElement>(null)
+
+  // 📣 @부르기: "@"를 치면 목록(맨 위 @모두 · 프론트 직원 · 지원팀), 고르면 "@이름 "
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const candidates = mention
+    ? [{ id: 'all', name: MENTION_ALL, sub: '이 방 사람 모두' }, ...props.people]
+        .filter((c) => c.name.toLowerCase().includes(mention.query.toLowerCase()))
+        .slice(0, 8)
+    : []
+  function updateMention(el: HTMLTextAreaElement) {
+    const before = el.value.slice(0, el.selectionStart)
+    const found = before.match(/(^|\s)@([^\s@]*)$/)
+    setMention(found ? { start: el.selectionStart - found[2].length - 1, query: found[2] } : null)
+    setMentionIndex(0)
+  }
+  const pendingCaret = useRef<number | null>(null)
+  function pickMention(name: string) {
+    const el = textarea.current
+    if (!el || !mention) return
+    const end = el.selectionStart
+    setBody(`${body.slice(0, mention.start)}@${name} ${body.slice(end)}`)
+    pendingCaret.current = mention.start + name.length + 2
+    setMention(null)
+  }
+  useLayoutEffect(() => {
+    const at = pendingCaret.current
+    if (at === null) return
+    pendingCaret.current = null
+    textarea.current?.focus()
+    textarea.current?.setSelectionRange(at, at)
+  }, [body])
 
   useEffect(() => {
     if (editing) {
@@ -714,9 +795,21 @@ function FrontComposer(props: {
     const reply = replyTo && preview ? { id: replyTo.id, authorId: replyTo.authorId, ...preview } : null
     setBody('')
     onSent()
+    const base = { text, authorId: uid, createdAt: Date.now(), ...(reply ? { replyTo: reply } : {}) }
+    const mn = findFrontMentions(text, props.people, uid)
+    const called = { ...(mn.mentions.length ? { mentions: mn.mentions } : {}), ...(mn.all ? { mentionAll: true } : {}) }
     try {
-      // 프론트 규칙: text, authorId, createdAt, replyTo 말고는 넣으면 거절된다.
-      await addDoc(messagesCol(room.id), { text, authorId: uid, createdAt: Date.now(), ...(reply ? { replyTo: reply } : {}) })
+      try {
+        await addDoc(messagesCol(room.id), { ...base, ...called })
+      } catch (err) {
+        // 프론트 규칙이 아직 게스트의 mentions 를 안 받으면: 글만 다시 보낸다 (색칠·"나를 불렀어요" 알림은 프론트 업데이트 뒤)
+        if (!Object.keys(called).length || (err as { code?: string }).code !== 'permission-denied') throw err
+        await addDoc(messagesCol(room.id), base)
+        if (!mentionDeniedTold) {
+          mentionDeniedTold = true
+          toast('글은 보냈어요. 프론트 앱이 업데이트되면 부른 사람에게 "나를 불렀어요" 알림이 가요.')
+        }
+      }
     } catch {
       setBody((now) => now || text)
       toast('보내지 못했어요. 이 방에서 내보내졌거나 인터넷이 끊겼을 수 있어요.', { error: true })
@@ -752,6 +845,25 @@ function FrontComposer(props: {
           }}
         />
       )}
+      {mention && candidates.length > 0 && (
+        <ul className="mention-list" role="listbox" aria-label="부를 사람">
+          {candidates.map((c, i) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={i === mentionIndex}
+                className={i === mentionIndex ? 'mention-option active' : 'mention-option'}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => pickMention(c.name)}
+              >
+                {c.id === 'all' ? '👥 @모두 (이 방 사람 모두)' : `@${c.name}`}
+                {c.id !== 'all' && <span className="muted small"> · {c.sub}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <ClipboardChip inputRef={textarea} onPaste={(t) => insertAt(textarea.current, body, t, setBody)} />
       <div className="composer-row">
         <button
@@ -782,8 +894,33 @@ function FrontComposer(props: {
         <textarea
           ref={textarea}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => {
+            setBody(e.target.value)
+            updateMention(e.target)
+          }}
+          onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && updateMention(e.currentTarget)}
+          onClick={(e) => updateMention(e.currentTarget)}
+          onBlur={() => setTimeout(() => setMention(null), 150)}
           onKeyDown={(e) => {
+            // @목록이 떠 있으면: ↑↓ 고르기, Enter·Tab 넣기, Esc 닫기
+            if (mention && candidates.length) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                const step = e.key === 'ArrowDown' ? 1 : -1
+                setMentionIndex((i) => (i + step + candidates.length) % candidates.length)
+                return
+              }
+              if ((e.key === 'Enter' || e.key === 'Tab') && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                pickMention(candidates[mentionIndex]?.name ?? candidates[0].name)
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setMention(null)
+                return
+              }
+            }
             if (e.key === 'Escape' && (replyTo || editing)) return cancel()
             // PC: Enter = 보내기, Shift/Ctrl+Enter = 줄바꿈. 휴대폰: Enter = 줄바꿈(보내기는 버튼).
             if (e.key !== 'Enter' || e.nativeEvent.isComposing || isTouchUi() || e.shiftKey) return

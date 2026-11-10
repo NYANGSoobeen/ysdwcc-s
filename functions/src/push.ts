@@ -182,17 +182,28 @@ export async function notifyChatMessage(teamId: string, channelId: string, m: Re
 }
 
 // 🏌️ 프론트 채팅방 새 말 (프론트 서버가 ydrGuestPush로 알려 줌) → 그 방에 있는 우리 직원에게.
-export async function notifyFront(uids: string[], title: string, body: string, ch: string) {
+// 📣 mentioned = 그중 @로 부른 사람(@모두면 모두): 프론트 채팅 알림을 꺼 둬도 "나를 부른 말"을 켰으면 "🔔 나를 불렀어요"로 받는다.
+export async function notifyFront(uids: string[], title: string, body: string, ch: string, mentioned: string[] = []) {
   const people = await activeUsers(uids)
-  const tokens = (await tokensOf([...people.keys()])).filter((t) => t.kinds.front && reachable(t))
-  const note: PushNote = {
-    title: short(`🏌️ ${title || '프론트 채팅'}`, 80),
+  const called = new Set(mentioned)
+  const room = String(title || '프론트 채팅').replace(/^💬\s*/, '')
+  const who = String(body || '').split(':')[0].trim()
+  const url = `/?front=${encodeURIComponent(ch)}`
+  const note: PushNote = { title: short(`🏌️ ${title || '프론트 채팅'}`, 80), body: short(body || '새 메시지', 120), url, tag: `front-${ch}`, kind: 'front' }
+  const callNote: PushNote = {
+    title: short(`🔔 ${who ? `${who}님이 ` : ''}나를 불렀어요 · 🏌️ ${room}`, 80),
     body: short(body || '새 메시지', 120),
-    url: `/?front=${encodeURIComponent(ch)}`,
+    url,
     tag: `front-${ch}`,
     kind: 'front',
   }
-  return sendNotes(tokens.map((token) => ({ token, note })))
+  const out: { token: Token; note: PushNote }[] = []
+  for (const t of await tokensOf([...people.keys()])) {
+    if (!reachable(t)) continue
+    if (called.has(t.uid) && (t.kinds.mention || t.kinds.front)) out.push({ token: t, note: callNote })
+    else if (t.kinds.front) out.push({ token: t, note })
+  }
+  return sendNotes(out)
 }
 
 // 📢 새 공지 → 쓴 사람을 뺀 팀원 중 공지 알림을 켠 기기에.

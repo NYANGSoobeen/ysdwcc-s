@@ -987,7 +987,7 @@ export const onChannelMessageCreatedPush = onDocumentCreated(
 )
 
 // 🏌️ 프론트 채팅 알림: 프론트 서버가 "게스트(우리 직원)가 있는 방에 새 말이 왔다"고 알려 준다 (GUEST_LINK.md 7번).
-// POST { uids: [우리 uid…], title, body, ch, msg }, 머리글 x-ydr-secret = 비밀값.
+// POST { uids: [우리 uid…], title, body, ch, msg, mentioned?: [@로 부른 우리 uid…] }, 머리글 x-ydr-secret = 비밀값.
 // 비밀값은 코드에 넣지 않고 최고 관리자가 관리자 화면에서 넣는다 → meta/frontLink.secret (앱에서 접근 불가).
 export const ydrGuestPush = onRequest({ invoker: 'public', timeoutSeconds: 30 }, async (req, res) => {
   if (req.method !== 'POST') {
@@ -1007,7 +1007,8 @@ export const ydrGuestPush = onRequest({ invoker: 'public', timeoutSeconds: 30 },
     res.status(400).send('bad request')
     return
   }
-  const sent = await notifyFront(uids, String(body.title ?? '').slice(0, 200), String(body.body ?? '').slice(0, 500), ch)
+  const mentioned = Array.isArray(body.mentioned) ? body.mentioned.filter((u): u is string => typeof u === 'string' && uids.includes(u)) : []
+  const sent = await notifyFront(uids, String(body.title ?? '').slice(0, 200), String(body.body ?? '').slice(0, 500), ch, mentioned)
   res.json({ ok: true, sent })
 })
 

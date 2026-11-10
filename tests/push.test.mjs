@@ -152,4 +152,14 @@ test('프론트 알림(ydrGuestPush): 비밀값이 맞을 때만, 나를 부른 
     tag: 'front-c1',
     kind: 'front',
   })
+  // 📣 @로 부른 사람(mentioned): 프론트 채팅 알림이 꺼진(c = 나를 부른 말만) 기기도 "나를 불렀어요"로 받는다
+  sent = []
+  const called = await call(fn.ydrGuestPush, {
+    headers: { 'x-ydr-secret': secret },
+    body: { ...req, title: '💬 프론트 전체', body: '김프론트: @이보기 확인해 주세요', mentioned: ['c', 'zz'] },
+  })
+  assert.equal(called.status, 200)
+  assert.deepEqual(sent.map((m) => m.token).sort(), ['tok-b1', 'tok-b2', 'tok-c1'])
+  assert.equal(sent.find((m) => m.token === 'tok-c1').data.title, '🔔 김프론트님이 나를 불렀어요 · 🏌️ 프론트 전체')
+  assert.equal(sent.find((m) => m.token === 'tok-b1').data.title, '🏌️ 💬 프론트 전체')
 })

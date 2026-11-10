@@ -339,6 +339,9 @@ export type FrontMessage = {
   system: boolean
   game: Game | null // 🎲 미니 게임 (src/chatgame, 프론트와 같은 모양)
   votes: Votes | null
+  // 📣 @부르기 (프론트 mention.js 와 같은 모양): 부른 사람 id(acc_아이디 · g_…), @모두
+  mentions: string[]
+  mentionAll: boolean
 }
 
 export const messagesCol = (ch: string) => collection(ydrDb, 'channels', ch, 'messages')
@@ -371,6 +374,8 @@ export function toFrontMessage(id: string, d: Record<string, unknown>): FrontMes
     system: d.system === true,
     game: d.game && typeof d.game === 'object' && typeof (d.game as Game).type === 'string' ? (d.game as Game) : null,
     votes: d.votes && typeof d.votes === 'object' ? (d.votes as Votes) : null,
+    mentions: Array.isArray(d.mentions) ? d.mentions.filter((x): x is string => typeof x === 'string') : [],
+    mentionAll: d.mentionAll === true,
   }
 }
 
