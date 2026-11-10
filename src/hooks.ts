@@ -21,7 +21,8 @@ export type Profile = {
   settings?: { frontChat?: boolean; team?: string; offDayReply?: { enabled?: boolean; message?: string } } // team: 마지막으로 고른 팀(기기끼리 맞춤), frontChat: 프론트 채팅에 들어가 있음 (다른 기기·다시 로그인해도 코드 없이 연결)
 }
 // myRole: 이 팀에서 내 권한 (최고 관리자는 팀원이 아니어도 'admin'). people: 팀원 + 최고 관리자 (글쓴이 이름 표시용). App이 채운다.
-export type Team = { id: string; name: string; members: Record<string, Role>; myRole?: Role; people?: string[] }
+// members: 사용 중인 팀원만(App이 사용 중지된 사람을 뺌, 2026-11-10), allMembers: 사용 중지 포함 전부(👥 직원 관리·관리자 화면용)
+export type Team = { id: string; name: string; members: Record<string, Role>; allMembers?: Record<string, Role>; myRole?: Role; people?: string[] }
 
 export function useAuthUser() {
   const [state, setState] = useState<{ user: User | null; loading: boolean }>({

@@ -25,14 +25,14 @@ function versionIsCurrent(v: string) {
 type Props = { team: Team; uid: string; teamIds: string[] }
 
 export function StaffPage({ team, uid, teamIds }: Props) {
-  const uids = Object.keys(team.members)
+  const uids = Object.keys(team.allMembers ?? team.members)
   const profiles = useMemberProfiles(uids)
   const teamNames = useTeamNames(teamIds)
   const otherTeams = teamIds.filter((id) => id !== team.id).map((id) => ({ id, name: teamNames[id] ?? '' }))
   const memberNames = Object.fromEntries(uids.map((u) => [u, profiles[u]?.name ?? '']))
   const [adding, setAdding] = useState(false)
   const { query } = useTabSearch()
-  const sorted = filterMembers(sortMembers(team, profiles), profiles, query)
+  const sorted = filterMembers(sortMembers(team, profiles, true), profiles, query)
 
   return (
     <div className="page">
@@ -155,7 +155,7 @@ function StaffRow(props: {
   const [moving, setMoving] = useState(false)
   const [editing, setEditing] = useState(false)
   const inactive = profile?.active === false
-  const role = team.members[memberUid]
+  const role = (team.allMembers ?? team.members)[memberUid]
   const [busy, setBusy] = useState(false)
 
   async function run(action: () => Promise<unknown>, done?: string) {

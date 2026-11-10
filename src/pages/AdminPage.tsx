@@ -30,7 +30,7 @@ type Props = {
 // 🛡️ 관리자 설정: 팀 이름과 (최고 관리자) 모든 팀·팀 만들기·#검색 키·프론트 알림·이모티콘·용량 관리.
 // 팀원 목록·등록·권한·직급은 👥 직원 관리(StaffPage)로 나눴다.
 export function AdminPage({ team, superAdmin, teamIds, onSelectTeam, onOpenUsage, onOpenStaff }: Props) {
-  const uids = Object.keys(team.members)
+  const uids = Object.keys(team.allMembers ?? team.members)
 
   return (
     <div className="page">
@@ -90,11 +90,13 @@ export function filterMembers(uids: string[], profiles: Record<string, { name: s
   })
 }
 
-export function sortMembers(team: Team, profiles: Record<string, { name: string }>) {
+// withDisabled: 사용 중지된 사람도 (👥 직원 관리), 아니면 사용 중인 팀원만 (팀원 화면)
+export function sortMembers(team: Team, profiles: Record<string, { name: string }>, withDisabled = false) {
   const order = { admin: 0, editor: 1, viewer: 2 }
-  return Object.keys(team.members).sort(
+  const all = withDisabled ? (team.allMembers ?? team.members) : team.members
+  return Object.keys(all).sort(
     (a, b) =>
-      order[team.members[a]] - order[team.members[b]] ||
+      order[all[a]] - order[all[b]] ||
       (profiles[a]?.name ?? '').localeCompare(profiles[b]?.name ?? '', 'ko'),
   )
 }

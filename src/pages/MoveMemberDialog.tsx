@@ -20,7 +20,7 @@ export function MoveMemberDialog(props: {
   const { team, memberUid, name, myUid, otherTeams, names, onClose } = props
   const titleId = useId()
   const [toTeamId, setToTeamId] = useState(otherTeams[0]?.id ?? '')
-  const [role, setRole] = useState<Role>(team.members[memberUid] ?? 'editor')
+  const [role, setRole] = useState<Role>((team.allMembers ?? team.members)[memberUid] ?? 'editor')
   const stay = Object.keys(team.members).filter((u) => u !== memberUid)
   const [newOwner, setNewOwner] = useState(stay.includes(myUid) ? myUid : (stay[0] ?? ''))
   const [owned, setOwned] = useState<number | null>(null)

@@ -117,7 +117,7 @@ function SignedIn({ user }: { user: User }) {
   const { team: rawTeam, denied } = useTeam(teamId, superReady ? 1 : 0)
   const superUids = useSuperAdminUids()
   const superKey = superUids.join(',')
-  const team = useMemo(
+  const baseTeam = useMemo(
     () =>
       rawTeam
         ? {
@@ -128,8 +128,17 @@ function SignedIn({ user }: { user: User }) {
         : null,
     [rawTeam, user.uid, isSuper, superKey],
   )
+  const memberProfiles = useMemberProfiles(baseTeam ? teamPeople(baseTeam) : [])
+  // ⛔ 계정 사용 중지된 사람은 팀원에서 뺀다(메뉴 팀원·팀원 화면·@부르기·읽음 숫자·근무표·담당자 고르기 등, 2026-11-10 사용자 요청).
+  // 팀 소속(teams.members)은 그대로라 "다시 사용"하면 돌아온다 → 👥 직원 관리·관리자 화면은 allMembers(전부)를 본다.
+  const disabledKey = Object.entries(memberProfiles).filter(([, p]) => p.active === false).map(([id]) => id).sort().join(',')
+  const team = useMemo(() => {
+    if (!baseTeam) return null
+    const off = new Set(disabledKey ? disabledKey.split(',') : [])
+    if (!off.size) return { ...baseTeam, allMembers: baseTeam.members }
+    return { ...baseTeam, allMembers: baseTeam.members, members: Object.fromEntries(Object.entries(baseTeam.members).filter(([id]) => !off.has(id))) }
+  }, [baseTeam, disabledKey])
   const channels = useChannels(team?.id, user.uid)
-  const memberProfiles = useMemberProfiles(team ? teamPeople(team) : [])
   const memberNames = Object.fromEntries(Object.entries(memberProfiles).map(([id, p]) => [id, p.name]))
   const teamNames = useTeamNames(teamIds)
   const [tab, setTabState] = useState<Tab>(savedTab)

@@ -34,7 +34,7 @@
     - 켬: 로그인 유지(IndexedDB), 오프라인 캐시.
     - 끔(여러 사람이 쓰는 컴퓨터): 세션 저장(브라우저 닫으면 로그아웃), Firestore 메모리 캐시(디스크에 고객 정보 안 남김, 앱을 다시 열 때부터 적용), 1분마다 localStorage `alive-at` 기록 → 15분 넘게 끊겼으면 로그아웃(`src/session.ts`).
     - 구현: `src/firebase.ts`의 `keepSignedIn()`, `applyKeepSignedIn()`(로그인 직전 `setPersistence`).
-  - 계정 사용 중지(`setMemberActive`, 이유 필수): `users.active=false` + 이유, Auth 계정 disabled + 토큰 폐기. 열린 앱은 바로 로그아웃하고 로그인 화면에 이유를 보여 준다. Firestore/Storage 규칙(`isActive`)과 CardDAV도 막는다. 팀 소속과 데이터는 그대로이며 "다시 사용"으로 푼다. 자기 자신, 최고 관리자, 마지막 관리자는 중지할 수 없다. (요청서의 `uids/{uid}` 문서 대신 기존 `users/{uid}`를 쓴다.)
+  - 계정 사용 중지(`setMemberActive`, 이유 필수): `users.active=false` + 이유, Auth 계정 disabled + 토큰 폐기. 열린 앱은 바로 로그아웃하고 로그인 화면에 이유를 보여 준다. Firestore/Storage 규칙(`isActive`)과 CardDAV도 막는다. 팀 소속과 데이터는 그대로이며 "다시 사용"으로 푼다. **화면에서는 팀원에서 뺀다(2026-11-10 사용자 요청 "사용 중지시키면 팀원에서도 빠져야지"):** App이 프로필 `active === false`인 사람을 `team.members`에서 빼고(메뉴 팀원·팀원 화면·@부르기·@모두·읽음 숫자·근무표·담당자 고르기·방 초대 등 `team.members`를 쓰는 곳 모두), 전부는 `team.allMembers`에 둔다 → 👥 직원 관리(`sortMembers(…, true)`)·관리자 설정 인원·부서 이동 권한은 `allMembers`라 "다시 사용"을 누를 수 있다. 예전 글의 이름은 `team.people`로 그대로 보인다. 자기 자신, 최고 관리자, 마지막 관리자는 중지할 수 없다. (요청서의 `uids/{uid}` 문서 대신 기존 `users/{uid}`를 쓴다.)
   - 로그인 화면 "아이디 저장": 체크하면 아이디만 이 기기에 기억한다 (비밀번호는 저장 안 함, localStorage `saved-login-id`).
   - 로그아웃 버튼 없이 로그인이 풀리면(만료, 중지) 기기에 남은 팀 데이터를 지운다.
 - **👥 직원 관리 · 🛡️ 관리자 설정 (2026-10-30, 메뉴 관리자 전용 묶음에서 둘로 나눔):**
