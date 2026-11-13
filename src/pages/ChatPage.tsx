@@ -56,6 +56,7 @@ import { Avatar } from '../ui/Avatar.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
 import { ask, askText, isTouchUi, Modal, toast } from '../ui/dialogs.tsx'
 import { api } from '../api.ts'
+import { armImeFix, imeUndo, mentionTapProps, type ImeFix } from '../ui/mentionFix.ts'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 
 
@@ -1193,11 +1194,21 @@ function Composer(props: {
     const end = el.selectionStart
     const next = `${body.slice(0, mention.start)}@${name} ${body.slice(end)}`
     pendingCaret.current = mention.start + name.length + 2
+    imeFix.current = armImeFix(next, pendingCaret.current, mention.query)
     setBody(next)
     setMention(null)
   }
   // 넣은 "@이름 " 바로 뒤로 커서를 옮긴다 (화면을 그리자마자, 다음 글자가 엉뚱한 데 들어가지 않게).
   const pendingCaret = useRef<number | null>(null)
+  const imeFix = useRef<ImeFix | null>(null) // 📱 한글 조합 중 고르면 조각이 또 붙는 것 되돌리기
+  function undoIme(v: string) {
+    const back = imeUndo(imeFix, v)
+    if (back === null) return false
+    const at = imeFix.current?.at ?? back.length
+    setBody(back)
+    requestAnimationFrame(() => textarea.current?.setSelectionRange(at, at))
+    return true
+  }
   useLayoutEffect(() => {
     const el = textarea.current
     if (el && pendingCaret.current !== null) {
@@ -1461,8 +1472,7 @@ function Composer(props: {
                 role="option"
                 aria-selected={i === mentionIndex}
                 className={i === mentionIndex ? 'mention-option active' : 'mention-option'}
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => pickMention(c.name)}
+                {...mentionTapProps(() => pickMention(c.name))}
               >
                 {c.uid === 'all' ? '👥 @모두 (팀원 전체)' : `@${c.name}`}
               </button>
@@ -1500,9 +1510,11 @@ function Composer(props: {
           ref={textarea}
           value={body}
           onChange={(e) => {
+            if (undoIme(e.target.value)) return
             setBody(e.target.value)
             updateMention(e.target)
           }}
+          onCompositionEnd={() => setTimeout(() => textarea.current && undoIme(textarea.current.value), 0)}
           onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && updateMention(e.currentTarget)}
           onClick={(e) => updateMention(e.currentTarget)}
           onBlur={() => setTimeout(() => setMention(null), 150)}

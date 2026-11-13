@@ -34,6 +34,7 @@ import {
   type FrontRoom,
 } from './ydr.ts'
 import { badgeText } from '../reads.ts'
+import { armImeFix, imeUndo, mentionTapProps, type ImeFix } from '../ui/mentionFix.ts'
 
 // 🏌️ 프론트 채팅 화면: 초대 코드 넣기 → 초대받은 방 목록 → 채팅 (src/front/ydr.ts 참고)
 const PAGE = 100
@@ -720,12 +721,22 @@ function FrontComposer(props: {
     setMentionIndex(0)
   }
   const pendingCaret = useRef<number | null>(null)
+  const imeFix = useRef<ImeFix | null>(null) // 📱 한글 조합 중 고르면 조각이 또 붙는 것 되돌리기
+  function undoIme(v: string) {
+    const back = imeUndo(imeFix, v)
+    if (back === null) return false
+    const at = imeFix.current?.at ?? back.length
+    setBody(back)
+    requestAnimationFrame(() => textarea.current?.setSelectionRange(at, at))
+    return true
+  }
   function pickMention(name: string) {
     const el = textarea.current
     if (!el || !mention) return
     const end = el.selectionStart
     setBody(`${body.slice(0, mention.start)}@${name} ${body.slice(end)}`)
     pendingCaret.current = mention.start + name.length + 2
+    imeFix.current = armImeFix(`${body.slice(0, mention.start)}@${name} ${body.slice(end)}`, pendingCaret.current, mention.query)
     setMention(null)
   }
   useLayoutEffect(() => {
@@ -854,8 +865,7 @@ function FrontComposer(props: {
                 role="option"
                 aria-selected={i === mentionIndex}
                 className={i === mentionIndex ? 'mention-option active' : 'mention-option'}
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => pickMention(c.name)}
+                {...mentionTapProps(() => pickMention(c.name))}
               >
                 {c.id === 'all' ? '👥 @모두 (이 방 사람 모두)' : `@${c.name}`}
                 {c.id !== 'all' && <span className="muted small"> · {c.sub}</span>}
@@ -895,9 +905,11 @@ function FrontComposer(props: {
           ref={textarea}
           value={body}
           onChange={(e) => {
+            if (undoIme(e.target.value)) return
             setBody(e.target.value)
             updateMention(e.target)
           }}
+          onCompositionEnd={() => setTimeout(() => textarea.current && undoIme(textarea.current.value), 0)}
           onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && updateMention(e.currentTarget)}
           onClick={(e) => updateMention(e.currentTarget)}
           onBlur={() => setTimeout(() => setMention(null), 150)}
