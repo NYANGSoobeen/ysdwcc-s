@@ -373,6 +373,14 @@ export function MenuDrawer({ open, onClose, onSelect, onSelectRoom, onCreateRoom
               onCreateRoom()
             })
           }
+          // 🏌️ 프론트 방을 골라도 서랍을 닫는다 (2026-11-14: 우리 방과 달리 서랍이 열린 채 남아 입력칸을 가렸다)
+          onSelectFrontRoom={
+            rest.onSelectFrontRoom &&
+            ((id) => {
+              rest.onSelectFrontRoom?.(id)
+              onClose()
+            })
+          }
         >
           {children}
         </MenuList>
