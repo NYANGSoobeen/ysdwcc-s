@@ -10,8 +10,15 @@ const PUSH_URL = `https://us-west1-${import.meta.env.VITE_FIREBASE_PROJECT_ID ||
 
 export function FrontLinkCard() {
   const [configured, setConfigured] = useState<boolean | null>(null)
+  const [lastCall, setLastCall] = useState<{ at: number; people: number; sent: number } | null | undefined>(undefined)
   useEffect(() => {
-    api.frontLinkInfo().then((r) => setConfigured(r.configured), () => setConfigured(false))
+    api.frontLinkInfo().then(
+      (r) => {
+        setConfigured(r.configured)
+        setLastCall(r.lastCall ?? null)
+      },
+      () => setConfigured(false),
+    )
   }, [])
 
   async function makeSecret() {
@@ -41,6 +48,13 @@ export function FrontLinkCard() {
     <section className="card">
       <h3>🏌️ 프론트 채팅 알림 연동</h3>
       <p className="muted small">프론트 앱 채팅방 ⋯ → ⚙️ 타부서 연동 설정에 아래 세 가지를 넣으면, 프론트 채팅방 새 말이 우리 직원 폰에 알림으로 와요.</p>
+      {configured && lastCall !== undefined && (
+        <p className="small">
+          {lastCall
+            ? `📡 마지막 알림 요청 ${new Date(lastCall.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · 받을 직원 ${lastCall.people}명 · 보낸 기기 ${lastCall.sent}개`
+            : '⚠️ 아직 프론트에서 알림 요청이 온 적이 없어요. 프론트 앱 연동 설정(함수 주소·비밀값)을 확인해 주세요.'}
+        </p>
+      )}
       <dl className="stats">
         <div>
           <dt>Firebase 프로젝트 ID</dt>

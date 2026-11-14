@@ -300,7 +300,14 @@ function SignedIn({ user }: { user: User }) {
     const send = () => tellViewing(document.visibilityState === 'visible' ? viewingTag : null)
     send()
     document.addEventListener('visibilitychange', send)
-    return () => document.removeEventListener('visibilitychange', send)
+    window.addEventListener('pagehide', send)
+    // 보는 동안 15초마다 다시 알림 (서비스 워커는 40초 넘게 소식 없으면 안 보는 것으로 침 — 아이폰은 앱을 내릴 때 알림이 안 닿을 수 있어서)
+    const timer = viewingTag ? window.setInterval(() => document.visibilityState === 'visible' && send(), 15_000) : 0
+    return () => {
+      document.removeEventListener('visibilitychange', send)
+      window.removeEventListener('pagehide', send)
+      window.clearInterval(timer)
+    }
   }, [viewingTag])
 
   // 모든 팀에서 제외되면 이 기기의 데이터를 지우고 로그아웃한다.

@@ -1009,6 +1009,11 @@ export const ydrGuestPush = onRequest({ invoker: 'public', timeoutSeconds: 30 },
   }
   const mentioned = Array.isArray(body.mentioned) ? body.mentioned.filter((u): u is string => typeof u === 'string' && uids.includes(u)) : []
   const sent = await notifyFront(uids, String(body.title ?? '').slice(0, 200), String(body.body ?? '').slice(0, 500), ch, mentioned)
+  // 🔍 점검용: 프론트가 마지막으로 알림을 부탁한 때·받을 직원 수·보낸 기기 수 (관리자 화면 연동 카드에 보임)
+  await getFirestore()
+    .doc('meta/frontLink')
+    .set({ lastCall: { at: FieldValue.serverTimestamp(), people: uids.length, sent } }, { merge: true })
+    .catch(() => {})
   res.json({ ok: true, sent })
 })
 
@@ -1036,7 +1041,12 @@ export const sendTestPush = onCall(async (req) => {
 export const frontLinkInfo = onCall(async (req) => {
   await requireSuperAdmin(req)
   const snap = await getFirestore().doc('meta/frontLink').get()
-  return { configured: String(snap.get('secret') ?? '').length >= 20, updatedAt: snap.get('updatedAt')?.toMillis?.() ?? null }
+  const last = snap.get('lastCall') as { at?: { toMillis?: () => number }; people?: number; sent?: number } | undefined
+  return {
+    configured: String(snap.get('secret') ?? '').length >= 20,
+    updatedAt: snap.get('updatedAt')?.toMillis?.() ?? null,
+    lastCall: last?.at?.toMillis ? { at: last.at.toMillis(), people: Number(last.people ?? 0), sent: Number(last.sent ?? 0) } : null,
+  }
 })
 
 export const setFrontLinkSecret = onCall(async (req) => {

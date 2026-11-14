@@ -4,7 +4,13 @@
  * - 📛 앱 아이콘 숫자: 앱이 열려 있을 때 앱이 알려 준 수에서, 알림이 올 때마다 하나씩 올린다 (앱 꺼져 있어도).
  * - 알림을 누르면 열려 있는 앱을 앞으로 가져와 그 방을 열고, 없으면 새로 연다.
  */
-const viewing = new Map() // 창(client id) → 보고 있는 tag
+const viewing = new Map() // 창(client id) → { tag, at } 보고 있는 방과 알려 준 시각
+// 📱 아이폰(2026-11-14 "프론트 채팅 알림이 안 와, 앱에 들어갔다 나와야 숫자가 떠"): 앱을 내릴 때 "이제 안 봐요"가
+//    서비스 워커에 닿기 전에 앱이 멈춰서 "그 방을 보는 중"이 남고, 창 상태도 '보임'으로 남아 알림을 계속 건너뛰었다.
+//    → 앱이 보는 동안 15초마다 다시 알리고, 40초 넘게 소식이 없으면 안 보는 것으로 친다.
+const VIEW_FRESH_MS = 40 * 1000
+// 애플(아이폰·맥 사파리)은 푸시를 받고 알림을 안 띄우면 알림 구독을 끊어 버릴 수 있다 → 건너뛸 때도 띄웠다 바로 닫는다.
+const APPLE = /iPhone|iPad|iPod|Macintosh/.test(self.navigator.userAgent) && !/Chrome|CriOS|Edg|Firefox|FxiOS/.test(self.navigator.userAgent)
 const BADGE_CACHE = 'app-badge'
 // 🔔 알림 방식 (알림 설정 화면, 기기마다): 'sound' 소리 + 알림창 · 'quiet' 소리 없이 알림창만 · 'badge' 무음(숫자만)
 async function readMode() {
@@ -58,7 +64,7 @@ self.addEventListener('message', (event) => {
   const d = event.data || {}
   const id = event.source && event.source.id
   if (d.type === 'viewing' && id) {
-    if (d.tag) viewing.set(id, d.tag)
+    if (d.tag) viewing.set(id, { tag: d.tag, at: Date.now() })
     else viewing.delete(id)
   }
   if (d.type === 'badge') event.waitUntil(writeBadge(Number(d.count) || 0))
@@ -87,8 +93,20 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      // 그 방을 지금 보고 있는 창이 있으면 알리지 않는다.
-      if (tag && windows.some((w) => w.visibilityState === 'visible' && viewing.get(w.id) === tag)) return
+      // 그 방을 지금 보고 있는 창이 있으면 알리지 않는다 (최근 40초 안에 앱이 알려 준 것만 믿음).
+      const now = Date.now()
+      const seen = (w) => {
+        const v = viewing.get(w.id)
+        return v && v.tag === tag && now - v.at <= VIEW_FRESH_MS
+      }
+      if (tag && windows.some((w) => w.visibilityState === 'visible' && seen(w))) {
+        if (APPLE) {
+          const t = `skip-${now}`
+          await self.registration.showNotification(title, { body, tag: t, silent: true })
+          ;(await self.registration.getNotifications({ tag: t })).forEach((x) => x.close())
+        }
+        return
+      }
       // 채팅 알림이면 앱 아이콘 숫자를 하나 올린다 (공지는 안 읽은 채팅 수가 아니라서 제외).
       if (d.kind !== 'notice') await writeBadge((await readBadge()) + 1)
       await show(title, {

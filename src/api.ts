@@ -79,7 +79,7 @@ export const api = {
   webSearch: call<{ q: string; kind: SearchKind }, { results: SearchResult[] }>('webSearch'),
   searchKeyInfo: call<void, { configured: boolean; updatedAt: number | null }>('searchKeyInfo'),
   setSearchKey: call<{ key: string }, { ok: true }>('setSearchKey'),
-  frontLinkInfo: call<void, { configured: boolean; updatedAt: number | null }>('frontLinkInfo'),
+  frontLinkInfo: call<void, { configured: boolean; updatedAt: number | null; lastCall: { at: number; people: number; sent: number } | null }>('frontLinkInfo'),
   setFrontLinkSecret: call<{ secret?: string }, { secret: string }>('setFrontLinkSecret'),
   getUsage: call<{ teamId: string }, Usage>('getUsage'),
   cleanUnusedFiles: call<{ teamId: string; paths: string[] }, { deleted: number; bytes: number; skipped: number }>('cleanUnusedFiles'),
