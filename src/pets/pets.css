@@ -40,6 +40,8 @@
 .petSecH{font-weight:700; font-size:13px; color:var(--sub); margin:14px 0 8px;}
 .petPick{display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px;}
 .petPickBtn{display:flex !important; flex-direction:column; align-items:center; gap:2px; background:var(--bg) !important; color:var(--text) !important; border:2px solid var(--line) !important; border-radius:14px !important; padding:6px 4px !important; font-size:11px; font-weight:600;}
+.petPickBtn canvas{margin:auto 0;}   /* 펫은 칸 가운데, 이름은 맨 아래 */
+.petPickBtn span{margin-top:auto;}
 .petPickBtn.on{border-color:var(--accent) !important; background:var(--accent2) !important;}
 .petRow{display:flex; gap:8px; margin-top:10px; align-items:center;}
 .petRow input{flex:1;}
@@ -85,3 +87,9 @@
 .petObs.bone::before,.petObs.bone::after{content:''; position:absolute; top:-3px; width:10px; height:20px; border-radius:50%; background:#fff6e8; box-shadow:inset 0 0 0 2px #e2cdb0;}
 .petObs.bone::before{left:-5px;} .petObs.bone::after{right:-5px;}
 .petObs.hit{opacity:.45;}
+.petBox.hiss .petCv{animation:petHiss .1s linear 12; filter:drop-shadow(0 0 0 transparent);}   /* 🎭 하악질: 털 세우고 부들부들 */
+@keyframes petHiss{0%{transform:translateX(-1px) scale(1.06,1.04)} 50%{transform:translateX(1px) scale(1.07,1.05)} 100%{transform:translateX(-1px) scale(1.06,1.04)}}
+.petBox.hiss .petSay{color:#c0392b; font-weight:700;}
+.petBox.bark{animation:petBarkHop .45s ease-out;}   /* 🎭 짖을 때 콩 */
+@keyframes petBarkHop{30%{margin-top:-8px} 100%{margin-top:0}}
+.petBite{font-size:22px !important;}

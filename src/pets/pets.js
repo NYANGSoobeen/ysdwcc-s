@@ -20,8 +20,29 @@ const PET_SP={
   maltese:{kind:'dog', n:'솜이', b:'말티즈', base:'#ffffff', hi:'#ffffff', lo:'#ece4dc', light:'#ffffff', ear:'floppy', pat:'none', tail:'curl', bow:'#ff7fa0'},
   bichon:{kind:'dog', n:'몽실', b:'비숑 프리제', base:'#fffcf6', hi:'#ffffff', lo:'#eee5da', light:'#fffcf6', ear:'cloud', pat:'none', tail:'curl'},
   golden:{kind:'dog', n:'버터', b:'골든 리트리버', base:'#eab468', hi:'#f6cb88', lo:'#cf9447', light:'#f6cb88', ear:'floppy', pat:'gold', tail:'long', earC:'#d79a4c', size:1.3},
+  poodle:{kind:'dog', n:'초코', b:'토이 푸들', base:'#b8794b', hi:'#cc915f', lo:'#8f5634', light:'#cc915f', ear:'cloud', pat:'poodle', tail:'curl', curly:1},
+  grey:{kind:'dog', n:'바람', b:'그레이하운드', base:'#a9a5a1', hi:'#bfbbb7', lo:'#8a8683', light:'#f4f0ea', ear:'rose', pat:'grey', tail:'thin', lean:1, fast:1, bigEye:1, size:1.3},
   husky:{kind:'dog', n:'설기', b:'시베리안 허스키', base:'#f6f6f3', hi:'#ffffff', lo:'#d9dad8', light:'#ffffff', ear:'big', pat:'husky', pt:'#5c626c', tail:'curl', eyeC:'#4c9fe0', size:1.3},
   gsd:{kind:'dog', n:'대장', b:'셰퍼드', base:'#c98a4a', hi:'#dba468', lo:'#a86d34', light:'#e6b47c', ear:'big', pat:'gsd', tail:'long', muz:'#4b3424', size:1.3}
+};
+// 🎭 성격 (품종마다): vocal 수다(짖기·울기) · grumpy 까칠(하악질·물기) · shy 겁(도망) · energy 활발(쫓기·장난) · friendly 친화 · cuddly 안기기 좋아함
+const PET_TRAIT={
+  cheese:{t:'애교 많은 먹보', vocal:.3, grumpy:.1, shy:.1, energy:.4, friendly:.9, cuddly:.7},
+  calico:{t:'새침하고 까칠', vocal:.3, grumpy:.75, shy:.3, energy:.4, friendly:.3, cuddly:.2},
+  tux:{t:'장난꾸러기 호기심쟁이', vocal:.4, grumpy:.35, shy:.1, energy:.9, friendly:.6, cuddly:.3},
+  siam:{t:'수다쟁이 집착냥', vocal:.9, grumpy:.4, shy:.1, energy:.6, friendly:.8, cuddly:.5},
+  rag:{t:'순둥순둥 안기기 좋아함', vocal:.2, grumpy:0, shy:.2, energy:.2, friendly:.9, cuddly:1},
+  ash:{t:'활발한 사냥꾼', vocal:.3, grumpy:.3, shy:.1, energy:.85, friendly:.6, cuddly:.4},
+  curl:{t:'사람 좋아하는 호기심냥', vocal:.4, grumpy:.15, shy:.2, energy:.6, friendly:.95, cuddly:.6},
+  shiba:{t:'도도한 츤데레 고집쟁이', vocal:.5, grumpy:.6, shy:.2, energy:.6, friendly:.4, cuddly:.1},
+  corgi:{t:'활발한 먹보', vocal:.6, grumpy:.15, shy:0, energy:.9, friendly:.9, cuddly:.6},
+  maltese:{t:'겁 많은 왈왈이', vocal:.85, grumpy:.45, shy:.7, energy:.5, friendly:.5, cuddly:.6},
+  bichon:{t:'애교쟁이 순둥이', vocal:.3, grumpy:.05, shy:.2, energy:.6, friendly:1, cuddly:.9},
+  poodle:{t:'영리하고 예민함', vocal:.6, grumpy:.35, shy:.4, energy:.7, friendly:.6, cuddly:.5},
+  golden:{t:'모두의 친구 순둥이', vocal:.2, grumpy:0, shy:0, energy:.7, friendly:1, cuddly:1},
+  husky:{t:'수다쟁이 탈출 대장', vocal:.9, grumpy:.2, shy:.1, energy:1, friendly:.8, cuddly:.3},
+  grey:{t:'번개처럼 빠른 소파 껌딱지', vocal:.1, grumpy:.1, shy:.45, energy:.55, friendly:.7, cuddly:.85},
+  gsd:{t:'용감한 경비대장', vocal:.7, grumpy:.4, shy:0, energy:.8, friendly:.5, cuddly:.4}
 };
 const shadeHex=(hex,k)=>{ const n=parseInt(hex.slice(1),16); return '#'+[n>>16,n>>8&255,n&255].map(v=>Math.max(0,Math.min(255,Math.round(v*k))).toString(16).padStart(2,'0')).join(''); };
 
@@ -34,7 +55,9 @@ function petDraw(p, act, f, o){
   const px=(x,y,col)=>{ x=Math.round(x); y=Math.round(y); const x0=Math.floor(x*K), y0=Math.floor(y*K), x1=Math.max(x0+1,Math.floor((x+1)*K)), y1=Math.max(y0+1,Math.floor((y+1)*K)); for(let j=y0;j<y1;j++) for(let i=x0;i<x1;i++) put(i,j,col); };
   const ell=(cx,cy,rx,ry,col)=>{ cx*=K; cy*=K; rx*=K; ry*=K; for(let y=Math.floor(cy-ry);y<=cy+ry;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++){ const dx=(x+.5-cx)/rx, dy=(y+.5-cy)/ry; if(dx*dx+dy*dy<=1) put(x,y,col); } };
   const rect=(x,y,w,h,col)=>{ for(let j=0;j<h;j++) for(let i=0;i<w;i++) px(x+i,y+j,col); };
-  const eye=(ex,ey,col,PX)=>{ const X=PX!=null?PX:Math.round(Math.round(ex)*K), Y=Math.round(Math.round(ey-1)*K), hh=Math.max(2,Math.round(2*K)); for(let j=0;j<hh;j++) put(X,Y+j,col); };
+  const eye=(ex,ey,col,PX,side)=>{ const X=PX!=null?PX:Math.round(Math.round(ex)*K), Y=Math.round(Math.round(ey-1)*K), hh=Math.max(2,Math.round(2*K))+(p.bigEye?1:0);
+    for(let j=0;j<hh;j++){ put(X,Y+j,col); if(p.bigEye) put(X+(side<0?-1:1),Y+j,col); }
+    if(p.bigEye) put(side<0?X-1:X,Y,'#ffffff'); };   // 큰 눈엔 반짝이
   const curve=(pts,r,col)=>{ for(let t=0;t<=1;t+=0.04){ const [a,b,d]=pts, x=(1-t)*(1-t)*a[0]+2*(1-t)*t*b[0]+t*t*d[0], y=(1-t)*(1-t)*a[1]+2*(1-t)*t*b[1]+t*t*d[1]; ell(x,y,r,r,col); } };
   const tri=(pts,col)=>{ const [a,b,d]=pts.map(([u,v])=>[u*K,v*K]), s=(p1,p2,p3)=>(p1[0]-p3[0])*(p2[1]-p3[1])-(p2[0]-p3[0])*(p1[1]-p3[1]);
     for(let y=Math.floor(Math.min(a[1],b[1],d[1]));y<=Math.max(a[1],b[1],d[1]);y++) for(let x=Math.floor(Math.min(a[0],b[0],d[0]));x<=Math.max(a[0],b[0],d[0]);x++){ const q=[x+.5,y+.5],d1=s(q,a,b),d2=s(q,b,d),d3=s(q,d,a); if(!((d1<0||d2<0||d3<0)&&(d1>0||d2>0||d3>0))) put(x,y,col); } };
@@ -42,7 +65,7 @@ function petDraw(p, act, f, o){
   const tailT=p.tail||(cat?'cat':'curl'), tailC=p.pat==='calico'?p.p1:(p.pat==='point'||p.pat==='rag'||p.pat==='husky')?p.pt:p.pat==='gsd'?BLK:B;
   const legEnd=p.pat==='point'?p.pt:(['tux','shiba','corgi','rag'].includes(p.pat)?L:B);
   const eyeCol=p.eyeC||'#2a1f1d', earC=side=>p.pat==='calico'?(side?p.p2:p.p1):(p.pat==='point'||p.pat==='rag'||p.pat==='husky')?p.pt:p.pat==='gsd'?BLK:B;
-  const whiteChest=['tux','shiba','corgi','rag','calico'].includes(p.pat);
+  const whiteChest=['tux','shiba','corgi','rag','calico','grey'].includes(p.pat);
   const dy=p.short?3:0;
   // ---- 앞얼굴 ----
   const face=(x,y,closed)=>{
@@ -54,7 +77,8 @@ function petDraw(p, act, f, o){
     }
     if(p.ear==='cloud') ell(x,y-1,6.6,5.6,B);
     if(p.pat==='rag') ell(x,y+1,6,4.4,B);    // 복슬한 볼
-    ell(x,y,5.2,4.4,B);
+    if(p.ear==='rose'){ ell(x-3.6,y-3.7,1.5,0.9,S); ell(x+3.6,y-3.7,1.5,0.9,S); }   // 뒤로 접힌 작은 귀
+    if(p.lean) ell(x,y,4.4,4.1,B); else ell(x,y,5.2,4.4,B);
     if(p.pat==='calico'){ ell(x-3,y-2,2.4,2,p.p1); ell(x+3,y-2.4,2.2,1.8,p.p2); }
     if(p.pat==='point') ell(x,y+1.4,3,2.6,p.pt);
     if(p.pat==='rag'){ ell(x-2.4,y-0.4,2,2,p.pt); ell(x+2.4,y-0.4,2,2,p.pt); ell(x,y+2,2.4,1.8,L); px(x,y-3,L); px(x,y-2,L); px(x,y-1,L); }
@@ -64,70 +88,82 @@ function petDraw(p, act, f, o){
     if(!cat){
       if(p.pat==='shiba'){ ell(x-3,y+1.8,1.8,1.3,L); ell(x+3,y+1.8,1.8,1.3,L); px(x-2,y-2,L); px(x+1,y-2,L); }   // 흰 볼 + 눈썹 점
       if(p.pat==='corgi'){ px(x,y-4,L); px(x,y-3,L); px(x,y-2,L); px(x,y-1,L); }    // 이마 흰 줄
-      ell(x,y+2.4,2.8,2,(p.pat==='none'||p.ear==='cloud'||p.pat==='gold')?B:L); if(p.muz){ ell(x,y+2.4,2.4,1.8,p.muz); }
-      px(x,y+1.6,'#2a1f1d'); px(x-1,y+1.6,'#2a1f1d');
+      if(p.lean) ell(x-0.5,y+3,2.1,2.6,B); else ell(x,y+2.4,2.8,2,(p.pat==='none'||p.ear==='cloud'||p.pat==='gold')?B:L); if(p.muz){ ell(x,y+2.4,2.4,1.8,p.muz); }
+      const ny=p.lean&&!closed?y+4.6:y+1.6; px(x,ny,'#2a1f1d'); px(x-1,ny,'#2a1f1d');
     }
     if(p.ear==='floppy'){ ell(x-5,y+1,1.8,3.6,p.earC||S); ell(x+5,y+1,1.8,3.6,p.earC||S); }
+    if(p.pat==='poodle'){ ell(x-5.6,y+1.4,2.3,3.9,S); ell(x+5.6,y+1.4,2.3,3.9,S); }   // 복슬복슬 늘어진 귀
     if(closed){ px(x-3,y,S); px(x-2,y,S); px(x+1,y,S); px(x+2,y,S); }
-    else { const C2=Math.round(2*x*K)/2, Lx=Math.round(C2-3*K), Rx=2*C2-Lx-1; eye(0,y,eyeCol,Lx); eye(0,y,eyeCol,Rx); }   // 크기가 달라도 좌우 대칭
+    else { const C2=Math.round(2*x*K)/2, Lx=Math.round(C2-3*K), Rx=2*C2-Lx-1; eye(0,y,eyeCol,Lx,-1); eye(0,y,eyeCol,Rx,1); }   // 크기가 달라도 좌우 대칭
     if(cat) px(x,y+1.4,'#e48a9a');
-    if(o.tongue&&!closed){ px(x-1,y+4,'#f08aa0'); px(x,y+4,'#f08aa0'); px(x-1,y+5,'#e0708a'); px(x,y+5,'#f08aa0'); }
+    if(o.tongue&&!closed){ const ty=p.lean?y+1.5:0; px(x-1,y+4+ty,'#f08aa0'); px(x,y+4+ty,'#f08aa0'); px(x-1,y+5+ty,'#e0708a'); px(x,y+5+ty,'#f08aa0'); }
     if(p.bow){ px(x+2,y-5,p.bow); px(x+3,y-5,p.bow); px(x+2,y-4,p.bow); }
   };
   const OUTC=dark?'#151214':shadeHex(['#ffffff','#fffcf6','#fffaf2','#f6efe4'].includes(B)?'#cdbfb2':B,0.55);
   // 다리: 몸 위에 겹쳐도 보이게 양옆에 선을 긋고(ln), 발끝은 한 줄 밝게
   // 몸 안쪽 선은 테두리보다 연한 그늘색(LN) → 다리가 도드라지되 줄무늬처럼 보이지 않게
   const LN=dark?'#201c22':shadeHex(['#ffffff','#fffcf6','#fffaf2','#f6efe4'].includes(B)?'#e2d6c8':B,0.8);
-  const legs=(xs,y,h,sh,ln)=>xs.forEach((x,i)=>{ const k=sh?sh[i]:0; rect(x+k,y,2,h,i%2&&sh?S:B); rect(x+k,y+h-1,2,1,legEnd); if(ln){ rect(x+k+2,y,1,h,LN); } });
+  const legs=(xs,y,h,sh,ln)=>xs.forEach((x,i)=>{ const k=sh?sh[i]:0;
+    if(p.lean){ const col=i%2&&sh?S:B, X=Math.round((x+k+0.5)*K)-1, Y0=Math.round(y*K), Y1=Math.round((y+h)*K); for(let yy=Y0;yy<Y1;yy++){ put(X,yy,yy===Y1-1?legEnd:col); put(X+1,yy,yy===Y1-1?legEnd:col); } return; }   // 그레이하운드: 가늘게
+    rect(x+k,y,2,h,i%2&&sh?S:B); rect(x+k,y+h-1,2,1,legEnd); if(ln){ rect(x+k+2,y,1,h,LN); } });
   const backPaw=(x,y)=>{ rect(x,y,3,1,legEnd); px(x-1,y,LN); };
-  const thick=tailT==='fluff'?1.8:tailT==='long'?1.5:1.2;
+  const thick=tailT==='fluff'?1.8:tailT==='thin'?0.8:tailT==='long'?1.5:1.2;
 
   if(act==='idle'){
     const tip=f%4<2?0:1;
-    if(tailT==='cat'||tailT==='fluff'||tailT==='long') curve([[20,33],[28,35],[27,26+tip]],thick,tailC);
+    if(tailT==='cat'||tailT==='fluff'||(tailT==='long'||tailT==='thin')) curve([[20,33],[28,35],[27,26+tip]],thick,tailC);
     else if(tailT==='curl') curve([[21,26],[27+tip,22],[23,19]],1.6,tailC);
     else ell(24,31,1.6,1.4,tailC);
-    if(p.short){ ell(18,30,7.5,5,B); ell(15,26,4.4,4.4,B); } else { ell(17,28,6,6.4,B); ell(15,23,4,5,B); }
-    if(whiteChest) ell(14.5,25+dy*0.6,2,4-dy*0.4,L);
+    if(p.short){ ell(18,30,7.5,5,B); ell(15,26,4.4,4.4,B); } else if(p.lean){ ell(17.5,29.4,5,5,B); ell(15,22.4,3.2,5.2,B); ell(14.6,18.4,2.4,2.6,B); } else { ell(17,28,6,6.4,B); ell(15,23,4,5,B); }
+    if(whiteChest) { if(p.lean) ell(14.6,20.6,1.7,2.4,L); else ell(14.5,25+dy*0.6,2,4-dy*0.4,L); }
     if(p.pat==='calico'){ ell(20,27,3,3,p.p1); ell(18,32,2,1.6,p.p2); }
     if(p.pat==='tabby'){ [[20,24],[21,25],[21,27],[22,28],[20,30],[21,31]].forEach(([a,b])=>px(a,b,S)); }
     if(p.pat==='gsd') ell(20.5,25,2.4,3.6,BLK);
     if(p.pat==='husky') ell(20.5,25,2.6,3.8,p.pt);
-    legs([12,15],27+dy,8-dy,null);
-    face(14,15+dy,f%8===7);
+    if(p.lean) legs([12.5,15],24,11,null); else legs([12,15],27+dy,8-dy,null);
+    face(14,(p.lean?13.4:15)+dy,f%8===7);
     if(p.scarf){ rect(10,19+dy,9,2,p.scarf); px(16,21+dy,p.scarf); px(17,22+dy,p.scarf); px(15,21+dy,p.scarf); }
   }
   if(act==='walk'||act==='crawl'){   // crawl: 다리를 굽혀 몸을 낮춘 모습 (어질리티 터널)
     const dy=(p.short?3:0)+(act==='crawl'?(p.short?1:4):0);
     const sw=[0,1,0,-1], k=i=>sw[(f+i*2)%4]*1.2, bob=f%2?0:0.5;
     if(tailT==='cat'||tailT==='fluff') curve([[8,23+dy],[2,20+dy],[5,10+dy+(f%2)]],thick,tailC);
-    else if(tailT==='long') curve([[8,23],[2,25],[2,31+(f%2)]],thick,tailC);
+    else if((tailT==='long'||tailT==='thin')) curve([[8,23+dy*0.7+(p.lean&&act!=='crawl'?-2:0)],[2,25+dy*0.7],[2,31+(f%2)]],thick,tailC);
     else if(tailT==='curl') curve([[9,22],[3,17+(f%2)],[9,16]],1.6,tailC);
     else ell(7.5,22+dy,1.6,1.4,tailC);
-    legs([10,13,20,23],26+dy,act==='crawl'?4:(p.short?5:8),[k(0),k(1),k(2),k(3)]);
-    ell(16.5,24+bob+dy,p.short?9.5:8.5,3.8,B);
+    const lift=(p.lean&&act!=='crawl')?-2:0;
+    legs([10,13,20,23],(p.lean&&act!=='crawl'?22:26)+dy,act==='crawl'?4:(p.short?5:p.lean?13:8),[k(0),k(1),k(2),k(3)]);
+    if(p.lean){ const ly=dy+lift+bob;   // 그레이하운드 몸통: 등선(살짝 굽은 허리)과 배선(깊은 가슴 → 쏙 올라간 허리)을 이어서 한 덩어리로
+      const lin=(pts,x)=>{ for(let i=1;i<pts.length;i++){ const [a,b]=pts[i-1],[c,d]=pts[i]; if(x<=c) return b+(d-b)*Math.max(0,Math.min(1,(x-a)/(c-a))); } return pts[pts.length-1][1]; };
+      const TOP=[[6.5,20.8],[8.5,19.6],[13,19],[18,19.2],[22,18.8],[24.4,18]], BOT=[[6.5,22.6],[8.5,23.8],[11.5,23.4],[14,21.8],[16,22.6],[18.5,25.4],[21,26.6],[23,26],[24.6,23]];
+      for(let X=Math.round(6.5*K);X<=Math.round(24.6*K);X++){ const bx=(X+0.5)/K, t=Math.round((lin(TOP,bx)+ly)*K), b=Math.round((lin(BOT,bx)+ly)*K); for(let Y=t;Y<=b;Y++) put(X,Y,B); }
+      ell(10.4,22.2+ly,2.7,2.5,B);   // 뒷다리 허벅지
+    }
+    else ell(16.5,24+bob+dy,p.short?9.5:8.5,3.8,B);
     if(p.pat==='calico'){ ell(14,22.5,3,2,p.p1); ell(19,25,2,1.5,p.p2); }
     if(p.pat==='tabby') [12,15,18,21].forEach(a=>{ px(a,21+bob,S); px(a,22+bob,S); });
     if(p.pat==='gsd') ell(15,22+bob,7,2.4,BLK);
     if(p.pat==='husky') ell(15.5,22+bob+dy,7.8,2.5,p.pt);
     if(['tux','shiba','corgi','rag'].includes(p.pat)) ell(19,26.5+dy,4,1.4,L);
-    ell(24,21+dy,2.6,3,B);
-    const hx=26, hy=16+bob+dy;
+    if(p.pat==='grey'){ ell(22.2,24.6+dy+lift+(f%2?0:0.5),1.8,1.9,L); }   // 흰 앞가슴
+    if(p.lean) ell(23.6,18.6+dy+lift,1.8,3.4,B); else ell(24,21+dy,2.6,3,B);
+    const hx=26, hy=(p.lean?14.6+lift:16)+bob+dy;
     if(['cat','curl','pointy','big'].includes(p.ear)){ const h={cat:5,curl:4.5,pointy:4.5,big:6.5}[p.ear];
       tri([[hx-3,hy-2],[hx-2,hy-2-h],[hx+0.5,hy-3]],earC(0)); if(p.ear==='curl'){ px(hx-3,hy-7,earC(0)); px(hx-4,hy-7,earC(0)); px(hx-5,hy-6,earC(0)); } }
     if(p.ear==='cloud') ell(hx-0.5,hy-0.5,5.4,4.8,B);
     if(p.pat==='rag') ell(hx-0.5,hy+0.5,5,4,B);
-    ell(hx,hy,4.4,3.8,B);
-    ell(hx+3.6,hy+1.4,cat?1.8:2.8,cat?1.4:1.8,cat?B:((p.pat==='none'||p.ear==='cloud'||p.pat==='gold')?B:L)); if(p.muz) ell(hx+3.8,hy+1.4,2.4,1.6,p.muz);
+    if(p.lean){ ell(hx,hy,3.6,3,B); ell(hx+4.2,hy+1.2,3.6,1.5,B); ell(hx-2.6,hy-2,1.9,1.1,S); px(hx-4.2,hy-1.4,S); }   // 작은 머리 + 긴 주둥이 + 접힌 귀
+    else { ell(hx,hy,4.4,3.8,B);
+    ell(hx+3.6,hy+1.4,cat?1.8:2.8,cat?1.4:1.8,cat?B:((p.pat==='none'||p.ear==='cloud'||p.pat==='gold')?B:L)); if(p.muz) ell(hx+3.8,hy+1.4,2.4,1.6,p.muz); }
     if(p.pat==='point') ell(hx+2,hy+1,2.6,2.2,p.pt);
     if(p.pat==='rag'){ ell(hx+1.6,hy-0.4,2,2,p.pt); ell(hx+3.4,hy+1.6,1.6,1.2,L); }
     if(p.pat==='calico') ell(hx-1.5,hy-1.5,2,1.6,p.p1);
     if(p.pat==='shiba') ell(hx+1.5,hy+2,1.8,1.2,L);
     if(p.pat==='tabby'){ px(hx-1,hy-3,S); px(hx,hy-3,S); }
     if(p.pat==='husky'){ curve([[17,21.2+bob+dy],[22.5,20+dy],[hx-2.8,hy-0.5]],1.7,p.pt); ell(hx-1.4,hy-1.6,3.3,2.3,p.pt); px(hx+1,hy-3,p.pt); px(hx+2,hy-3,p.pt); px(hx+3,hy-2,p.pt); }   // 등→목 뒤→머리까지 이어진 회색, 얼굴·목 앞은 흰색
-    if(p.ear==='floppy') ell(hx-2,hy+1,1.6,3.4,p.earC||S);
-    eye(hx+2,hy-0.2,eyeCol);
-    px(hx+(cat?5:6.2),hy+(cat?0.8:0.6),cat?'#e48a9a':'#2a1f1d');
+    if(p.ear==='floppy'||p.pat==='poodle') ell(hx-2,hy+1,p.pat==='poodle'?2.2:1.6,3.6,p.earC||S);
+    eye(hx+2,hy-0.2,eyeCol,null,1);
+    px(hx+(cat?5:p.lean?7.6:6.2),hy+(cat?0.8:p.lean?0.8:0.6),cat?'#e48a9a':'#2a1f1d');
     if(o.tongue){ px(hx+4,hy+3,'#f08aa0'); px(hx+5,hy+3,'#f08aa0'); px(hx+4,hy+4,'#e0708a'); }
     if(p.scarf){ ell(24,21.5+dy,2.8,1.3,p.scarf); px(22,23+dy,p.scarf); px(21,24+dy,p.scarf); }
     if(p.bow){ px(hx-1,hy-4,p.bow); px(hx,hy-4,p.bow); }
@@ -135,10 +171,10 @@ function petDraw(p, act, f, o){
   if(act==='held'){
     const sw=f%2?1:-1, lh=p.short?5:7;
     if(tailT==='cat'||tailT==='fluff') curve([[17,30],[24+sw,32],[25+sw,24]],thick,tailC);
-    else if(tailT==='long') curve([[15,28],[16+sw,31],[15+sw*2,33.5]],thick,tailC);
+    else if((tailT==='long'||tailT==='thin')) curve([[15,28],[16+sw,31],[15+sw*2,33.5]],thick,tailC);
     else if(tailT==='curl') curve([[17,29],[22+sw,30],[20+sw,26]],1.4,tailC);
     else ell(15,30,1.6,1.4,tailC);
-    ell(15,21,4.6,p.short?8:9,B); if(whiteChest) ell(14.5,19,2,5,L);
+    if(p.lean){ ell(15,20.4,3.5,8.6,B); ell(15,16.4,2.3,2.6,L); } else { ell(15,21,4.6,p.short?8:9,B); if(whiteChest) ell(14.5,19,2,5,L); }
     if(p.pat==='calico'){ ell(17,23,2.4,3,p.p1); ell(13,26,1.6,1.6,p.p2); }
     if(p.pat==='tabby'){ px(18,18,S); px(18,21,S); px(18,24,S); px(12,20,S); px(12,23,S); }
     legs([11,17],14,9,null); legs([11+sw*0.5,17-sw*0.5],p.short?26:27,lh,null);
@@ -160,6 +196,11 @@ function petDraw(p, act, f, o){
   const add=[]; for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){ const i=y*CW+x; if(filled(i)) continue;
     if((x>0&&filled(i-1))||(x<CW-1&&filled(i+1))||(y>0&&filled(i-CW))||(y<CH-1&&filled(i+CW))) add.push([x,y]); }
   g.fillStyle=out; add.forEach(([x,y])=>g.fillRect(x,y,1,1));
+  if(p.curly){   // 🐩 곱슬 털: 몸 색 칸에만 진한 점을 규칙적으로 (눈·코는 그대로)
+    const im=g.getImageData(0,0,CW,CH), dd=im.data, n=parseInt(B.slice(1),16), br=n>>16, bg=n>>8&255, bb=n&255, sn=parseInt(S.slice(1),16);
+    for(let y=1;y<CH-1;y++) for(let x=1;x<CW-1;x++){ const i=(y*CW+x)*4; if(dd[i+3]&&dd[i]===br&&dd[i+1]===bg&&dd[i+2]===bb&&(x*3+y*2)%7===0){ dd[i]=sn>>16; dd[i+1]=sn>>8&255; dd[i+2]=sn&255; } }
+    g.putImageData(im,0,0);
+  }
   if(o.dirt||o.wet){   // 🟤 꼬질꼬질 얼룩 / 💧 젖은 털 (몸 안쪽 칸에만)
     const im=g.getImageData(0,0,CW,CH), dd=im.data;
     const cells=[]; for(let y=1;y<CH-1;y++) for(let x=1;x<CW-1;x++){ const i=y*CW+x; if(dd[i*4+3]&&dd[(i-1)*4+3]&&dd[(i+1)*4+3]&&dd[(i-CW)*4+3]&&dd[(i+CW)*4+3]) cells.push(i); }
@@ -214,7 +255,22 @@ function petsInit(){
   db.collection('pets').onSnapshot(s=>{ pt.err=''; const d={}; s.forEach(x=>{ d[x.id]=x.data(); }); pt.docs=d; petSync(); petPanelRender(); },
     e=>{ pt.err='펫 정보를 못 불러왔어요 (보안 규칙 배포가 필요할 수 있어요)'; petPanelRender(); });
   db.collection('petFx').onSnapshot(s=>{ s.forEach(x=>{ pt.fx[x.id]=x.data(); }); petFxApply(); }, ()=>{});
-  window.addEventListener('pointermove',e=>{ pt.hand.x=e.clientX; pt.hand.y=e.clientY; },{passive:true});
+  window.addEventListener('pointermove',e=>{
+    const now=performance.now(), dt=Math.max(16,now-(pt.hand.t||now-16)), v=Math.hypot(e.clientX-(pt.hand.x||e.clientX),e.clientY-(pt.hand.y||e.clientY))/dt*1000;
+    pt.hand.x=e.clientX; pt.hand.y=e.clientY; pt.hand.t=now;
+    if(v<900||pt.mode||petHidden()) return;
+    const S=petScale();
+    for(const p of pt.run.values()){
+      if(p.st==='held'||p.st==='air'||p.st==='jump'||Date.now()<(p.handCool||0)) continue;
+      const h=petSprite(p.sp,'idle',0).height*S; if(Math.abs(e.clientX-p.x)>70*S/2||e.clientY<p.y-h-40||e.clientY>p.y+20) continue;
+      p.handCool=Date.now()+3500; const T=petTr(p), cat=petIsCat(p.d);
+      if(p.st==='sleep'){ p.st='idle'; p.t=1; petSay(p,'…?! 😳',1.2); continue; }
+      if(Math.random()<T.shy) petFlee(p,e.clientX);
+      else if(cat&&T.energy>0.6&&Math.random()<0.6){ p.face=e.clientX>p.x?1:-1; petSay(p,'냥냥펀치! 🐾',1.2); if(!p.plat){ p.st='air'; p.vx=0; p.vy=-300; } }
+      else if(cat&&T.grumpy>0.6) petHiss(p);
+      else if(!cat&&Math.random()<T.vocal) { p.face=e.clientX>p.x?1:-1; petBark(p); }
+    }
+  },{passive:true});
   setInterval(()=>{ petSync(); petFxApply(); petSideRender(); }, 60000);   // 1분마다: 보이는 펫 바꾸기·오래된 효과 지우기
   petLoop();
 }
@@ -272,13 +328,14 @@ function petLoop(){
   pt.raf=requestAnimationFrame(step);
 }
 const PET_SPD={cat:70, dog:80};
-function petSpeed(p){ const s=petSpOf(p.d); return (PET_SPD[s.kind]*(s.short?0.8:1)*(s.size||1))*petScale()/2; }
+function petSpeed(p){ const s=petSpOf(p.d); return (PET_SPD[s.kind]*(s.short?0.8:1)*(s.fast?1.6:1)*(s.size||1))*petScale()/2; }
 
 function petStep(p,dt,a){
   const S=petScale(), spd=petSpeed(p);
   p.ft+=dt; const fr=p.st==='walk'||p.st==='run'?0.16:p.st==='sleep'?0.7:0.45; if(p.ft>fr){ p.ft=0; p.f++; }
   if(p.sayT>0){ p.sayT-=dt; if(p.sayT<=0) p.say.classList.remove('on'); }
-  if(p.st==='held'){ petSwing(p,dt,true); return; }
+  p.annoy=Math.max(0,(p.annoy||0)-dt*0.3);
+  if(p.st==='held'){ petSwing(p,dt,true); if(Math.abs(p.om||0)>100) petAnnoy(p,dt*2.6); else if(petTr(p).cuddly>0.8&&Math.random()<dt*0.2&&p.sayT<=0) petSay(p,petIsCat(p.d)?'골골골… 😽':'헤헤 좋아 🐶',1.4); return; }
   if(p.st!=='air'&&(p.th||p.om)){ p.th=0; p.om=0; }
   // 발판(말풍선·공지 위 등)에 올라가 있으면 그 칸을 따라 움직임 (스크롤해도 같이)
   let gy=a.floor, gl=a.l, gr=a.r;
@@ -299,7 +356,7 @@ function petStep(p,dt,a){
     petSwing(p,dt,false);
     p.vy+=1700*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.995;
     if(p.x<a.l){ p.x=a.l; p.vx=-p.vx*0.4; } if(p.x>a.r){ p.x=a.r; p.vx=-p.vx*0.4; }
-    if(p.y>=a.floor){ p.y=a.floor; p.plat=null; if(Math.abs(p.vy)>700){ p.vy=-p.vy*0.25; p.vx*=0.5; } else { p.vy=0; p.vx=0; p.st='idle'; p.t=1+Math.random()*2; } }
+    if(p.y>=a.floor){ p.y=a.floor; p.plat=null; if(Math.abs(p.vy)>700){ p.vy=-p.vy*0.25; p.vx*=0.5; } else { p.vy=0; p.vx=0; p.st='idle'; p.t=1+Math.random()*2; if(p.fleeAfter){ p.fleeAfter=false; petFlee(p,pt.hand.x||p.x,a,false); } } }
     return;
   }
   p.y=gy; p.x=Math.max(gl,Math.min(gr,p.x));
@@ -336,9 +393,54 @@ function petThink(p,a,gl,gr){
     const pl=petNearFloor(p,a); if(pl){ p.st='walk'; p.tx=pl.x; p.onArrive=q=>petDoFx(q, Math.random()<0.6?'lick':'bite', pl); return; }
   }
   if(r<0.42&&canShare&&cat){ const pl=petNearFloor(p,a); if(pl){ p.st='walk'; p.tx=pl.x; p.onArrive=q=>petDoFx(q,'bite',pl); return; } }
-  if(r>0.93){ p.st='sleep'; p.t=12+Math.random()*20; return; }
-  if(r>0.6){ p.st='idle'; p.t=2+Math.random()*4; return; }
+  if(petSocial(p,a)) return;   // 🎭 다른 펫 보고 짖기·쫓기·하악질·킁킁
+  const T=petTr(p);
+  if(Math.random()<T.vocal*0.08){ petBark(p); p.st='idle'; p.t=1.5; return; }
+  if(T.friendly>0.7&&Math.random()<0.12&&pt.hand.x>a.l&&pt.hand.x<a.r&&Math.abs(pt.hand.x-p.x)>60){ p.st='walk'; p.tx=pt.hand.x+(Math.random()-.5)*60; return; }   // 사람 좋아하는 아이는 손 쪽으로
+  if(r>0.93-T.energy*0.05&&T.energy<0.85){ p.st='sleep'; p.t=12+Math.random()*20; return; }
+  if(r>0.6+T.energy*0.15){ p.st='idle'; p.t=2+Math.random()*4; return; }
+  if(T.energy>0.8&&Math.random()<0.25){ p.st='run'; p.tx=a.l+Math.random()*(a.r-a.l); return; }
   p.st='walk'; p.tx=a.l+Math.random()*(a.r-a.l);
+}
+// 🎭 다른 펫과 만나면 (각자 화면에서만, 저장 안 함)
+function petSocial(p,a){
+  if(Math.random()>0.35) return false;
+  const T=petTr(p), cat=petIsCat(p.d);
+  let o=null, best=260; for(const q of pt.run.values()){ if(q===p||q.plat||q.st==='held'||q.st==='air'||q.st==='jump') continue; const dd=Math.abs(q.x-p.x); if(dd<best){ best=dd; o=q; } }
+  if(!o) return false;
+  const ocat=petIsCat(o.d), OT=petTr(o);
+  if(!cat&&ocat){   // 강아지 → 고양이
+    if(T.energy>0.6&&Math.random()<0.55){ p.st='run'; p.tx=o.x; petSay(p,pick(['멍멍! 거기 서!','왈왈! 놀자!','멍! 🐕💨']),1.4);
+      p.onArrive=q=>{ petBark(q); petReact(o,q,a); }; petReact(o,p,a,true); return true; }
+    if(Math.random()<T.vocal){ p.face=o.x>p.x?1:-1; petBark(p); p.st='idle'; p.t=1.5; setTimeout(()=>petReact(o,p,a),350); return true; }
+  }
+  if(cat&&!ocat){   // 고양이 → 강아지
+    if(T.grumpy>0.4&&best<160){ p.face=o.x>p.x?1:-1; petHiss(p); return true; }
+    if(T.shy>0.3&&best<160){ petFlee(p,o.x,a); return true; }
+  }
+  if(!cat&&!ocat&&best>40){   // 강아지끼리: 킁킁·경비대장은 낯선(지원팀) 펫에게 왈
+    const stranger=p.sp==='gsd'&&/^g_/.test(o.id)!==/^g_/.test(p.id);
+    p.st='walk'; p.tx=o.x+(o.x>p.x?-30:30)*petScale()/2;
+    p.onArrive=q=>{ q.face=o.x>q.x?1:-1; if(stranger){ petSay(q,'왈! 누구야! 🐕‍🦺',1.6); petReact(o,q,a); } else { petSay(q,pick(['킁킁… 🐽','킁킁 반가워!','같이 놀자 🐾']),1.4); if(Math.random()<0.6) setTimeout(()=>petSay(o,pick(['킁킁!','멍! 🐶','헥헥']),1.2),400); } };
+    return true;
+  }
+  if(cat&&ocat&&best>30&&Math.random()<0.5){   // 고양이끼리
+    if(T.grumpy>0.6||OT.grumpy>0.6){ p.face=o.x>p.x?1:-1; petHiss(T.grumpy>=OT.grumpy?p:o); return true; }
+    p.st='walk'; p.tx=o.x+(o.x>p.x?-28:28)*petScale()/2; p.onArrive=q=>petSay(q,pick(['냥? 🐱','부비부비~','냐앙 (코 인사)']),1.4); return true;
+  }
+  return false;
+}
+function petReact(o,src,a,chased){   // 짖거나 쫓아오면: 고양이는 하악질·도망·무시, 강아지는 같이 짖거나 꼬리 살랑
+  if(!o||o.st==='held'||o.st==='air') return;
+  const T=petTr(o);
+  if(petIsCat(o.d)){
+    if(T.grumpy>0.35&&!(chased&&T.shy>0.5)){ o.face=src.x>o.x?1:-1; petHiss(o); return; }
+    if(T.shy>0.15||chased){ const pl=petPickPlat(o,a||petArea()); if(pl&&Math.random()<0.6){ petJump(o,pl,pl.x,pl.y); petSay(o,'흥, 못 올라오지? 😼',1.6); } else petFlee(o,src.x,a); return; }
+    petSay(o,'…(무시) 😑',1.4);
+  } else {
+    if(T.shy>0.5){ petFlee(o,src.x,a,'낑! 💦'); return; }
+    if(T.vocal>0.5) petBark(o); else petSay(o,pick(['헥헥 (꼬리 살랑)','멍? 🐶']),1.3);
+  }
 }
 function petRaining(){ try{ if(!wxData||typeof wxCurrent!=='function') return false; const c=wxCurrent(wxData); return !!(c&&(c.pty||c.raining)); }catch(e){ return false; } }
 
@@ -405,6 +507,42 @@ function petDoFx(p,k,plat){
   const list=cur.filter(x=>Date.now()-x.at<PET_FX_MS.lick).concat([e]).slice(-8);
   pt.fx[p.id]={list, at:e.at}; petFxApply();
   const db=petDb(); if(db) db.doc('petFx/'+p.id).set({list, at:e.at}).catch(()=>{});
+}
+const petTr=p=>PET_TRAIT[p.sp]||PET_TRAIT.cheese;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function petBark(p){   // 짖기·울기 (품종마다 말투)
+  const sp=p.sp, cat=petIsCat(p.d);
+  const t=sp==='husky'?pick(['아우우우~ 🐺','우와우와!','아워워!']):sp==='maltese'?pick(['왈왈왈!!','캉캉!','왈!']):sp==='gsd'?pick(['왈! 왈!','컹컹!']):sp==='shiba'?pick(['왕!','…흥 🐕']):sp==='siam'?pick(['냐아아앙~','냐옹 냐옹!','냐아?']):cat?pick(['냥!','냐앙~','먀!']):pick(['멍멍!','왈왈!','멍!']);
+  petSay(p,t,1.4); p.el.classList.remove('bark'); void p.el.offsetWidth; p.el.classList.add('bark'); setTimeout(()=>p.el.classList.remove('bark'),500);
+}
+function petHiss(p,why){   // 고양이 하악질 (털 세우고 부들부들)
+  petSay(p,why||pick(['하악! 😾','캬악!!','하아악…']),1.6);
+  p.el.classList.add('hiss'); clearTimeout(p.hissT); p.hissT=setTimeout(()=>p.el.classList.remove('hiss'),1400);
+  if(p.st!=='held'&&p.st!=='air'&&p.st!=='jump'){ p.st='act'; p.t=1.4; }
+}
+function petFlee(p,fromX,a,txt){   // 도망가기
+  a=a||petArea(); if(p.plat||p.st==='held'||p.st==='air'||p.st==='jump') return;
+  const dir=p.x<fromX?-1:1, dist=150+Math.random()*200;
+  p.tx=Math.max(a.l,Math.min(a.r,p.x+dir*dist)); if(Math.abs(p.tx-p.x)<40) p.tx=Math.max(a.l,Math.min(a.r,p.x-dir*dist));
+  p.st='run'; p.onArrive=null; if(txt!==false) petSay(p,txt||pick(['히익! 💦','도망가자!','으앗 💨']),1.3);
+}
+function petBiteHand(p,x,y){   // 물기: 손(커서)을 앙
+  const b=document.createElement('div'); b.className='petHeart petBite'; b.textContent='🦷'; b.style.left=x+'px'; b.style.top=(y-10)+'px'; pt.layer.appendChild(b); setTimeout(()=>b.remove(),900);
+}
+// 귀찮게 하면(자꾸 누르기·들기·마구 흔들기) 성격 따라 하악질·물기·도망
+function petAnnoy(p,amt){
+  const T=petTr(p); p.annoy=(p.annoy||0)+amt*(1-T.cuddly*0.7);
+  const th=1.6+(1-T.grumpy)*4;
+  if(p.annoy<th||Date.now()<(p.angryUntil||0)) return false;
+  p.annoy=0.5; p.angryUntil=Date.now()+4000;
+  const cat=petIsCat(p.d), held=p.st==='held', hx=pt.hand.x||p.x, hy=pt.hand.y||p.y;
+  if(T.grumpy>=0.3){
+    if(cat) petHiss(p, held?'캬악! (할퀴었어요) 😾':null); else petSay(p, held?'으르릉… 앙! 🦷':pick(['으르르르… 😠','왈! 그만해!']),1.6);
+    if(held||Math.random()<T.grumpy){ petBiteHand(p,hx,hy); }
+  } else petSay(p, cat?'냐앙… 그만 😿':'낑낑… 그만해 🥺',1.6);
+  if(held){ p.st='air'; p.vx=(Math.random()<.5?-1:1)*260; p.vy=-260; p.fleeAfter=true; }
+  else if(T.shy>0.25||T.grumpy<0.3) petFlee(p,hx,null,false);
+  return true;
 }
 function petSay(p,txt,sec){ p.say.textContent=txt; p.say.classList.add('on'); p.sayT=sec||2.2; }
 
@@ -486,7 +624,10 @@ function petBindDrag(p){
     const g={sx:e.clientX, sy:e.clientY, moved:false, hist:[[e.clientX,e.clientY,performance.now()]]};
     try{ p.el.setPointerCapture(e.pointerId); }catch(_){}
     const mv=ev=>{
-      if(!g.moved&&Math.hypot(ev.clientX-g.sx,ev.clientY-g.sy)>6){ g.moved=true; p.px=null; p.vxs=0; p.th=0; p.om=0; p.st='held'; p.plat=null; p.onArrive=null; p.tongue=false; petSay(p,petIsCat(p.d)?'냐앙?! 🙀':'낑? 🐶',1.5); }
+      if(!g.moved&&Math.hypot(ev.clientX-g.sx,ev.clientY-g.sy)>6){ g.moved=true; p.px=null; p.vxs=0; p.th=0; p.om=0; p.st='held'; p.plat=null; p.onArrive=null; p.tongue=false;
+        if(p.sp==='shiba'&&Math.random()<0.5) petSay(p,'꺄아아악!! (시바 비명) 😱',1.6); else if(petTr(p).cuddly>0.8) petSay(p,petIsCat(p.d)?'안아 줘~ 😽':'헤헤 🐶',1.4); else petSay(p,petIsCat(p.d)?'냐앙?! 🙀':'낑? 🐶',1.5);
+        petAnnoy(p,1.2); }
+      if(g.moved&&p.st!=='held') return;   // 물고 빠져나갔으면 더 안 따라감
       if(g.moved){ const S=petScale(), s=petSprite(p.sp,'held',0); p.x=ev.clientX; p.y=ev.clientY+s.height*S*0.92; g.hist.push([ev.clientX,ev.clientY,performance.now()]); if(g.hist.length>6) g.hist.shift(); }
     };
     const up=ev=>{
@@ -500,7 +641,8 @@ function petBindDrag(p){
 }
 function petTap(p){
   const d=p.d, cat=petIsCat(d), dl=petDirt(d);
-  if(p.st==='sleep'){ p.st='idle'; p.t=1.5; petSay(p,'…으음? 😪'); return; }
+  if(p.st==='sleep'){ p.st='idle'; p.t=1.5; petSay(p,'…으음? 😪'); petAnnoy(p,1.2); return; }
+  if(petAnnoy(p,1)) return;   // 자꾸 누르면 성격 따라 하악질·물기·도망
   const heart=document.createElement('div'); heart.className='petHeart'; heart.textContent='💕';
   heart.style.left=p.x+'px'; heart.style.top=(p.y-36*petScale())+'px'; pt.layer.appendChild(heart); setTimeout(()=>heart.remove(),1200);
   petSay(p, dl>1?'꼬질꼬질… 씻겨 줘요 🛁':dl?(cat?'냥~ (좀 꼬질)':'멍! (좀 꼬질)'):petWet(d)?'축축해… 💦':(cat?['냥!','냐앙~','골골골…'][Math.floor(Math.random()*3)]:['멍!','왈왈!','헥헥 🐾'][Math.floor(Math.random()*3)]));
@@ -729,7 +871,7 @@ function petPanelRender(){
     let sel=petPanelSel&&petPanelSel!==true?petPanelSel:(mine?mine.sp:null);
     const nameIn=document.createElement('input'); nameIn.type='text'; nameIn.maxLength=12; nameIn.placeholder='이름 (12자까지)'; nameIn.value=mine?mine.name:'';
     Object.entries(PET_SP).forEach(([k,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='petPickBtn'+(sel===k?' on':'');
-      b.appendChild(petCanvas(k,'idle',2)); b.insertAdjacentHTML('beforeend','<span>'+petEsc(s.b)+'</span>');
+      b.appendChild(petCanvas(k,'idle',2)); b.title='🎭 '+((PET_TRAIT[k]||{}).t||''); b.insertAdjacentHTML('beforeend','<span>'+petEsc(s.b)+'</span>');
       b.onclick=()=>{ sel=k; petPanelSel=k; grid.querySelectorAll('.petPickBtn').forEach(x=>x.classList.toggle('on',x===b)); if(!nameIn.value||Object.values(PET_SP).some(z=>z.n===nameIn.value)) nameIn.value=s.n; };
       grid.appendChild(b); });
     box.appendChild(grid);
@@ -748,7 +890,7 @@ function petPanelRender(){
   const card=document.createElement('div'); card.className='petMine';
   card.appendChild(petCanvas(mine.sp,'idle',3,{dirt:petDirt(mine), wet:petWet(mine)}));
   const info=document.createElement('div'); info.className='petInfo';
-  info.innerHTML='<b>'+petEsc(petNameOf(mine))+'</b> <small>'+petEsc(petSpOf(mine).b)+'</small><div class="petSt">'+petEsc(petStatus(mine))+'</div>'+(petIsCat(mine)?'':'<div class="petSt">🏃 어질리티 최고 '+(mine.agi||0)+'점</div>');
+  info.innerHTML='<b>'+petEsc(petNameOf(mine))+'</b> <small>'+petEsc(petSpOf(mine).b)+'</small><div class="petSt">🎭 '+petEsc((PET_TRAIT[mine.sp]||{}).t||'')+'</div><div class="petSt">'+petEsc(petStatus(mine))+'</div>'+(petIsCat(mine)?'':'<div class="petSt">🏃 어질리티 최고 '+(mine.agi||0)+'점</div>');
   const btns=document.createElement('div'); btns.className='petBtns';
   petActBtns(me, mine).forEach(b=>btns.appendChild(b));
   const rn=document.createElement('button'); rn.type='button'; rn.textContent='✏️ 이름'; rn.onclick=async()=>{ const v=prompt('새 이름 (12자까지)', mine.name||''); if(v==null) return; const n=v.trim().slice(0,12); if(!n) return; try{ await petDb().doc('pets/'+me).update({name:n}); }catch(e){ petToast('저장이 안 됐어요 😢'); } };
@@ -768,7 +910,7 @@ function petPanelAll(box){
   if(!ids.length){ const e=document.createElement('div'); e.className='petEmpty'; e.textContent='아직 다른 직원의 펫이 없어요'; box.appendChild(e); }
   ids.sort((a,b)=>petDirtDays(pt.docs[b])-petDirtDays(pt.docs[a])).forEach(id=>{ const d=pt.docs[id];
     const r=document.createElement('div'); r.className='petItem'; r.appendChild(petCanvas(d.sp,'idle',2,{dirt:petDirt(d), wet:petWet(d)}));
-    const i=document.createElement('div'); i.className='petInfo'; i.innerHTML='<b>'+petEsc(petNameOf(d))+'</b> <small>'+petEsc(petOwnerName(id))+' · '+petEsc(petSpOf(d).b)+'</small><div class="petSt">'+petEsc(petStatus(d))+'</div>';
+    const i=document.createElement('div'); i.className='petInfo'; i.innerHTML='<b>'+petEsc(petNameOf(d))+'</b> <small>'+petEsc(petOwnerName(id))+' · '+petEsc(petSpOf(d).b)+'</small><div class="petSt">🎭 '+petEsc((PET_TRAIT[d.sp]||{}).t||'')+'</div><div class="petSt">'+petEsc(petStatus(d))+'</div>';
     const bs=document.createElement('div'); bs.className='petBtns';
     const call=document.createElement('button'); call.type='button'; call.textContent=pt.run.has(id)?'📍 화면에 있어요':'📍 불러오기'; call.onclick=()=>{ petBring(id); petPanelRender(); };
     bs.appendChild(call); petActBtns(id,d).forEach(b=>bs.appendChild(b)); i.appendChild(bs); r.appendChild(i); box.appendChild(r); });
