@@ -34,7 +34,6 @@ import {
   type FrontRoom,
 } from './ydr.ts'
 import { badgeText } from '../reads.ts'
-import { openPets, petsInit, refreshPets, setPetRoom } from '../pets/index.ts'
 import { armImeFix, imeUndo, mentionTapProps, type ImeFix } from '../ui/mentionFix.ts'
 
 // 🏌️ 프론트 채팅 화면: 초대 코드 넣기 → 초대받은 방 목록 → 채팅 (src/front/ydr.ts 참고)
@@ -182,22 +181,6 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   }, [room.id, room.from, limitN])
 
   const nameOf = useCallback((id: string | null) => authorName(id, uid, accounts), [uid, accounts])
-  // 🐾 우리 펫: 이 방 화면에서만 돌아다님 (프론트 pets/petFx 를 같이 씀)
-  const petNames = useRef({ myName, accounts })
-  petNames.current = { myName, accounts }
-  useEffect(() => {
-    setPetRoom({
-      list: () => listRef.current,
-      myName: () => petNames.current.myName,
-      ownerName: (id) => {
-        if (id.startsWith('g_')) return rememberedPerson(id.slice(2))?.name || '지원팀'
-        return petNames.current.accounts.get(`acc_${id}`)?.name || '프론트'
-      },
-    })
-    petsInit()
-    return () => setPetRoom(null)
-  }, [])
-  useEffect(() => refreshPets(), [accounts])
   // 📣 @부를 수 있는 사람: 프론트 직원(사용 중) + 이 방에서 말한 적 있는 다른 지원팀 직원(g_…). 이름만(직급 없이) = 프론트 mention.js 와 같은 글자
   const people = useMemo(() => {
     const out: MentionPerson[] = []
@@ -348,9 +331,6 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
           <span aria-hidden="true">💬</span> <span className="room-title">{room.name}</span>
         </h2>
         <div className="header-actions">
-          <button type="button" className="ghost more-button" title="🐾 우리 펫 (프론트와 같이 키워요)" aria-label="우리 펫" onClick={() => openPets()}>
-            🐾
-          </button>
           <MoreButton
             actions={() => [
               { icon: '＋', label: '다른 방 초대 코드 넣기', onSelect: () => void joinWithCode() },
@@ -365,7 +345,6 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
       <PinBar api={pins} pin={pin} roomId={room.id} barRef={pinBar} />
       <div
         className="messages"
-        data-pet-room=""
         ref={listRef}
         onScroll={onScroll}
         onPointerDown={(e) => {

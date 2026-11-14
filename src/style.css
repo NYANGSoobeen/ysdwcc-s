@@ -6863,24 +6863,3 @@ html.keyboard-open .sms-composer {
 .msgRow.pinFlash .bubble {
   animation: pinFlash 1.8s ease;
 }
-
-/* 🐾 우리 펫 (src/pets/pets.css 는 프론트 파일 그대로): 그 파일이 쓰는 색 이름을 우리 앱 색으로 잇는다.
-   펫 층 z-index 12 (메뉴 서랍·우리 창보다 아래), 펫 창 50 (우리 창 60보다 아래). */
-#petLayer,
-.petBgWrap,
-.petPlayBar {
-  --card: var(--surface);
-  --line: var(--border);
-  --sub: var(--muted);
-  --accent: var(--venice);
-  --accent2: color-mix(in srgb, var(--rock) 45%, transparent);
-  --bubble: var(--notice-bg);
-  font-family: var(--font-sans);
-}
-@media (prefers-color-scheme: dark) {
-  #petLayer,
-  .petBgWrap,
-  .petPlayBar {
-    --accent: #2f7aa3;
-  }
-}
