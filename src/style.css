@@ -6863,3 +6863,12 @@ html.keyboard-open .sms-composer {
 .msgRow.pinFlash .bubble {
   animation: pinFlash 1.8s ease;
 }
+
+/* 📱 두 번 눌러(더블탭) 확대 막기 (2026-11-16 사용자 요청, 아이폰·갤럭시): manipulation = 밀기·두 손가락 확대는 그대로, 더블탭 확대만 끔.
+   touch-action은 물려받지 않고 스크롤 상자마다 따로 계산돼서 모든 요소에 준다. 사진 크게 보기·스티커·게임처럼
+   따로 정한 곳(none, pan-y 등)은 클래스 규칙이 더 세서 그대로. */
+*,
+*::before,
+*::after {
+  touch-action: manipulation;
+}
