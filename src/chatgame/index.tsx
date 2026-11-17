@@ -1,3 +1,4 @@
+import { emojiOk } from '../ui/emojiFix.ts'
 // 🎲 채팅 미니 게임 (2026-11-08 사용자 요청, 프론트 앱 js/chatgame.js 를 그대로 옮김): 📊 투표 · 🪜 사다리타기 · 🎲 주사위 · 🎡 돌림판 · 🎟️ 제비뽑기.
 // chatgame.js·chatgame.css·form-list.js 는 프론트가 준 파일 그대로(고치지 않음, 프론트가 고치면 다시 복사).
 // chatgame.js 는 전역 값(db·firebase·currentChannel·myId·uiForm·toast …)을 기대하는 옛 방식 코드라,
@@ -60,9 +61,10 @@ const NAMES: (keyof Env)[] = [
 function build(): Api {
   const form = formSrc.replace('/*FORM_LIST*/', listSrc)
   const code =
-    `"use strict";\nvar ${NAMES.join(', ')};\n${form}\n;\n${gameSrc}\n;\n` +
+    `"use strict";\nvar ${NAMES.join(', ')}, fxEmojiOk = this && this.fxEmojiOk;\n${form}\n;\n${gameSrc}\n;\n` +
     `return { gameCard: gameCard, gameMenuItems: gameMenuItems, set: function (o) { ${NAMES.map((n) => `if ('${n}' in o) ${n} = o.${n};`).join(' ')} } };`
-  return new Function(code)() as Api
+  // 🪟 사다리(🪜)가 윈도우 10에서 빈 네모면 🔀 (chatgame.js gmLadderIc 가 fxEmojiOk 를 씀)
+  return new Function(code).call({ fxEmojiOk: emojiOk }) as Api
 }
 
 // 투표 마감 시각이 되면 카드를 다시 그린다 (chatgame.js 의 renderMessages)

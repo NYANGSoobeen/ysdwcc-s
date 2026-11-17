@@ -1,4 +1,5 @@
 import { ClipboardChip } from '../ui/ClipboardChip.tsx'
+import { fixEmoji, safeEmoji } from '../ui/emojiFix.ts'
 import { GameButton } from '../games/GameButton.tsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { doc } from 'firebase/firestore'
@@ -948,7 +949,7 @@ function MessageItem(props: {
                 api={props.games}
                 msg={{ id: m.id, game: m.game, votes: m.votes, authorId: m.authorUid, createdAt: m.createdAt?.toMillis() ?? Date.now(), text: m.body }}
               />
-            ) : m.body && (chatFxOf(m.body) ? <FxTag fx={chatFxOf(m.body)!} /> : <p>{linkify(m.body, props.memberNames, props.myName)}</p>)}
+            ) : m.body && (chatFxOf(m.body) ? <FxTag fx={chatFxOf(m.body)!} /> : <p>{linkify(fixEmoji(m.body), props.memberNames, props.myName)}</p>)}
             {m.link && (
               <a className="link-card" href={m.link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {m.link.image && <img src={m.link.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
@@ -1661,7 +1662,7 @@ export function EmojiButton({ onPick, onSticker }: { onPick: (emoji: string) => 
           )}
           {tab === 'emoji' || !onSticker ? (
             <div className="emoji-grid" role="listbox" aria-label="이모지 고르기">
-              {EMOJIS.map((e) => (
+              {EMOJIS.map((e) => safeEmoji(e) ?? e).filter((e, i, a) => a.indexOf(e) === i).map((e) => (
                 <button key={e} type="button" role="option" aria-selected={false} onPointerDown={(ev) => ev.preventDefault()} onClick={() => onPick(e)}>
                   {e}
                 </button>

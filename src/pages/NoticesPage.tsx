@@ -1,4 +1,5 @@
 import { doc } from 'firebase/firestore'
+import { fixEmoji } from '../ui/emojiFix.ts'
 import { GameButton } from '../games/GameButton.tsx'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { errorMessage } from '../auth.ts'
@@ -139,7 +140,7 @@ export function NoticesPage({ team, uid }: { team: Team; uid: string }) {
           {n.photos.length > 0 && <NoticePhotos photos={n.photos} onOpen={(i) => setViewer({ photos, index: i })} />}
           <div className="notice-inner">
             {n.title && <h3 className="notice-title">{n.title}</h3>}
-            {n.body && <p className="notice-text">{linkifyText(n.body)}</p>}
+            {n.body && <p className="notice-text">{linkifyText(fixEmoji(n.body))}</p>}
             <footer className="notice-foot">
               <span className="muted">
                 {names[n.authorUid] ?? '나간 팀원'} · {when(n.createdAt)}

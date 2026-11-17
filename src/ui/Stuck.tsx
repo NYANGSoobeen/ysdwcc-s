@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { emojiOk, safeEmoji } from './emojiFix.ts'
 import { StorageImage } from '../components/StorageImage.tsx'
 import { useEmoticons } from '../emoticons.ts'
 import { recentStickers, type StickerChoice, type StuckSticker } from '../stuck.ts'
@@ -8,7 +9,11 @@ import { ask, Modal, tell } from './dialogs.tsx'
 
 type Group = { icon: string; label: string; list: string[] }
 let emojiGroups: Promise<Group[]> | null = null
-const loadEmojiGroups = () => (emojiGroups ??= import('../emojiData.ts').then((m) => m.EMOJI_GROUPS))
+// 🪟 윈도우 10처럼 새 이모지가 안 그려지는 기기는 고르는 창에서 뺀다 (Win + . 창처럼 그려지는 것만)
+const loadEmojiGroups = () =>
+  (emojiGroups ??= import('../emojiData.ts').then((m) =>
+    /Windows/.test(navigator.userAgent) ? m.EMOJI_GROUPS.map((g) => ({ ...g, list: g.list.filter((e) => emojiOk(e)) })) : m.EMOJI_GROUPS,
+  ))
 
 // 고르는 창: 🕘 최근 · 이모지 묶음(Win + . 과 같은 9묶음) · 이모티콘 테마 전부
 export function StickerPicker({ onPick, onClose }: { onPick: (choice: StickerChoice) => void; onClose: () => void }) {
@@ -63,7 +68,7 @@ export function StickerPicker({ onPick, onClose }: { onPick: (choice: StickerCho
 }
 
 export function StuckFace({ s }: { s: Pick<StuckSticker, 'e' | 'a'> }) {
-  return s.e ? <span className="stk-emoji">{s.e}</span> : <StorageImage path={s.a!} alt="이모티콘" className="stk-img" />
+  return s.e ? <span className="stk-emoji">{safeEmoji(s.e) ?? s.e}</span> : <StorageImage path={s.a!} alt="이모티콘" className="stk-img" />
 }
 
 const when = (s: StuckSticker) =>

@@ -1,4 +1,5 @@
 // 🚗 카트 배차왕: 몰려오는 손님 팀에게 알맞은 카트를 골라 VISTA·DUKE 코스로 내보내기 (60초, 쉬움·보통·어려움)
+const ctBub=()=>typeof gdEm==='function'?gdEm('🫧'):'🫧';   // 🫧(2021년)는 윈도우 10에 없어서 → 💧 (garden.js gdEm)
 // - 손님 팀 카드를 누르고 → 카트를 누르면 출발. 팀이 원하는 코스(VISTA/DUKE) 티가 비어 있어야 함
 // - 5명 팀은 5인승 카트만 · 배터리 40% 미만이나 진흙 묻은 카트로 보내면 손님 불만 ❤️ -1 · 손님이 너무 오래 기다려 떠나도 ❤️ -1
 // - 손님 없이 카트만 누르면 정비: 진흙 → 세차, 그 밖엔 충전 켜기/끄기 (충전 중인 카트도 바로 보낼 수 있음)
@@ -74,8 +75,8 @@ function ctHurt(g,t){ g.hp--; g.shake=0.3; ctSay(g,t+' ❤️-1'); try{ navigato
 function ctFix(g,i){
   const c=g.carts[i], L=CT_LV[g.lv];
   if(c.st==='out') return ctSay(g,'#'+c.no+' 카트는 코스에 나가 있어요');
-  if(c.st==='wash') return ctSay(g,'#'+c.no+' 카트 세차 중이에요 🫧');
-  if(c.dirty){ c.st='wash'; c.t=L.wash; c.charging=false; return ctSay(g,'#'+c.no+' 카트 세차 시작 🫧'); }
+  if(c.st==='wash') return ctSay(g,'#'+c.no+' 카트 세차 중이에요 '+ctBub());
+  if(c.dirty){ c.st='wash'; c.t=L.wash; c.charging=false; return ctSay(g,'#'+c.no+' 카트 세차 시작 '+ctBub()); }
   if(c.charging){ c.charging=false; return ctSay(g,'#'+c.no+' 충전 멈춤'); }
   if(c.bat>=99.5) return ctSay(g,'#'+c.no+' 배터리가 이미 가득해요 🔋');
   c.charging=true; ctSay(g,'#'+c.no+' 충전 시작 ⚡');
@@ -83,7 +84,7 @@ function ctFix(g,i){
 function ctSend(g,qi,ci){
   const m=g.q[qi], c=g.carts[ci], L=CT_LV[g.lv];
   if(c.st==='out') return ctSay(g,'#'+c.no+' 카트는 코스에 나가 있어요');
-  if(c.st==='wash') return ctSay(g,'#'+c.no+' 카트는 세차 중이에요 🫧');
+  if(c.st==='wash') return ctSay(g,'#'+c.no+' 카트는 세차 중이에요 '+ctBub());
   if(m.size>c.cap) return ctSay(g,m.size+'명 팀은 5인승 카트에 태워야 해요');
   if(g.tee[m.course]>0) return ctSay(g,m.course+' 티가 아직 사용 중이에요 ('+g.tee[m.course].toFixed(1)+'초)');
   // off it goes
@@ -189,7 +190,7 @@ function ctDraw(c,g){
     c.fillStyle='#e4e4e4'; mgRR(c,bx,by,bw,10,3); c.fill(); c.fillStyle='#bbb'; c.fillRect(bx+bw,by+3,3,4);
     c.fillStyle=low?'#e8504a':ct.bat<70?'#f2b64b':'#5cbf5a'; mgRR(c,bx,by,Math.max(4,bw*ct.bat/100),10,3); c.fill();
     mgText(c,Math.round(ct.bat)+'%',bx+bw+7,by+5,10,low?'#e8504a':'#555',null,false);
-    const lbl=ct.st==='wash'?'🫧 세차 중 '+ct.t.toFixed(1)+'초':ct.dirty?'🟤 진흙! 눌러서 세차':ct.charging?'⚡ 충전 중':low?'🔋 배터리 부족':ct.back>0?'↩️ 돌아왔어요':'✅ 출발 가능';
+    const lbl=ct.st==='wash'?ctBub()+' 세차 중 '+ct.t.toFixed(1)+'초':ct.dirty?'🟤 진흙! 눌러서 세차':ct.charging?'⚡ 충전 중':low?'🔋 배터리 부족':ct.back>0?'↩️ 돌아왔어요':'✅ 출발 가능';
     const lc=ct.st==='wash'?'#2f7fd1':ct.dirty?'#8a5a34':ct.charging?'#2f7a34':low?'#e8504a':'#2f7a34';
     if(ct.charging){ c.globalAlpha=0.6+0.4*Math.sin(now*6); }
     mgText(c,lbl,r.x+r.w/2,r.y+103,10.5,lc,'center',false); c.globalAlpha=1;

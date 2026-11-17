@@ -15,7 +15,7 @@ function gameList(s){ if(Array.isArray(s)) return s.map(x=>String(x).trim().slic
 function gameMenuItems(){
   return [
     {label:'📊 투표', action:()=>gameNew('poll')},
-    {label:'🪜 사다리타기', action:()=>gameNew('ladder')},
+    {label:gmLadderIc()+' 사다리타기', action:()=>gameNew('ladder')},
     {label:'🎲 주사위', action:()=>gameNew('dice')},
     {label:'🎡 돌림판', action:()=>gameNew('wheel')},
     {label:'🎟️ 제비뽑기', action:()=>gameNew('draw')}
@@ -57,7 +57,7 @@ async function gameNew(type){
       catch(e){ fail(e,'사진 올리기'); return; }
     }
   } else if(type==='ladder'){
-    const r=await uiForm('🪜 사다리타기',[
+    const r=await uiForm(gmLadderIc()+' 사다리타기',[
       {key:'names', label:'참가자 (2~'+GAME_MAX_ITEMS+'명)', type:'list', max:GAME_MAX_ITEMS, maxlength:30, min:2, start:3, value:gameNameHint(), placeholder:'참가자', addLabel:'참가자 추가'},
       {key:'prizes', label:'결과 (예: 커피 쏘기 · 참가자보다 적으면 나머지는 "통과")', type:'list', max:GAME_MAX_ITEMS, maxlength:30, min:1, start:1, placeholder:'결과', addLabel:'결과 추가'}
     ],{okLabel:'올리기'});
@@ -116,6 +116,7 @@ function gameCard(m){
   }catch(e){ el.textContent=m.text||''; }
   return el;
 }
+const gmLadderIc=()=>typeof fxEmojiOk==='function'&&!fxEmojiOk('🪜')?'🔀':'🪜';   // 🪜(2020년)는 윈도우 10에 없어서 빈 네모 → 그 기기에선 🔀
 function gameHead(el, icon, title, sub){
   const h=document.createElement('div'); h.className='gmHead';
   h.innerHTML='<span class="gmIc">'+icon+'</span><span class="gmTitle"></span>';
@@ -200,7 +201,7 @@ function ladderPath(g, start){   // → {end, pts:[[col,row]…]} (row: 0=맨 �
 const LADDER_COLORS=['#e2776e','#5ab0e8','#7ccf8a','#b58be8','#f6a33b','#ff7fa8','#3fb8af','#c9a227','#8a7cf0','#e05d9a'];
 function ladderCard(el, m){
   const g=m.game, n=g.names.length, opened=ladderOpened.get(m.id)||new Set(); ladderOpened.set(m.id, opened);
-  gameHead(el,'🪜','사다리타기', n+'명');
+  gameHead(el,gmLadderIc(),'사다리타기', n+'명');
   const W=Math.max(220, n*52), H=210, top=26, bot=H-26, gap=W/n, x=c=>gap*(c+0.5), y=r=>top+(bot-top)*r/(LADDER_ROWS+1);
   const NS='http://www.w3.org/2000/svg', svg=document.createElementNS(NS,'svg');
   svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.setAttribute('class','ladderSvg'); svg.style.minWidth=Math.min(W,n*40)+'px';

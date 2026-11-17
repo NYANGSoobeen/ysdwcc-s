@@ -1,3 +1,4 @@
+import { emojiOk } from './ui/emojiFix.ts'
 // 🎉 채팅 효과 (2026-11-03, 프론트 앱 js/chatfx.js 를 그대로 옮김 — 사용자가 준 chatfx.js·chatfx.css·README)
 // "/축하", "/생일"처럼 /명령어로 시작하는 말을 보내면, 그 방을 보고 있는 모두의 채팅 배경에 7초 애니메이션.
 // - 메시지는 글 그대로 저장 (예: "/축하 승진 축하해요!") → 따로 저장하는 값 없음 · 프론트 앱과 같은 글이라 🏌️ 프론트 방에서도 양쪽 다 효과
@@ -28,32 +29,7 @@ export type ChatFx = (typeof CHAT_FX)[number] & { rest: string }
 const CHAT_FX_RECENT = 20000
 
 // 새 이모지(🫠 2021년)는 윈도우 10 등 오래된 기기에 글꼴이 없어 빈칸 → 이 기기에서 색 있게 그려지는지 보고, 안 되면 icon2 (2026-11-09 프론트)
-const fxEmojiCache: Record<string, boolean> = {}
-function fxEmojiOk(e: string) {
-  if (e in fxEmojiCache) return fxEmojiCache[e]
-  let ok = true
-  try {
-    const c = document.createElement('canvas')
-    c.width = c.height = 24
-    const g = c.getContext('2d', { willReadFrequently: true })!
-    g.fillStyle = '#000'
-    g.textBaseline = 'top'
-    g.font = '20px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'
-    g.fillText(e, 0, 0)
-    const d = g.getImageData(0, 0, 24, 24).data
-    ok = false
-    for (let i = 0; i < d.length; i += 4) {
-      // 색이 있으면 이모지로 그려진 것
-      if (d[i + 3] > 0 && (Math.abs(d[i] - d[i + 1]) > 20 || Math.abs(d[i + 1] - d[i + 2]) > 20)) {
-        ok = true
-        break
-      }
-    }
-  } catch {
-    ok = true
-  }
-  return (fxEmojiCache[e] = ok)
-}
+const fxEmojiOk = emojiOk
 export const fxIcon = (f: { icon: string; icon2?: string }) => (f.icon2 && !fxEmojiOk(f.icon) ? f.icon2 : f.icon)
 
 // "/축하 승진 축하해요" → {key, icon, say, rest:'승진 축하해요'} · 명령어 뒤엔 띄어쓰기나 끝이어야 함
@@ -217,7 +193,7 @@ export function chatFxPlay(key: string) {
       big: 'sway',
       tint: '255,214,140',
       spawn(_t, f) {
-        if (f % 6 === 0) emo(pick(['🤗', '💛', '🍀', '🫂', '☀️', '💛']), { x: R(15, W - 15), y: H + 25, vx: R(-0.3, 0.3), vy: -R(1.4, 2.4), s: R(20, 32), swA: 1 })
+        if (f % 6 === 0) emo(pick(['🤗', '💛', '🍀', '🤝', '☀️', '💛']), { x: R(15, W - 15), y: H + 25, vx: R(-0.3, 0.3), vy: -R(1.4, 2.4), s: R(20, 32), swA: 1 })
         if (f % 3 === 0) add({ t: 's', x: R(0, W), y: R(0, H), r: R(2, 4), ph: R(0, 6), sp: R(0.05, 0.1), col: '#ffe08a', life: R(90, 150) })
       },
     },

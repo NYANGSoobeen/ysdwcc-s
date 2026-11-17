@@ -1,3 +1,4 @@
+import { emojiOk, safeEmoji } from '../ui/emojiFix.ts'
 // 🎮 게임 (2026-11-03 사용자 요청 "프론트에 있는 게임을 가져와서 랭킹"): 프론트 앱 게임 5개를 코드 그대로 옮겼다.
 // src/games/legacy/*.js = 프론트 저장소 js/minigame·golf·boar·cart·lostball·jinsang.js 를 그대로 복사한 것.
 // 그 코드가 기대하는 전역 값(db·myAccount·myProfile·toast·uiConfirm·isAdmin·firebase)을 여기서 우리 앱 것으로 이어 주고,
@@ -165,6 +166,9 @@ export async function openGames(me: Me) {
   // 골프의 "예전 uid 기록 옮기기"가 내 기록을 지우지 않게 (우리는 처음부터 uid 가 문서 이름이라 옮길 것이 없음)
   w.firebase = { auth: () => ({ currentUser: { uid: `legacy-${me.uid}` } }) }
   w.toast = (text: string) => toast(String(text))
+  // 🪟 윈도우 10에 없는 새 이모지(🫧 등)는 옛 이모지로 (cart.js ctBub 가 프론트 정원의 gdEm 을 찾음)
+  w.gdEm = (e: string) => safeEmoji(e) ?? e
+  w.fxEmojiOk = emojiOk
   w.wxAsk = () => wxAsk(me.uid)
   w.uiConfirm = (message: string, okLabel?: string) => ask({ message, ok: okLabel || '확인' })
   if (!loaded) {

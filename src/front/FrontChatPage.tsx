@@ -1,4 +1,5 @@
 import { addDoc, deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { fixEmoji } from '../ui/emojiFix.ts'
 import { GameButton } from '../games/GameButton.tsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
@@ -658,7 +659,7 @@ function FrontMessageItem(props: {
             )}
             {m.game ? (
               <GameCardView api={props.games} msg={{ id: m.id, game: m.game, votes: m.votes, authorId: m.authorId, createdAt: m.createdAt, text: m.text }} />
-            ) : m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(m.text, [...props.mentionNames, ...(m.mentionAll ? [MENTION_ALL] : [])], props.myName, mine)}</p>)}
+            ) : m.text && (chatFxOf(m.text) ? <FxTag fx={chatFxOf(m.text)!} /> : <p>{linkify(fixEmoji(m.text), [...props.mentionNames, ...(m.mentionAll ? [MENTION_ALL] : [])], props.myName, mine)}</p>)}
             {link?.url && (
               <a className="link-card" href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                 {link.thumb && /^https?:/.test(link.thumb) && (
