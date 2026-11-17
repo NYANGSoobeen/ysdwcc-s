@@ -35,7 +35,7 @@ import { AlertsPage } from './pages/AlertsPage.tsx'
 import { SchedulePage } from './pages/SchedulePage.tsx'
 import { MealPage } from './pages/MealPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
-import { IDLE_NOTICE, rememberSignedIn, wasSignedIn, watchIdle } from './session.ts'
+import { rememberSignedIn, wasSignedIn, watchIdle } from './session.ts'
 import { SearchContext } from './ui/search.tsx'
 import { useIsDesktop } from './useMedia.ts'
 
@@ -197,8 +197,8 @@ function SignedIn({ user }: { user: User }) {
 
   useEffect(() => rememberSignedIn(user.uid), [user.uid])
 
-  // 공용 컴퓨터(PC): 15분 넘게 앱을 닫아 두었으면 다시 로그인하게 한다.
-  useEffect(() => watchIdle(() => void logOutAndWipe(IDLE_NOTICE)), [])
+  // 로그인 유지를 끈 기기: 브라우저를 닫았다 열면·15분 넘게 끊기면 다시 로그인하게 한다 (src/session.ts).
+  useEffect(() => watchIdle((notice) => void logOutAndWipe(notice)), [])
 
   // 보고 있는 채팅방 (휴대폰에서 null이면 방 목록)
   const channelId = team && channelState?.teamId === team.id ? channelState.id : null
