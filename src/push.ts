@@ -214,6 +214,12 @@ async function toWorker(message: unknown) {
   reg?.active?.postMessage(message)
 }
 
+// 🔒 로그인 상태를 서비스 워커에 알린다 (public/push-sw.js): 로그아웃 'out'이면 알림을 안 띄우고,
+// 로그인 유지를 끈 'temp'면 앱 창이 다 닫혀 있을 때(브라우저를 닫음) 안 띄운다.
+export async function tellSession(value: 'keep' | 'temp' | 'out') {
+  await toWorker({ type: 'session', value }).catch(() => {})
+}
+
 // 🔔 알림 방식 (기기마다, 알림 설정 화면). 서비스 워커가 알림을 그릴 때 따른다(public/push-sw.js).
 export type PushSound = 'sound' | 'quiet' | 'badge'
 const SOUND_KEY = 'push-sound'

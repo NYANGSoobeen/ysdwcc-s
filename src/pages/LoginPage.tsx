@@ -3,11 +3,14 @@ import { api } from '../api.ts'
 import { errorMessage, logIn, takeLoginNotice, toEmail } from '../auth.ts'
 import { isNativeApp, keepSignedIn } from '../firebase.ts'
 import { PASSWORD_HINT, passwordProblem } from '../password.ts'
+import { tellSession } from '../push.ts'
 
 // 페이지를 열 때 한 번만 읽는다 (읽으면 지워지므로 렌더링마다 읽으면 안 된다).
 const notice = takeLoginNotice()
 
 export function LoginPage() {
+  // 🔒 로그인 화면 = 로그아웃 상태: 이 기기에 남아 있던 알림도 띄우지 않게 (public/push-sw.js)
+  useEffect(() => void tellSession('out'), [])
   const [needsSetup, setNeedsSetup] = useState(false)
 
   useEffect(() => {

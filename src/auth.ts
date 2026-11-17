@@ -5,7 +5,7 @@ import { applyKeepSignedIn, auth, db, keepSignedIn } from './firebase.ts'
 import { clearNativeContacts } from './native.ts'
 import { passwordProblem } from './password.ts'
 import { disconnectFront } from './front/ydr.ts'
-import { disablePush } from './push.ts'
+import { disablePush, tellSession } from './push.ts'
 import { wipePhoneData } from './phone.ts'
 import { forgetSignedIn, markAlive } from './session.ts'
 
@@ -94,7 +94,8 @@ export async function logOutAndWipe(notice?: string) {
   wipePhoneData()
   // 갤럭시 앱이면 폰 연락처에 넣은 고객도 지운다 (데이터 저장 규칙: 계정째 삭제).
   await clearNativeContacts({ forget: true })
-  // 이 기기 알림을 끈다 (다음 사람에게 내 알림이 가지 않게).
+  // 이 기기 알림을 끈다 (다음 사람에게 내 알림이 가지 않게). 서버 목록에서 지우기 전에 서비스 워커부터 막는다.
+  await tellSession('out')
   await disablePush().catch(() => {})
   // 프론트 채팅(게스트) 로그인도 끊는다.
   await disconnectFront()

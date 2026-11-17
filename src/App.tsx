@@ -10,7 +10,8 @@ import { useMentionAlerts } from './useMentionAlerts.ts'
 import { useUnreadCounts } from './reads.ts'
 import { FrontChatPage } from './front/FrontChatPage.tsx'
 import { resumeFront, useFront, useFrontUnread } from './front/ydr.ts'
-import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellViewing, type OpenRequest } from './push.ts'
+import { keepSignedIn } from './firebase.ts'
+import { frontTag, listenOpenRequests, refreshPush, roomTag, setBadge, startPushHeartbeat, tellSession, tellViewing, type OpenRequest } from './push.ts'
 import { MenuBadgeContext, MenuContext, MenuDrawer, Sidebar, type Tab } from './menu.tsx'
 import { useNativeContactsAutoOn, useNativeContactsSync } from './native.ts'
 import { isPcDevice, usePhoneBadges, usePrefetchPhoneNames } from './phone.ts'
@@ -259,6 +260,8 @@ function SignedIn({ user }: { user: User }) {
 
   // 🔔 푸시 알림: 켜 둔 기기면 등록을 새로 적고, 알림을 눌러 들어오면 그 방을 연다.
   useEffect(() => void refreshPush(), [user.uid])
+  // 🔒 로그인 상태를 서비스 워커에 (로그인 유지 끔이면 브라우저를 닫은 동안 알림을 안 띄움)
+  useEffect(() => void tellSession(keepSignedIn() ? 'keep' : 'temp'), [user.uid])
   const openRequest = useRef<(req: OpenRequest) => void>(() => {})
   openRequest.current = (req) => {
     if (req.kind === 'front') return openFrontRoom(req.ch)

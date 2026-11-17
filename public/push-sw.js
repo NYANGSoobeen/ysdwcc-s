@@ -38,6 +38,32 @@ async function show(title, options) {
   }
 }
 
+// 🔒 로그인 상태 (2026-11-17 "로그아웃은 됐는데 알림이 왜 오지"): 'keep' 로그인 유지 · 'temp' 로그인 유지 끔 · 'out' 로그아웃.
+// 'out'이면 알림을 띄우지 않고, 'temp'면 앱 창이 하나도 열려 있지 않을 때(= 브라우저를 닫음 → 다시 열면 로그아웃) 띄우지 않는다.
+// 서버 목록에서 지우기 전(창을 닫은 사이·지우기가 실패한 경우)에 오는 알림도 이걸로 막는다.
+async function readSession() {
+  try {
+    const res = await (await caches.open(BADGE_CACHE)).match('/__session')
+    return res ? await res.text() : 'keep'
+  } catch (e) {
+    return 'keep'
+  }
+}
+async function writeSession(v) {
+  try {
+    await (await caches.open(BADGE_CACHE)).put('/__session', new Response(String(v)))
+  } catch (e) {
+    /* 기억 못 하면 예전처럼 */
+  }
+}
+// 알림을 안 띄울 때: 크롬은 푸시를 받고 아무것도 안 띄우면 "백그라운드에서 업데이트됨" 알림을 대신 띄우고,
+// 애플은 구독을 끊을 수 있어서 → 소리 없이 띄웠다 바로 닫는다.
+async function quietSkip(title, body) {
+  const t = `skip-${Date.now()}`
+  await self.registration.showNotification(title, { body, tag: t, silent: true })
+  ;(await self.registration.getNotifications({ tag: t })).forEach((x) => x.close())
+}
+
 async function readBadge() {
   try {
     const res = await (await caches.open(BADGE_CACHE)).match('/__badge')
@@ -69,6 +95,7 @@ self.addEventListener('message', (event) => {
   }
   if (d.type === 'badge') event.waitUntil(writeBadge(Number(d.count) || 0))
   if (d.type === 'mode') event.waitUntil(writeMode(d.mode))
+  if (d.type === 'session') event.waitUntil(writeSession(d.value))
   if (d.type === 'test')
     event.waitUntil(
       (async () => {
@@ -93,6 +120,11 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const session = await readSession()
+      if (session === 'out' || (session === 'temp' && !windows.some((w) => new URL(w.url).origin === self.location.origin))) {
+        await quietSkip(title, body)
+        return
+      }
       // 그 방을 지금 보고 있는 창이 있으면 알리지 않는다 (최근 40초 안에 앱이 알려 준 것만 믿음).
       const now = Date.now()
       const seen = (w) => {
