@@ -1,10 +1,12 @@
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { deleteDoc, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { deleteToken, getMessaging, getToken, isSupported } from 'firebase/messaging'
 import { app, auth, db, isNativeApp } from './firebase.ts'
 
 // 🔔 푸시 알림 (9번). 앱이 꺼져 있어도 새 채팅·나를 부른 말·공지·프론트 채팅 알림.
 // - 웹(PC 크롬·엣지, 갤럭시 크롬, 홈 화면에 추가한 아이폰 앱): FCM 웹 푸시. 알림은 서비스 워커(public/push-sw.js)가 그린다.
-// - 갤럭시 앱: 설치형 앱 알림이 따로 필요하다 (google-services.json + APK 다시 만들기, 아직 안 함).
+// - 갤럭시 앱 1.8.0부터: Kotlin Push 플러그인(android/.../push/)이 FCM 토큰을 주고, 데이터 메시지를 받아 알림을 그린다(platform 'android').
+//   1.8.0 전 앱은 채팅 알림이 없다(업데이트 안내).
 // - 기기마다 pushTokens/{sha256(token)} = { uid, token, platform, mode, kinds, pc, seenAt, updatedAt } (서버가 이 목록으로 보낸다)
 // - kinds: 종류별 켜기/끄기 {chat 모든 새 채팅, mention 나를 부른 말, notice 공지, front 프론트 채팅} (mode는 예전 기기용)
 // - PC(여러 사람이 쓰는 컴퓨터)는 앱이 열려 있는 동안 5분마다 seenAt을 적고, 서버는 20분 넘게 소식 없는 PC에는 안 보낸다.
@@ -15,9 +17,23 @@ export const DEFAULT_KINDS: PushKinds = { chat: true, mention: true, notice: tru
 
 const SAVED_KEY = 'push-device' // { token, uid, kinds, at } 이 기기에서 켠 알림
 const WANTED_KEY = 'push-wanted' // { uid, kinds } 로그아웃해도 기억 (직접 끄면 지움)
+const AUTO_KEY = 'push-auto' // 갤럭시 앱에서 저절로 켜 본 적 있음
 const HEARTBEAT_MS = 5 * 60 * 1000
 // 웹 푸시 공개 키. 비워 두면 Firebase 기본 키를 쓴다 (콘솔 → 클라우드 메시징 → 웹 푸시 인증서에서 만든 키를 넣어도 됨).
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || undefined
+
+// 갤럭시 앱 채팅 푸시 다리 (android/.../push/PushPlugin.kt)
+type PushNativePlugin = {
+  status(): Promise<{ available: boolean; permission: boolean; asked: boolean }>
+  token(): Promise<{ token: string }>
+  deleteToken(): Promise<void>
+  setSound(o: { mode: string }): Promise<void>
+  viewing(o: { tag: string | null }): Promise<void>
+  clear(o: { tag: string }): Promise<void>
+  test(): Promise<void>
+}
+const PushNative = registerPlugin<PushNativePlugin>('Push')
+const hasPushNative = () => isNativeApp && Capacitor.isPluginAvailable('Push')
 
 type Saved = { token: string; uid: string; kinds: PushKinds; at: number }
 
@@ -48,7 +64,7 @@ const standalone = () => matchMedia('(display-mode: standalone)').matches || (na
 export const isPc = () => matchMedia('(hover: hover) and (pointer: fine)').matches && !isIOS
 
 export type PushState =
-  | { kind: 'native' } // 갤럭시 앱 (아직 지원 안 함)
+  | { kind: 'native' } // 1.8.0 전 갤럭시 앱 (채팅 알림 없음 → 업데이트)
   | { kind: 'ios-browser' } // 아이폰 사파리: 홈 화면에 추가해야 알림 가능
   | { kind: 'unsupported' }
   | { kind: 'blocked' } // 브라우저 설정에서 알림을 막아 둠
@@ -56,7 +72,15 @@ export type PushState =
   | { kind: 'on'; kinds: PushKinds }
 
 export async function pushState(): Promise<PushState> {
-  if (isNativeApp) return { kind: 'native' }
+  if (isNativeApp) {
+    if (!hasPushNative()) return { kind: 'native' }
+    const st = await PushNative.status().catch(() => null)
+    if (!st?.available) return { kind: 'native' }
+    if (!st.permission && st.asked) return { kind: 'blocked' }
+    const saved = readSaved()
+    if (st.permission && saved && saved.uid === auth.currentUser?.uid) return { kind: 'on', kinds: saved.kinds }
+    return { kind: 'off' }
+  }
   if (isIOS && !standalone()) return { kind: 'ios-browser' }
   if (!('serviceWorker' in navigator) || !('Notification' in window) || !(await isSupported().catch(() => false))) {
     return { kind: 'unsupported' }
@@ -73,6 +97,7 @@ async function hashId(token: string) {
 }
 
 async function currentToken() {
+  if (isNativeApp) return (await PushNative.token()).token
   // 앱(서비스 워커)이 아직 준비되지 않았으면 기다리다 그만둔다.
   const registration = await Promise.race([
     navigator.serviceWorker.ready,
@@ -88,10 +113,10 @@ async function saveToken(token: string, kinds: PushKinds) {
   await setDoc(doc(db, 'pushTokens', await hashId(token)), {
     uid,
     token,
-    platform: 'web',
+    platform: isNativeApp ? 'android' : 'web',
     mode: modeOf(kinds),
     kinds,
-    pc: isPc(),
+    pc: !isNativeApp && isPc(),
     seenAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
@@ -101,6 +126,14 @@ async function saveToken(token: string, kinds: PushKinds) {
 
 // 알림 켜기 (버튼을 누를 때 불러야 아이폰이 허락 창을 띄운다)
 export async function enablePush(kinds: PushKinds = DEFAULT_KINDS) {
+  if (isNativeApp) {
+    if (!hasPushNative()) throw new Error('갤럭시 앱을 업데이트하면 채팅 알림을 받을 수 있어요.')
+    const token = await currentToken()
+    if (!token) throw new Error('알림 등록에 실패했어요. 잠시 뒤 다시 해 주세요.')
+    await saveToken(token, kinds)
+    void PushNative.setSound({ mode: pushSound() }).catch(() => {})
+    return
+  }
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error('알림이 허용되지 않았어요. 브라우저(또는 휴대폰) 설정에서 이 사이트의 알림을 허용해 주세요.')
   const token = await currentToken()
@@ -121,19 +154,30 @@ export async function disablePush(byUser = false) {
   if (byUser) write(WANTED_KEY, null)
   if (!saved) return
   await deleteDoc(doc(db, 'pushTokens', await hashId(saved.token))).catch(() => {})
-  await deleteToken(getMessaging(app)).catch(() => {})
+  if (isNativeApp) await PushNative.deleteToken().catch(() => {})
+  else await deleteToken(getMessaging(app)).catch(() => {})
 }
 
 // 앱을 열 때: 켜 둔 기기면 토큰이 바뀌었는지 확인하고, 일주일에 한 번은 서버 목록을 새로 적는다.
 // 로그아웃 때문에 꺼졌던 기기면(직접 끈 게 아니면) 같은 사람이 로그인했을 때 다시 켠다.
 export async function refreshPush() {
   const uid = auth.currentUser?.uid
-  if (!uid || isNativeApp || !('Notification' in window) || Notification.permission !== 'granted') return
+  if (!uid) return
+  if (isNativeApp) {
+    if (!hasPushNative()) return
+    const st = await PushNative.status().catch(() => null)
+    if (!st?.available || !st.permission) return
+  } else if (!('Notification' in window) || Notification.permission !== 'granted') return
   const saved = readSaved()
   const wanted = read<{ uid: string; kinds: PushKinds }>(WANTED_KEY)
   try {
     if (!saved) {
       if (wanted?.uid === uid) await enablePush(wanted.kinds)
+      // 갤럭시 앱 1.8.0: 처음 한 번은 저절로 켠다 (직원이 직접 끄면 그대로, 기기 기억 push-auto)
+      else if (isNativeApp && !read(AUTO_KEY)) {
+        write(AUTO_KEY, { at: Date.now() })
+        await enablePush(DEFAULT_KINDS)
+      }
       return
     }
     const token = await currentToken()
@@ -187,17 +231,24 @@ export function setPushSound(mode: PushSound) {
     // 기억 못 하면 소리 + 알림창
   }
   void toWorker({ type: 'mode', mode })
+  if (hasPushNative()) void PushNative.setSound({ mode }).catch(() => {})
 }
 export function testPushHere() {
+  if (hasPushNative()) {
+    void PushNative.test().catch(() => {})
+    return
+  }
   void toWorker({ type: 'test', mode: pushSound() })
 }
 
 // 지금 보고 있는 방(알림 tag)을 알려 주면, 그 방의 알림은 띄우지 않고 이미 뜬 알림은 지운다.
 export function tellViewing(tag: string | null) {
   void toWorker({ type: 'viewing', tag })
+  if (hasPushNative()) void PushNative.viewing({ tag }).catch(() => {})
   if (tag) void clearNotifications(tag)
 }
 export async function clearNotifications(tag: string) {
+  if (hasPushNative()) void PushNative.clear({ tag }).catch(() => {})
   const reg = await navigator.serviceWorker?.getRegistration().catch(() => undefined)
   const list = (await reg?.getNotifications({ tag }).catch(() => [])) ?? []
   list.forEach((n) => n.close())

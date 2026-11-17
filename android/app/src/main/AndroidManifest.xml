@@ -56,6 +56,15 @@
                 android:resource="@xml/contacts" />
         </service>
 
+        <!-- 🔔 채팅·공지·프론트 채팅 푸시 (1.8.0, FCM 데이터 메시지 → push/ChatPush.kt) -->
+        <service
+            android:name=".push.ChatPush"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- 🌙 휴무일 자동 응답: 전화가 오면 (앱이 꺼져 있어도) 고객 번호면 무음 + 자동 문자 -->
         <receiver
             android:name=".phone.OffDayReceiver"

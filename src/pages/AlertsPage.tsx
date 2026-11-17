@@ -4,7 +4,8 @@ import { api } from '../api.ts'
 import { errorMessage } from '../auth.ts'
 import { isIOS } from '../download.ts'
 import { MenuButton } from '../menu.tsx'
-import { isAndroidBrowser } from '../native.ts'
+import { isAndroidBrowser, LATEST_APK } from '../native.ts'
+import { isNativeApp } from '../firebase.ts'
 import { hasPhoneNative, oldAndroidApp, PhoneNative } from '../phone.ts'
 import { requestAlerts, setAlertKinds, useAlertsStatus, type AlertKinds } from '../phoneAlerts.ts'
 import {
@@ -57,7 +58,15 @@ export function AlertsPage({ unread, workSms }: { unread: number; workSms: numbe
         <GameButton />
       </header>
       <div className="page-body">
-        {hasPhoneNative || oldAndroidApp ? <GalaxyAlerts workSms={workSms} /> : <WebAlerts unread={unread} />}
+        {hasPhoneNative || oldAndroidApp ? (
+          <>
+            {/* 갤럭시 앱: 💬 채팅 알림(1.8.0부터, FCM) + 📞✉️ 전화·문자 알림 */}
+            <WebAlerts unread={unread} />
+            <GalaxyAlerts workSms={workSms} />
+          </>
+        ) : (
+          <WebAlerts unread={unread} />
+        )}
       </div>
     </div>
   )
@@ -118,11 +127,25 @@ function WebAlerts({ unread }: { unread: number }) {
   const on = state.kind === 'on'
   const kinds = on ? state.kinds : DEFAULT_KINDS
   const badgeOk = 'setAppBadge' in navigator
+  // 갤럭시 앱 웹뷰에는 Notification 이 없다 → 상태로 판단
+  const perm = isNativeApp ? (state.kind === 'blocked' ? 'denied' : state.kind === 'on' ? 'granted' : 'default') : typeof Notification === 'undefined' ? 'default' : Notification.permission
   return (
     <>
       <section className="card">
-        <h3>이 기기의 알림</h3>
-        {state.kind === 'ios-browser' ? (
+        <h3>{isNativeApp ? '💬 채팅·공지 알림' : '이 기기의 알림'}</h3>
+        {state.kind === 'native' ? (
+          <p className="nt-status">
+            {LATEST_APK.code >= 24 ? (
+              <>
+                <strong>📱 갤럭시 앱 업데이트가 필요해요</strong> · 갤럭시 앱 1.8.0부터 채팅·공지·🏌️ 프론트 채팅 알림을 받을 수 있어요. 아래 탭 위 "업데이트"를 눌러 주세요.
+              </>
+            ) : (
+              <>
+                <strong>📱 갤럭시 앱 채팅 알림은 준비 중이에요</strong> · 다음 갤럭시 앱 업데이트(1.8.0)부터 받을 수 있어요. 그동안 채팅 알림이 필요하면 크롬에서 ysdwcc-s.web.app 을 열어 알림을 켜 주세요.
+              </>
+            )}
+          </p>
+        ) : state.kind === 'ios-browser' ? (
           <p className="nt-status">
             아이폰은 <strong>홈 화면에 추가한 앱</strong>에서만 알림을 받을 수 있어요 (iOS 16.4 이상). Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가" →
             홈 화면의 앱을 열고 여기서 알림을 켜 주세요.
@@ -147,13 +170,13 @@ function WebAlerts({ unread }: { unread: number }) {
               )}
             </p>
             <div className="nt-check">
-              <Check ok={state.kind !== 'blocked' && Notification.permission === 'granted'}>
-                기기 알림 허용: {Notification.permission === 'granted' ? '허용됨' : Notification.permission === 'denied' ? '차단됨' : '아직 안 물어봄'}
+              <Check ok={state.kind !== 'blocked' && perm === 'granted'}>
+                기기 알림 허용: {perm === 'granted' ? '허용됨' : perm === 'denied' ? '차단됨' : '아직 안 물어봄'}
               </Check>
               <Check ok={on}>이 기기 등록: {on ? '됨' : '안 됨'}</Check>
-              <Check ok>기기 종류: {isPc() ? 'PC (앱을 열어 둔 동안 · 마지막으로 연 뒤 20분까지만 알림)' : '휴대폰·태블릿'}</Check>
+              <Check ok>기기 종류: {isNativeApp ? '갤럭시 앱' : isPc() ? 'PC (앱을 열어 둔 동안 · 마지막으로 연 뒤 20분까지만 알림)' : '휴대폰·태블릿'}</Check>
               <Check ok>빨간 숫자: 안 읽은 채팅 {unread}</Check>
-              {!isPc() && (
+              {!isPc() && !isNativeApp && (
                 <Check ok={badgeOk || isAndroidBrowser}>
                   앱 아이콘 숫자: {isAndroidBrowser ? '알림창에 쌓인 알림 개수로 표시돼요' : badgeOk ? '지원됨' : '이 기기에서는 지원 안 됨'}
                 </Check>
@@ -226,7 +249,9 @@ function WebAlerts({ unread }: { unread: number }) {
           </button>
         </div>
         <p className="muted small">
-          {isIOS
+          {isNativeApp
+            ? '갤럭시 앱: 알림이 안 오면 설정 → 배터리 → 백그라운드 사용 한도에서 이 앱을 "절전 예외"로 해 주세요. 소리·진동은 설정 → 애플리케이션 → 양산동원로얄CC지원팀 → 알림에서도 바꿀 수 있어요.'
+            : isIOS
             ? '아이폰은 소리를 앱이 정할 수 없어서, 소리·잠금화면 표시는 아이폰 설정 → 알림 → 양산동원지원팀에서도 바꿀 수 있어요. 무음은 알림창이 아주 잠깐 보였다가 바로 사라질 수 있어요.'
             : isAndroidBrowser
               ? '갤럭시(크롬): 소리는 폰 설정이 우선해요. 소리 없이 받으려면 설정 → 애플리케이션 → Chrome → 알림에서 소리를 꺼 주세요. 알림이 안 오면 설정 → 배터리 → 백그라운드 사용 한도에서 Chrome을 "절전 예외"로 해 주세요.'

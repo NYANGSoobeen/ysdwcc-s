@@ -58,12 +58,9 @@ export async function tokensOf(uids: string[]): Promise<Token[]> {
 export function buildMessage(t: Pick<Token, 'token' | 'platform'>, note: PushNote): Message {
   const data = { title: note.title, body: note.body, url: note.url, tag: note.tag, kind: note.kind ?? 'chat' }
   if (t.platform === 'android') {
-    return {
-      token: t.token,
-      notification: { title: note.title, body: note.body },
-      data,
-      android: { priority: 'high', notification: { tag: note.tag } },
-    }
+    // 갤럭시 앱 1.8.0: 데이터만 보내 앱(android/.../push/ChatPush.kt)이 알림을 그린다
+    // (보고 있는 방은 안 띄우고, 알림 방식·같은 방 묶기를 앱이 정함). notification을 넣으면 앱이 꺼져 있을 때 안드로이드가 그대로 띄워 버린다.
+    return { token: t.token, data, android: { priority: 'high', ttl: 24 * 3600 * 1000 } }
   }
   return { token: t.token, data, webpush: { headers: { Urgency: 'high', TTL: String(24 * 3600) } } }
 }

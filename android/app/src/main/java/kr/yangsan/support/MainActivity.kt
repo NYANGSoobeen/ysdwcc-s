@@ -8,6 +8,7 @@ import kr.yangsan.support.contacts.ContactsSyncPlugin
 import kr.yangsan.support.files.FileSaverPlugin
 import kr.yangsan.support.phone.PhoneAlerts
 import kr.yangsan.support.phone.PhonePlugin
+import kr.yangsan.support.push.PushPlugin
 import kr.yangsan.support.update.UpdaterPlugin
 
 class MainActivity : BridgeActivity() {
@@ -17,6 +18,7 @@ class MainActivity : BridgeActivity() {
         registerPlugin(FileSaverPlugin::class.java)
         registerPlugin(PhonePlugin::class.java)
         registerPlugin(UpdaterPlugin::class.java)
+        registerPlugin(PushPlugin::class.java)
         super.onCreate(savedInstanceState)
         openSharedText(intent)
         openFromAlert(intent, coldStart = true)

@@ -46,7 +46,8 @@ test('팀 채팅: 보낸 사람·사용 중지된 사람 빼고, "나를 부른 
   assert.deepEqual(web.data, { title: '오전 근무', body: '박관리: 오늘 회의 10시', url: '/?room=t1%3Ar1', tag: 'room-t1-r1', kind: 'chat' })
   assert.ok(web.webpush && !web.notification, '웹은 데이터만 보낸다 (서비스 워커가 그림)')
   const android = sent.find((m) => m.token === 'tok-b2')
-  assert.equal(android.notification.title, '오전 근무')
+  assert.equal(android.data.title, '오전 근무')
+  assert.ok(!android.notification && android.android.priority === 'high', '갤럭시 앱도 데이터만 (앱이 그림)')
 
   sent = []
   await push.notifyChatMessage('t1', 'main', { authorUid: 'b', body: '@이보기 확인 부탁', mentions: ['c'] })
