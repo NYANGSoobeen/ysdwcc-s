@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../auth.ts'
-import { api } from '../api.ts'
+import { api, type LastCall } from '../api.ts'
 import { copyText } from './ChatPage.tsx'
 import { ask, tell, toast } from '../ui/dialogs.tsx'
 
@@ -10,12 +10,14 @@ const PUSH_URL = `https://us-west1-${import.meta.env.VITE_FIREBASE_PROJECT_ID ||
 
 export function FrontLinkCard() {
   const [configured, setConfigured] = useState<boolean | null>(null)
-  const [lastCall, setLastCall] = useState<{ at: number; people: number; sent: number } | null | undefined>(undefined)
+  const [lastCall, setLastCall] = useState<LastCall | null | undefined>(undefined)
+  const [lastReject, setLastReject] = useState<number | null>(null)
   useEffect(() => {
     api.frontLinkInfo().then(
       (r) => {
         setConfigured(r.configured)
         setLastCall(r.lastCall ?? null)
+        setLastReject(r.lastReject ?? null)
       },
       () => setConfigured(false),
     )
@@ -48,13 +50,7 @@ export function FrontLinkCard() {
     <section className="card">
       <h3>🏌️ 프론트 채팅 알림 연동</h3>
       <p className="muted small">프론트 앱 채팅방 ⋯ → ⚙️ 타부서 연동 설정에 아래 세 가지를 넣으면, 프론트 채팅방 새 말이 우리 직원 폰에 알림으로 와요.</p>
-      {configured && lastCall !== undefined && (
-        <p className="small">
-          {lastCall
-            ? `📡 마지막 알림 요청 ${new Date(lastCall.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · 받을 직원 ${lastCall.people}명 · 보낸 기기 ${lastCall.sent}개`
-            : '⚠️ 아직 프론트에서 알림 요청이 온 적이 없어요. 프론트 앱 연동 설정(함수 주소·비밀값)을 확인해 주세요.'}
-        </p>
-      )}
+      {configured && lastCall !== undefined && <LinkCheck lastCall={lastCall} lastReject={lastReject} />}
       <dl className="stats">
         <div>
           <dt>Firebase 프로젝트 ID</dt>
@@ -83,5 +79,32 @@ export function FrontLinkCard() {
         {configured ? '🔑 비밀값 새로 만들기' : '🔑 비밀값 만들기'}
       </button>
     </section>
+  )
+}
+
+const when = (t: number) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+
+// 🔍 프론트 알림이 안 올 때 어디서 막혔는지 (2026-11-17 "여전히 알림이 안 와")
+function LinkCheck({ lastCall, lastReject }: { lastCall: LastCall | null; lastReject: number | null }) {
+  const rejectNewer = lastReject && (!lastCall || lastReject > lastCall.at)
+  let hint: string
+  if (rejectNewer) hint = '⛔ 프론트가 알림을 보냈는데 비밀값이 안 맞아 거절했어요. 아래 "비밀값 새로 만들기"로 만든 값을 프론트 앱 ⚙️ 타부서 연동 설정에 다시 넣어 주세요.'
+  else if (!lastCall) hint = '⚠️ 아직 프론트에서 알림 요청이 온 적이 없어요. 프론트 앱 ⚙️ 타부서 연동 설정에 함수 주소·비밀값이 들어 있는지, 프론트 서버(함수)가 배포됐는지 확인해 주세요.'
+  else if (lastCall.active === 0) hint = '⚠️ 프론트가 알려 준 직원이 우리 앱에 없어요(사용 중지 등).'
+  else if (lastCall.devices === 0) hint = '⚠️ 받을 직원 중 알림을 켠 기기가 하나도 없어요. 직원 폰 🔔 알림 설정에서 알림을 켜 주세요 (갤럭시 설치형 앱은 1.8.0부터, 그 전엔 크롬에서).'
+  else if (lastCall.frontOn === 0) hint = '⚠️ 알림을 켠 기기는 있지만 "🏌️ 프론트 채팅" 체크가 꺼져 있어요. 🔔 알림 설정 → 받을 알림에서 켜 주세요.'
+  else if (lastCall.sent === 0) hint = '⚠️ 보내기는 했는데 하나도 성공하지 못했어요. 그 기기에서 알림을 끄고 다시 켜 주세요.'
+  else hint = '✅ 서버까지는 정상이에요. 그래도 안 오면 그 폰의 알림 허용·방해 금지·절전 설정을 확인해 주세요.'
+  return (
+    <div className="small">
+      {lastCall && (
+        <p>
+          📡 마지막 알림 요청 {when(lastCall.at)} · 받을 직원 {lastCall.people}명
+          {lastCall.devices !== null && ` · 그 직원들 기기 ${lastCall.devices}개 · 프론트 알림 켠 기기 ${lastCall.frontOn}개`} · 보낸 기기 {lastCall.sent}개
+        </p>
+      )}
+      {lastReject && <p>⛔ 비밀값이 틀린 요청: {when(lastReject)}</p>}
+      <p>{hint}</p>
+    </div>
   )
 }

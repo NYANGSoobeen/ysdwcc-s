@@ -997,6 +997,13 @@ export const ydrGuestPush = onRequest({ invoker: 'public', timeoutSeconds: 30 },
   const saved = String((await getFirestore().doc('meta/frontLink').get()).get('secret') ?? '')
   const given = String(req.get('x-ydr-secret') ?? '')
   if (saved.length < 20 || !sameSecret(given, saved)) {
+    // 🔍 비밀값을 붙여 왔는데 틀리면 기록 (관리자 카드에 "비밀값이 안 맞아요"), 아무것도 없이 두드린 건 안 남김
+    if (given) {
+      await getFirestore()
+        .doc('meta/frontLink')
+        .set({ lastReject: { at: FieldValue.serverTimestamp() } }, { merge: true })
+        .catch(() => {})
+    }
     res.status(403).send('forbidden')
     return
   }
@@ -1008,11 +1015,12 @@ export const ydrGuestPush = onRequest({ invoker: 'public', timeoutSeconds: 30 },
     return
   }
   const mentioned = Array.isArray(body.mentioned) ? body.mentioned.filter((u): u is string => typeof u === 'string' && uids.includes(u)) : []
-  const sent = await notifyFront(uids, String(body.title ?? '').slice(0, 200), String(body.body ?? '').slice(0, 500), ch, mentioned)
+  const stats = { active: 0, devices: 0, frontOn: 0 }
+  const sent = await notifyFront(uids, String(body.title ?? '').slice(0, 200), String(body.body ?? '').slice(0, 500), ch, mentioned, stats)
   // 🔍 점검용: 프론트가 마지막으로 알림을 부탁한 때·받을 직원 수·보낸 기기 수 (관리자 화면 연동 카드에 보임)
   await getFirestore()
     .doc('meta/frontLink')
-    .set({ lastCall: { at: FieldValue.serverTimestamp(), people: uids.length, sent } }, { merge: true })
+    .set({ lastCall: { at: FieldValue.serverTimestamp(), people: uids.length, sent, ...stats } }, { merge: true })
     .catch(() => {})
   res.json({ ok: true, sent })
 })
@@ -1041,11 +1049,22 @@ export const sendTestPush = onCall(async (req) => {
 export const frontLinkInfo = onCall(async (req) => {
   await requireSuperAdmin(req)
   const snap = await getFirestore().doc('meta/frontLink').get()
-  const last = snap.get('lastCall') as { at?: { toMillis?: () => number }; people?: number; sent?: number } | undefined
+  const last = snap.get('lastCall') as { at?: { toMillis?: () => number }; people?: number; sent?: number; active?: number; devices?: number; frontOn?: number } | undefined
+  const rej = snap.get('lastReject') as { at?: { toMillis?: () => number } } | undefined
   return {
     configured: String(snap.get('secret') ?? '').length >= 20,
     updatedAt: snap.get('updatedAt')?.toMillis?.() ?? null,
-    lastCall: last?.at?.toMillis ? { at: last.at.toMillis(), people: Number(last.people ?? 0), sent: Number(last.sent ?? 0) } : null,
+    lastCall: last?.at?.toMillis
+      ? {
+          at: last.at.toMillis(),
+          people: Number(last.people ?? 0),
+          sent: Number(last.sent ?? 0),
+          active: last.active ?? null,
+          devices: last.devices ?? null,
+          frontOn: last.frontOn ?? null,
+        }
+      : null,
+    lastReject: rej?.at?.toMillis?.() ?? null,
   }
 })
 

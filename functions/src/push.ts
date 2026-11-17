@@ -180,7 +180,8 @@ export async function notifyChatMessage(teamId: string, channelId: string, m: Re
 
 // 🏌️ 프론트 채팅방 새 말 (프론트 서버가 ydrGuestPush로 알려 줌) → 그 방에 있는 우리 직원에게.
 // 📣 mentioned = 그중 @로 부른 사람(@모두면 모두): 프론트 채팅 알림을 꺼 둬도 "나를 부른 말"을 켰으면 "🔔 나를 불렀어요"로 받는다.
-export async function notifyFront(uids: string[], title: string, body: string, ch: string, mentioned: string[] = []) {
+// stats: 🔍 점검용 숫자를 채워 준다 (우리 앱에 있는 직원 · 그 사람들 기기 · 🏌️ 프론트 알림을 켠 기기)
+export async function notifyFront(uids: string[], title: string, body: string, ch: string, mentioned: string[] = [], stats?: { active: number; devices: number; frontOn: number }) {
   const people = await activeUsers(uids)
   const called = new Set(mentioned)
   const room = String(title || '프론트 채팅').replace(/^💬\s*/, '')
@@ -195,7 +196,13 @@ export async function notifyFront(uids: string[], title: string, body: string, c
     kind: 'front',
   }
   const out: { token: Token; note: PushNote }[] = []
-  for (const t of await tokensOf([...people.keys()])) {
+  const tokens = await tokensOf([...people.keys()])
+  if (stats) {
+    stats.active = people.size
+    stats.devices = tokens.length
+    stats.frontOn = tokens.filter((t) => t.kinds.front || (called.has(t.uid) && t.kinds.mention)).length
+  }
+  for (const t of tokens) {
     if (!reachable(t)) continue
     if (called.has(t.uid) && (t.kinds.mention || t.kinds.front)) out.push({ token: t, note: callNote })
     else if (t.kinds.front) out.push({ token: t, note })
