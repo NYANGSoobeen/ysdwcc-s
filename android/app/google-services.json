@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "935951336459",
+    "project_id": "ysdwcc-s",
+    "storage_bucket": "ysdwcc-s.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:935951336459:android:31c495839713e7c87ef30e",
+        "android_client_info": {
+          "package_name": "kr.yangsan.support"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9vjgfK5EZ8zK3GvZbhU1Wx4q04eupJ2k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
