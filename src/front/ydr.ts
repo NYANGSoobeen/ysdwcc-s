@@ -177,6 +177,19 @@ export async function connectFront(code?: string) {
   if (!me) return
   // 앱을 열 때 다시 로그인하는 동안만 "연결하는 중" (초대 코드를 넣을 때는 입력 화면을 그대로 둔다)
   if (!code && state.status === 'off') set({ status: 'connecting' })
+  // ⚡ 빨리 연결(2026-11-17 사용자 "프론트 방은 앱 들어가서 연결되는 데까지 시간이 걸려"): 이 기기에 프론트 로그인이
+  // 남아 있으면(같은 사람) 프론트 함수(guestAuth, 처음 부르면 몇 초 걸림)를 기다리지 않고 바로 방·메시지를 연다.
+  // 사진·이름 알리기와 로그인 다시 받기는 뒤에서 그대로 한다.
+  let fast = false
+  if (!code) {
+    await ydrAuth.authStateReady().catch(() => {})
+    if (ydrAuth.currentUser?.uid === `g_${me.uid}`) {
+      fast = true
+      setFlag(true)
+      rememberOnAccount(true)
+      watchGuest(ydrAuth.currentUser.uid)
+    }
+  }
   try {
     const [idToken, { photoUrl, nickname }] = await Promise.all([me.getIdToken(), myPhotoAndNick(me.uid)])
     const res = await httpsCallable<{ idToken: string; code?: string; photoUrl?: string; nickname?: string }, AuthResult>(ydrFunctions, 'guestAuth')({
@@ -185,6 +198,7 @@ export async function connectFront(code?: string) {
       ...(photoUrl ? { photoUrl } : {}),
       ...(nickname ? { nickname } : {}),
     })
+    if (fast && ydrAuth.currentUser?.uid === res.data.uid) return // 이미 같은 사람으로 들어가 있음 (사진·이름만 알림)
     await signInWithCustomToken(ydrAuth, res.data.token)
     setFlag(true)
     rememberOnAccount(true)
@@ -197,6 +211,7 @@ export async function connectFront(code?: string) {
       return
     }
     // 다시 로그인이 실패해도(인터넷 끊김 등) 남아 있는 프론트 로그인으로 계속 본다.
+    if (fast) return
     if (!code && ydrAuth.currentUser) watchGuest(ydrAuth.currentUser.uid)
     else if (state.status === 'connecting') set({ status: 'off' })
     if (code) throw new Error(frontError(err))

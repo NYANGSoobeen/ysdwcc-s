@@ -49,7 +49,17 @@ async function fixCallableAccess() {
       // 인터넷 문제면 건너뛴다.
     }
   }
-  if (blocked.length === 0) return console.log('\n✔ 앱에서 부르는 함수 모두 열려 있음')
+  // 밖에서 부르는 함수(onRequest: 🏌️ 프론트 알림 ydrGuestPush, 연락처 carddav)도 같은 문제가 생길 수 있어 GET으로 확인
+  // (열려 있으면 우리 코드가 405·401 등으로 답하고, 막혀 있으면 Cloud Run이 403)
+  for (const name of [...src.matchAll(/export const (\w+) = onRequest\(/g)].map((m) => m[1])) {
+    try {
+      const res = await fetch(`https://us-west1-ysdwcc-s.cloudfunctions.net/${name}`)
+      if (res.status === 403) blocked.push(name)
+    } catch {
+      // 인터넷 문제면 건너뛴다.
+    }
+  }
+  if (blocked.length === 0) return console.log('\n✔ 앱·프론트에서 부르는 함수 모두 열려 있음')
   console.log(`\n🔧 호출이 막힌 함수 ${blocked.length}개: ${blocked.join(', ')} → 누구나 호출 가능으로 바꿉니다`)
   const failed = []
   for (const name of blocked) {
