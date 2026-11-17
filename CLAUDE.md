@@ -112,7 +112,7 @@
 - **😊 이모티콘 (5번, 2026-10-28, 카톡 이모티콘처럼, `src/emoticons.ts`):**
   - **모든 팀 공용, 최고 관리자만 관리**(사용자가 정함). `stickerPacks/{id} {name, order, createdAt}`(테마), `stickers/{id} {packId, assetId, name, order, createdAt}`(assetId = Storage `stickers/{id}.{png|gif}`). 규칙: 팀에 속한(`users.teamIds` 있음) 사용 중인 직원은 읽기, 쓰기·삭제는 `users.superAdmin`만(Storage도 같음). 이모티콘 문서를 지우면 `onStickerDeleted`가 그림을 지운다(테마 삭제는 앱이 그 테마 이모티콘 문서를 지움).
   - 그림: PNG·JPG·WebP는 긴 쪽 256px PNG로 줄여(투명 유지), **움직이는 GIF는 원본 그대로 1MB까지**(`EMOTICON_MAX_BYTES` = storage.rules).
-  - 관리: 관리자 화면 최고 관리자 묶음 "😊 이모티콘" 카드(`EmoticonAdminCard`): 새 테마, 이름 바꾸기, ▲▼ 순서, 테마 삭제, ＋ 추가(여러 장), ✕ 지우기.
+  - 관리: 관리자 화면 최고 관리자 묶음 "😊 이모티콘" 카드(`EmoticonAdminCard`): 새 테마, 이름 바꾸기, ▲▼ 순서, 테마 삭제, ＋ 추가(여러 장), ✕ 지우기, **그림을 누르면 ◀ 앞으로·▶ 뒤로·📦 다른 테마로 옮기기·🗑️ 지우기**(`moveEmoticon`·`moveEmoticonToPack`, 2026-11-17 "이모티콘이 테마에 섞여 있어": 앱은 문서마다 자기 그림만 보여 줘서, 올릴 때 고른 그림이 섞였던 것으로 보임 → 다시 안 올리고 고치게).
   - 보내기: 입력칸 😊 창 위쪽 탭 🕘 최근 · 😊 이모지 · 테마들. 이모티콘을 누르면 바로 메시지 `{stickerAssetId}`로 보낸다(`sendStickerMessage`, 답장 중이면 답장). 최근 보낸 이모티콘은 이 기기 localStorage `recent-emoticons`(24개). 목록은 실시간 구독 없이 😊 창을 처음 열 때 한 번 읽는다(`loadEmoticons`). 휴대폰은 😊 창이 입력칸 줄 전체 너비.
   - 말풍선: 바탕 없이 그림만 120px(`emoticon-bubble`, 답장·글이 있으면 보통 말풍선). 푸시·답장 미리보기 "😊 이모티콘". 수정 중엔 이모티콘 탭 없음. **🏌️ 프론트 방에서도 우리 이모티콘(2026-11-09 사용자 요청):** 게스트는 프론트 Storage에 못 올려서 우리 Storage 그림(`stickers/…`)의 내려받기 주소를 `{text:'', authorId, createdAt, stickerUrl, replyTo?}`로 보낸다(`sendSticker` in `FrontChatPage.tsx`). 우리 앱은 `stickerUrl`이 `https://firebasestorage.googleapis.com/`일 때만 그림(`STICKER_URL_RE`). 프론트 규칙·화면도 받음(2026-11-10 프론트 11.21: 그림으로 보이고, 못 불러오면 "😊 이모티콘" 글, 푸시도 "😊 이모티콘").
   - 용량 관리: `stickers/` 파일은 팀 폴더 밖이라 막대(프로젝트 전체)에만 들어간다.

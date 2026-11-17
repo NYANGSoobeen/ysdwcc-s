@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { errorMessage } from '../auth.ts'
 import { StorageImage } from '../components/StorageImage.tsx'
-import { addEmoticons, addPack, deleteEmoticon, deletePack, EmoticonFileError, movePack, renamePack, useEmoticons } from '../emoticons.ts'
+import { addEmoticons, addPack, deleteEmoticon, deletePack, EmoticonFileError, moveEmoticon, moveEmoticonToPack, movePack, renamePack, useEmoticons } from '../emoticons.ts'
+import { openMenu } from '../ui/ContextMenu.tsx'
 import { ask, askText, toast } from '../ui/dialogs.tsx'
 
 // 최고 관리자: 😊 이모티콘 테마·이모티콘 추가/삭제 (모든 팀 공용).
@@ -42,6 +43,23 @@ export function EmoticonAdminCard() {
     await run('지우는 중…', () => deleteEmoticon(id))
   }
 
+  // 그림을 누르면: 다른 테마로 옮기기 · 앞으로/뒤로 · 지우기
+  function itemMenu(id: string, packId: string, x: number, y: number) {
+    openMenu(
+      [
+        { icon: '◀', label: '앞으로', onSelect: () => void run('옮기는 중…', () => moveEmoticon(id, -1)) },
+        { icon: '▶', label: '뒤로', onSelect: () => void run('옮기는 중…', () => moveEmoticon(id, 1)) },
+        ...packs
+          .filter((p) => p.id !== packId)
+          .map((p) => ({ icon: '📦', label: `"${p.name}" 테마로 옮기기`, onSelect: () => void run('옮기는 중…', () => moveEmoticonToPack(id, p.id)) })),
+        { icon: '🗑️', label: '지우기', danger: true, onSelect: () => void removeOne(id) },
+      ],
+      x,
+      y,
+      '이모티콘',
+    )
+  }
+
   function pickFiles(packId: string) {
     setTarget(packId)
     fileInput.current?.click()
@@ -51,7 +69,7 @@ export function EmoticonAdminCard() {
     <section className="card emoticon-admin">
       <h3>😊 이모티콘 (모든 팀 공용)</h3>
       <p className="muted small">
-        테마별로 그림을 올리면 모든 직원이 채팅 입력칸 😊에서 골라 보낼 수 있어요. PNG·JPG는 256px로 줄여 저장하고, 움직이는 GIF는 1MB까지 그대로 올려요.
+        테마별로 그림을 올리면 모든 직원이 채팅 입력칸 😊에서 골라 보낼 수 있어요. PNG·JPG는 256px로 줄여 저장하고, 움직이는 GIF는 1MB까지 그대로 올려요. 그림을 누르면 다른 테마로 옮기거나 순서를 바꿀 수 있어요.
       </p>
       {!loaded && <p className="muted small">불러오는 중…</p>}
       {packs.map((p, i) => {
@@ -77,9 +95,12 @@ export function EmoticonAdminCard() {
             </div>
             <div className="emoticon-admin-grid">
               {list.map((s) => (
-                <div key={s.id} className="emoticon-admin-item">
+                <div key={s.id} className="emoticon-admin-item" onClick={(e) => !busy && itemMenu(s.id, p.id, e.clientX, e.clientY)}>
                   <StorageImage path={s.assetId} alt={s.name || '이모티콘'} />
-                  <button type="button" className="remove" onClick={() => void removeOne(s.id)} disabled={!!busy} aria-label={`${s.name || '이모티콘'} 지우기`}>
+                  <button type="button" className="remove" onClick={(e) => {
+                      e.stopPropagation()
+                      void removeOne(s.id)
+                    }} disabled={!!busy} aria-label={`${s.name || '이모티콘'} 지우기`}>
                     ✕
                   </button>
                 </div>

@@ -6872,3 +6872,4 @@ html.keyboard-open .sms-composer {
 *::after {
   touch-action: manipulation;
 }
+.emoticon-admin-item { cursor: pointer; }

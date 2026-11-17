@@ -116,6 +116,26 @@ export async function deletePack(id: string) {
   await loadEmoticons(true)
 }
 
+// 이모티콘을 다른 테마로 옮기기 (맨 뒤로), 같은 테마 안에서 앞뒤 바꾸기 (2026-11-17, 테마가 섞였을 때 다시 안 올리고 고치게)
+export async function moveEmoticonToPack(id: string, packId: string) {
+  const order = Math.max(0, ...state.items.filter((i) => i.packId === packId).map((i) => i.order)) + 1
+  await updateDoc(doc(db, 'stickers', id), { packId, order })
+  await loadEmoticons(true)
+}
+export async function moveEmoticon(id: string, dir: -1 | 1) {
+  const me = state.items.find((i) => i.id === id)
+  if (!me) return
+  const list = state.items.filter((i) => i.packId === me.packId)
+  const i = list.findIndex((x) => x.id === id)
+  const j = i + dir
+  if (j < 0 || j >= list.length) return
+  ;[list[i], list[j]] = [list[j], list[i]]
+  const batch = writeBatch(db)
+  list.forEach((x, k) => batch.update(doc(db, 'stickers', x.id), { order: k + 1 }))
+  await batch.commit()
+  await loadEmoticons(true)
+}
+
 export async function deleteEmoticon(id: string) {
   await deleteDoc(doc(db, 'stickers', id))
   await loadEmoticons(true)
