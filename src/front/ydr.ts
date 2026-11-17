@@ -59,7 +59,7 @@ export const ydrAuth = initializeAuth(ydrApp, {
   persistence: keepSignedIn() ? [indexedDBLocalPersistence, browserLocalPersistence] : browserSessionPersistence,
 })
 export const ydrDb = initializeFirestore(ydrApp, { localCache: memoryLocalCache() })
-const ydrStorage = getStorage(ydrApp)
+export const ydrStorage = getStorage(ydrApp)
 const ydrFunctions = getFunctions(ydrApp, 'us-west1')
 if (useEmulators) {
   connectAuthEmulator(ydrAuth, 'http://127.0.0.1:9099', { disableWarnings: true })
@@ -345,7 +345,7 @@ export type FrontMessage = {
   sticker: string | null
   // 😊 우리 앱 이모티콘 (2026-11-09): 게스트는 프론트 Storage에 못 올려서 우리 Storage 그림의 내려받기 주소를 보냄
   stickerUrl: string | null
-  file: { name: string; assetId: string } | null
+  file: { name: string; assetId: string; size?: number; mime?: string } | null
   // 🎬 프론트 앱이 보낸 동영상 {assetId, poster(첫 장면 assetId), name, size, mime, w, h, dur}
   video: { assetId: string; poster?: string; name?: string; size?: number; mime?: string; w?: number; h?: number; dur?: number } | null
   link: { url: string; title?: string; desc?: string; site?: string; thumb?: string } | null
@@ -369,7 +369,7 @@ export function frontMessagesQuery(ch: string, from: number, n: number) {
 }
 
 // 😊 stickerUrl 은 Firebase Storage 내려받기 주소만 그린다 (로컬 시험은 에뮬레이터 주소도)
-const STICKER_URL_RE = import.meta.env.VITE_USE_EMULATORS ? /^(https:\/\/firebasestorage\.googleapis\.com\/|http:\/\/127\.0\.0\.1:9199\/)/ : /^https:\/\/firebasestorage\.googleapis\.com\//
+export const STICKER_URL_RE = import.meta.env.VITE_USE_EMULATORS ? /^(https:\/\/firebasestorage\.googleapis\.com\/|http:\/\/127\.0\.0\.1:9199\/)/ : /^https:\/\/firebasestorage\.googleapis\.com\//
 export function toFrontMessage(id: string, d: Record<string, unknown>): FrontMessage {
   const ids = Array.isArray(d.imageAssetIds) && d.imageAssetIds.length ? (d.imageAssetIds as string[]) : d.imageAssetId ? [String(d.imageAssetId)] : []
   return {

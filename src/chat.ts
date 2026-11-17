@@ -41,10 +41,10 @@ export const VIDEO_EXTS = ['mp4', 'mov', 'm4v', 'webm', '3gp']
 export const VIDEO_MAX_BYTES = 50 * 1024 * 1024
 export const MAX_VIDEOS = 5
 export const isVideoFile = (f: File) => f.type.startsWith('video/') || VIDEO_EXTS.includes(extOf(f.name))
-const videoType = (f: File) =>
+export const videoType = (f: File) =>
   f.type.startsWith('video/') ? f.type : ({ mov: 'video/quicktime', webm: 'video/webm', '3gp': 'video/3gpp' } as Record<string, string>)[extOf(f.name)] ?? 'video/mp4'
 // Storage 파일 이름의 확장자 (규칙이 아는 것만)
-const videoExt = (f: File) => {
+export const videoExt = (f: File) => {
   const e = extOf(f.name)
   if (VIDEO_EXTS.includes(e)) return e
   return { 'video/quicktime': 'mov', 'video/webm': 'webm', 'video/3gpp': '3gp' }[f.type] ?? 'mp4'
@@ -235,7 +235,7 @@ export async function sendMessage(
 }
 
 // 첫 장면 사진·크기·길이를 알아낸다. 이 브라우저가 못 여는 형식(PC의 아이폰 HEVC 등)이면 null → 미리보기 없이 보낸다.
-function videoInfo(file: File): Promise<{ w: number; h: number; dur: number; poster: Blob | null } | null> {
+export function videoInfo(file: File): Promise<{ w: number; h: number; dur: number; poster: Blob | null } | null> {
   return new Promise((resolve) => {
     const v = document.createElement('video')
     const url = URL.createObjectURL(file)

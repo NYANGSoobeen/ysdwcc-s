@@ -1,4 +1,4 @@
-import { addDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { addDoc, deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { GameButton } from '../games/GameButton.tsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
@@ -8,7 +8,6 @@ import { MenuButton } from '../menu.tsx'
 import { copyText, EmojiButton, fileIcon, photoCols, VideoBox } from '../pages/ChatPage.tsx'
 import { frontGames, gameMenu, GameCardView } from '../chatgame/index.tsx'
 import { frontPins, PinBar, useFrontPin } from '../chatpin/index.tsx'
-import { photoUrl } from '../chat.ts'
 import { ClipboardChip, insertAt } from '../ui/ClipboardChip.tsx'
 import { Avatar, rememberedPerson, showProfileCard } from '../ui/Avatar.tsx'
 import { chatFxOf } from '../chatfx.ts'
@@ -34,6 +33,8 @@ import {
   type FrontRoom,
 } from './ydr.ts'
 import { badgeText } from '../reads.ts'
+import { FRONT_MAX_PHOTOS, uploadFrontFile, uploadFrontPhotos, uploadFrontVideo } from './frontMedia.ts'
+import { isPhotoFile, isVideoFile, MAX_VIDEOS, photoUrl } from '../chat.ts'
 import { armImeFix, imeUndo, mentionTapProps, type ImeFix } from '../ui/mentionFix.ts'
 
 // 🏌️ 프론트 채팅 화면: 초대 코드 넣기 → 초대받은 방 목록 → 채팅 (src/front/ydr.ts 참고)
@@ -298,7 +299,13 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
     if (!ok) return
     try {
       // 🎲 게임 메시지는 게임도 지운다 (프론트 규칙: 게스트는 text·edited·deleted·game 만 바꿀 수 있음)
-      await updateDoc(doc(messagesCol(room.id), m.id), { deleted: true, text: '', ...(m.game ? { game: null } : {}) })
+      // 🖼️🎬📎 사진·동영상·파일 칸도 비운다 (파일은 게스트가 못 지워서 프론트 저장공간 정리가 치움)
+      const media = {
+        ...(m.images.length ? { imageAssetId: deleteField(), imageAssetIds: deleteField() } : {}),
+        ...(m.video ? { video: deleteField() } : {}),
+        ...(m.file ? { file: deleteField() } : {}),
+      }
+      await updateDoc(doc(messagesCol(room.id), m.id), { deleted: true, text: '', ...(m.game ? { game: null } : {}), ...media })
     } catch {
       toast('삭제하지 못했어요.', { error: true })
     }
@@ -770,6 +777,73 @@ function FrontComposer(props: {
 
   const preview = useMemo(() => (replyTo ? replySnippet(replyTo) : null), [replyTo])
 
+  // 🖼️🎬📎 사진·동영상·파일 (2026-11-17, 프론트 GUEST_LINK 5-2): 프론트 Storage에 올리고 프론트 직원과 같은 모양으로 (src/front/frontMedia.ts)
+  const photoInput = useRef<HTMLInputElement>(null)
+  const cameraInput = useRef<HTMLInputElement>(null)
+  const videoInput = useRef<HTMLInputElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState<string | null>(null)
+  async function sendMedia(list: File[]) {
+    const photos = list.filter(isPhotoFile)
+    const videos = list.filter((f) => !isPhotoFile(f) && isVideoFile(f))
+    const files = list.filter((f) => !isPhotoFile(f) && !isVideoFile(f))
+    if (photos.length > FRONT_MAX_PHOTOS) return toast(`사진은 한 번에 ${FRONT_MAX_PHOTOS}장까지 보낼 수 있어요.`, { error: true })
+    if (videos.length > MAX_VIDEOS) return toast(`동영상은 한 번에 ${MAX_VIDEOS}개까지 보낼 수 있어요.`, { error: true })
+    if (videos.length) {
+      const mb = videos.reduce((a, f) => a + f.size, 0) / 1024 / 1024
+      const ok = await ask({ message: `🎬 동영상 ${videos.length}개 (${mb.toFixed(1)}MB)를 보낼까요?\n원본 그대로 올려요 (하나에 100MB 미만).`, ok: '보내기' })
+      if (!ok) return
+    }
+    const reply = replyTo && preview ? { id: replyTo.id, authorId: replyTo.authorId, ...preview } : null
+    if (replyTo) onSent()
+    let first = true
+    const post = async (extra: Record<string, unknown>) => {
+      await addDoc(messagesCol(room.id), { text: '', authorId: uid, createdAt: Date.now(), ...extra, ...(first && reply ? { replyTo: reply } : {}) })
+      first = false
+    }
+    try {
+      if (photos.length) {
+        setUploading(`🖼️ 올리는 중… 0/${photos.length}`)
+        const ids = await uploadFrontPhotos(photos, (d, t) => setUploading(`🖼️ 올리는 중… ${d}/${t}`))
+        await post(ids.length > 1 ? { imageAssetId: ids[0], imageAssetIds: ids } : { imageAssetId: ids[0] })
+      }
+      for (const [i, f] of videos.entries()) {
+        const n = videos.length > 1 ? `${i + 1}/${videos.length} ` : ''
+        setUploading(`🎬 동영상 올리는 중… ${n}0%`)
+        await post({ video: await uploadFrontVideo(f, (p) => setUploading(`🎬 동영상 올리는 중… ${n}${p}%`)) })
+      }
+      for (const [i, f] of files.entries()) {
+        const n = files.length > 1 ? `${i + 1}/${files.length} ` : ''
+        setUploading(`📎 파일 올리는 중… ${n}0%`)
+        await post({ file: await uploadFrontFile(f, (p) => setUploading(`📎 파일 올리는 중… ${n}${p}%`)) })
+      }
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? ''
+      const msg = (err as Error).message ?? ''
+      toast(
+        /MB를 넘어/.test(msg)
+          ? msg
+          : code.includes('unauthorized') || code === 'permission-denied'
+            ? '프론트 앱이 아직 지원팀 사진·파일을 받지 못해요. 프론트 앱 업데이트(GUEST_LINK 5-2) 뒤에 보낼 수 있어요.'
+            : '보내지 못했어요. 인터넷을 확인해 주세요.',
+        { error: true, long: true },
+      )
+    } finally {
+      setUploading(null)
+    }
+  }
+  const mediaItems: MenuAction[] = [
+    { icon: '🖼️', label: '사진 보관함', onSelect: () => photoInput.current?.click() },
+    ...(isTouchUi() ? [{ icon: '📷', label: '사진 찍기', onSelect: () => cameraInput.current?.click() }] : []),
+    { icon: '🎬', label: '동영상 (100MB 미만)', onSelect: () => videoInput.current?.click() },
+    { icon: '📎', label: '파일 (20MB 미만)', onSelect: () => fileInput.current?.click() },
+  ]
+  const pickInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files ?? [])]
+    e.target.value = ''
+    if (files.length) void sendMedia(files)
+  }
+
   // 😊 우리 앱 이모티콘 보내기 (2026-11-09 사용자 요청 "프론트&지원팀 방에서도"): 게스트는 프론트 Storage에 못 올리므로
   // 우리 Storage 그림(stickers/…)의 내려받기 주소를 stickerUrl 로 보낸다. 프론트 규칙·화면이 stickerUrl 을 받아야 동작.
   async function sendSticker(assetId: string) {
@@ -874,16 +948,21 @@ function FrontComposer(props: {
           ))}
         </ul>
       )}
+      {uploading && <p className="muted small uploading" role="status">{uploading}</p>}
+      <input ref={photoInput} type="file" accept="image/*" multiple hidden onChange={pickInput} />
+      <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={pickInput} />
+      <input ref={videoInput} type="file" accept="video/*" multiple hidden onChange={pickInput} />
+      <input ref={fileInput} type="file" multiple hidden onChange={pickInput} />
       <ClipboardChip inputRef={textarea} onPaste={(t) => insertAt(textarea.current, body, t, setBody)} />
       <div className="composer-row">
         <button
           type="button"
           className="round-button attach-button"
-          aria-label="미니 게임"
-          disabled={Boolean(editing)}
+          aria-label="사진·동영상·파일·미니 게임"
+          disabled={Boolean(editing) || Boolean(uploading)}
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
-            openMenu(props.gameItems, r.left, r.top - 8)
+            openMenu([...mediaItems, ...props.gameItems], r.left, r.top - 8)
           }}
         >
           ＋
