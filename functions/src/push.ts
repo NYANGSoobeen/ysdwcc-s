@@ -132,7 +132,8 @@ export function fxText(t: string) {
 
 export function previewOf(m: Record<string, unknown>) {
   const body = typeof m.body === 'string' ? m.body : ''
-  if (body.trim()) return short(fxText(body) ?? body, 100)
+  // 🪜 사다리는 🔀로 (윈도우 10엔 🪜 글꼴이 없음, 프론트 12.99와 같게)
+  if (body.trim()) return short((fxText(body) ?? body).replace(/🪜/gu, '🔀'), 100)
   const photos = Array.isArray(m.attachments) ? m.attachments.length : 0
   if (photos) return photos > 1 ? `📷 사진 ${photos}장` : '📷 사진'
   if (m.video) return '🎬 동영상'

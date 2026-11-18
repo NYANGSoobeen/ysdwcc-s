@@ -63,7 +63,7 @@ function build(): Api {
   const code =
     `"use strict";\nvar ${NAMES.join(', ')}, fxEmojiOk = this && this.fxEmojiOk;\n${form}\n;\n${gameSrc}\n;\n` +
     `return { gameCard: gameCard, gameMenuItems: gameMenuItems, set: function (o) { ${NAMES.map((n) => `if ('${n}' in o) ${n} = o.${n};`).join(' ')} } };`
-  // 🪟 사다리(🪜)가 윈도우 10에서 빈 네모면 🔀 (chatgame.js gmLadderIc 가 fxEmojiOk 를 씀)
+  // 🪟 사다리 아이콘은 프론트 12.99부터 늘 🔀 (chatgame.js gmLadderIc), fxEmojiOk 는 다른 곳용으로 이어 둠
   return new Function(code).call({ fxEmojiOk: emojiOk }) as Api
 }
 

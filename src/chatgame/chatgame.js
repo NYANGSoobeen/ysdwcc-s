@@ -68,7 +68,7 @@ async function gameNew(type){
     if(!prizes.length){ toast('결과를 하나 이상 적어 주세요 (예: 커피 쏘기)'); return; }
     while(prizes.length<names.length) prizes.push('통과');
     game={type:'ladder', names, prizes:gameShuffle(prizes), rungs:ladderMake(names.length)};
-    text='🪜 사다리타기: '+names.join(', ')+'\n결과: '+gameShuffle(prizes).join(', ')+' (누가 뭔지는 사다리를 타 봐야 알아요)';
+    text='🔀 사다리타기: '+names.join(', ')+'\n결과: '+gameShuffle(prizes).join(', ')+' (누가 뭔지는 사다리를 타 봐야 알아요)';
   } else if(type==='dice'){
     const r=await uiForm('🎲 주사위',[{key:'n', label:'주사위 개수 (1~3)', type:'number', value:'1'}],{okLabel:'굴리기'});
     if(!r) return;
@@ -116,7 +116,8 @@ function gameCard(m){
   }catch(e){ el.textContent=m.text||''; }
   return el;
 }
-const gmLadderIc=()=>typeof fxEmojiOk==='function'&&!fxEmojiOk('🪜')?'🔀':'🪜';   // 🪜(2020년)는 윈도우 10에 없어서 빈 네모 → 그 기기에선 🔀
+const gmLadderIc=()=>'🔀';   // 12.99: 사다리 아이콘은 늘 🔀 (🪜는 2020년 이모지라 윈도우 10에서 빈 네모 · 저장되는 글도 🔀, 지원팀 앱도 같이 → GUEST_LINK.md 5-1)
+const gmFixTxt=t=>String(t||'').replace(/🪜/gu,'🔀');   // 예전에 저장된 글(답장 인용 등)에 남은 🪜
 function gameHead(el, icon, title, sub){
   const h=document.createElement('div'); h.className='gmHead';
   h.innerHTML='<span class="gmIc">'+icon+'</span><span class="gmTitle"></span>';

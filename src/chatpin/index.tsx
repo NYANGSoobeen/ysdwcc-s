@@ -1,3 +1,4 @@
+import { fixEmoji } from '../ui/emojiFix.ts'
 // 📌 채팅방 위 고정 (2026-11-08 사용자 요청, 프론트 앱 js/chatpin.js 를 그대로 옮김, 카톡 채팅방 공지처럼 방마다 하나).
 // chatpin.js·chatpin.css 는 프론트가 준 파일 그대로(고치지 않음, 프론트가 고치면 다시 복사).
 // 🎲 미니 게임(src/chatgame)과 같은 방식: 옛 방식 코드라 uiForm(창)과 한 덩어리로 묶어 함수 안에서 돌리고, 기대하는 값을 여기서 이어 준다.
@@ -142,7 +143,8 @@ export function frontPins(e: PinEnv): Api {
 function setEnv(api: Api, e: PinEnv, extra: Record<string, unknown>) {
   api.set({
     ...extra,
-    channels: [{ id: e.roomId, pin: e.pin }],
+    // 🪜 → 🔀 (예전에 고정한 사다리타기 글)
+    channels: [{ id: e.roomId, pin: e.pin ? { ...e.pin, text: fixEmoji(e.pin.text ?? '') } : e.pin }],
     currentChannel: e.roomId,
     myId: e.myId,
     displayNameFor: (id: string) => (id ? e.nameOf(id) : ''),

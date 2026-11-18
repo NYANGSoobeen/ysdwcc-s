@@ -608,7 +608,7 @@ function FrontMessageItem(props: {
                 <strong>↩ {props.replyName}에게 답장</strong>
                 <span>
                   {replyIcon(reply.kind)}
-                  {reply.text}
+                  {fixEmoji(reply.text)}
                 </span>
               </button>
             )}
@@ -914,7 +914,7 @@ function FrontComposer(props: {
         <div className="composer-context">
           <div>
             <strong>{editing ? '✏️ 메시지 수정' : `↩ ${props.replyName}에게 답장`}</strong>
-            <span>{editing ? editing.text : `${replyIcon(preview?.kind)}${preview?.text ?? ''}`}</span>
+            <span>{editing ? editing.text : `${replyIcon(preview?.kind)}${fixEmoji(preview?.text ?? '')}`}</span>
           </div>
           <button type="button" className="ghost icon" onClick={cancel} aria-label={editing ? '수정 취소' : '답장 취소'}
             onPointerDown={(e) => e.preventDefault()}>

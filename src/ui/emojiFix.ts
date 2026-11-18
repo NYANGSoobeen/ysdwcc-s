@@ -63,9 +63,10 @@ const KEYS = Object.keys(EMOJI_FB).sort((a, b) => b.length - a.length)
 const NEW_RE = new RegExp(KEYS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
 
 // 이 기기에서 안 그려지는 새 이모지만 옛 이모지로 (그려지는 기기에서는 글을 그대로 돌려줌)
+// 🪜 사다리는 기기와 상관없이 늘 🔀 (2026-11-18 프론트 12.99와 맞춤: 사다리타기 글도 이제 "🔀 사다리타기"로 저장, 예전 글의 🪜도 🔀로 보이게)
 export function fixEmoji(text: string) {
   if (!text) return text
-  return text.replace(NEW_RE, (e) => (emojiOk(e) ? e : EMOJI_FB[e]))
+  return text.replace(/🪜/gu, '🔀').replace(NEW_RE, (e) => (emojiOk(e) ? e : EMOJI_FB[e]))
 }
 // 이모지 하나: 그려지면 그대로, 아니면 바꿀 것(없으면 null = 숨김)
 export function safeEmoji(e: string): string | null {

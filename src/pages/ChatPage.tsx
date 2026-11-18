@@ -913,7 +913,7 @@ function MessageItem(props: {
             {reply && (
               <button type="button" className="reply-quote" onClick={() => props.onJump(reply.id)}>
                 <strong>↩ {profiles[reply.authorUid]?.name ?? '나간 팀원'}에게 답장</strong>
-                <span>{props.original?.deleted ? '삭제된 메시지입니다' : reply.text}</span>
+                <span>{props.original?.deleted ? '삭제된 메시지입니다' : fixEmoji(reply.text)}</span>
               </button>
             )}
             {m.attachments.length > 0 && (
