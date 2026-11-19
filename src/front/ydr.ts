@@ -495,8 +495,9 @@ export function frontUnreadBy(
   guests: Map<string, number> | null,
   authorId: string | null | undefined,
   at: number,
+  knownGuest: (id: string) => boolean = () => true,
 ) {
-  return frontUnreadWho(accounts, reads, guests, authorId, at).length
+  return frontUnreadWho(accounts, reads, guests, authorId, at, knownGuest).length
 }
 
 // 아직 안 읽은 사람 id 목록 (프론트 직원 acc_아이디, 게스트 g_…) — 숫자를 누르면 이름으로 보여 줌
@@ -506,6 +507,7 @@ export function frontUnreadWho(
   guests: Map<string, number> | null,
   authorId: string | null | undefined,
   at: number,
+  knownGuest: (id: string) => boolean = () => true,
 ) {
   const author = String(authorId ?? '').replace(/^acc_/, '')
   const who: string[] = []
@@ -516,12 +518,12 @@ export function frontUnreadWho(
   }
   if (guests) {
     for (const [id, from] of guests) {
-      if (id === authorId || from > at) continue
+      if (id === authorId || from > at || !knownGuest(id)) continue
       if ((reads.get(id) ?? 0) < at) who.push(id)
     }
   } else {
     for (const [id, r] of reads) {
-      if (id.startsWith('g_') && id !== authorId && r < at) who.push(id)
+      if (id.startsWith('g_') && id !== authorId && r < at && knownGuest(id)) who.push(id)
     }
   }
   return [...new Set(who)]

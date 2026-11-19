@@ -141,7 +141,10 @@ function FrontRoomView({ room, uid, myName, admin, onLeft }: { room: FrontRoom; 
   const guestUids = [...new Set([...(roomGuests?.keys() ?? []), ...reads.keys()])]
     .filter((id) => id.startsWith('g_') && id !== uid)
     .map((id) => id.slice(2))
-  useMemberProfiles(guestUids)
+  const guestProfiles = useMemberProfiles(guestUids)
+  // 우리 앱에 없는 게스트(지워진 예전 계정 등 = "타부서")는 안 읽은 숫자에서 뺀다 (2026-11-19 사용자 "타부서를 안 세면 맞을 것 같아")
+  // 나는 늘 셈(내 프로필은 따로 읽음)
+  const knownGuest = (id: string) => id === uid || !!guestProfiles[id.slice(2)]
   const listRef = useRef<HTMLDivElement>(null)
   // 🎉 채팅 효과 (/축하 등): 프론트 앱과 같은 글이라 양쪽 다 효과가 나온다
   const fxList = useMemo(() => messages.map((m) => ({ id: m.id, text: m.text, at: m.createdAt || null, deleted: m.deleted })), [messages])
@@ -407,9 +410,9 @@ function FrontRoomView({ room, uid, myName, admin, onLeft }: { room: FrontRoom; 
                 showAuthor={!mine && !groupedWithPrev}
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
-                unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, roomGuests, m.authorId, m.createdAt)}
+                unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, roomGuests, m.authorId, m.createdAt, knownGuest)}
                 onUnread={admin ? () => {
-                  const who = frontUnreadWho(accounts, reads, roomGuests, m.authorId, m.createdAt)
+                  const who = frontUnreadWho(accounts, reads, roomGuests, m.authorId, m.createdAt, knownGuest)
                   void tell(
                     `👀 아직 안 읽은 사람 ${who.length}명\n\n` + who.map((id) => {
                         const n = authorName(id, uid, accounts)
