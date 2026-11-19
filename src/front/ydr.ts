@@ -22,6 +22,7 @@ import {
   orderBy,
   query,
   setDoc,
+  deleteDoc,
   updateDoc,
   where,
 } from 'firebase/firestore'
@@ -256,6 +257,9 @@ export async function disconnectFront(opts: { forget?: boolean } = {}) {
 
 export async function leaveFrontRoom(ch: string) {
   leaving.add(ch)
+  // 나가면 안 읽은 숫자에 더 안 세이게 내 읽음 기록을 먼저 지움 (나간 뒤엔 규칙상 못 지움)
+  const me = ydrAuth.currentUser?.uid
+  if (me) await deleteDoc(doc(ydrDb, 'channels', ch, 'reads', me)).catch(() => {})
   try {
     await httpsCallable<{ ch: string }, unknown>(ydrFunctions, 'guestLeave')({ ch })
   } catch (err) {
@@ -472,6 +476,11 @@ export function frontUnreadBy(accounts: Map<string, FrontAccount>, reads: Map<st
     if (!a.active || a.loginId === author) continue
     if (!a.admin && a.chatFrom > at) continue
     if ((reads.get(a.loginId) ?? 0) < at) n++
+  }
+  // 👥 이 방 타부서 게스트(g_…)도 센다 (프론트 13.29 unreadByCount와 같게). 게스트는 다른 게스트 명단(guests)을
+  // 못 읽어서, 이 방 읽음 기록(reads/g_…)이 있는 게스트로 대신한다. 읽음 시각이 이 말보다 늦으면(= 들어온 뒤 읽음) 안 셈.
+  for (const [id, r] of reads) {
+    if (id.startsWith('g_') && id !== authorId && r < at) n++
   }
   return n
 }
