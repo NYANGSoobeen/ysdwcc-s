@@ -28,6 +28,7 @@ import {
   useFront,
   useFrontAccounts,
   useFrontRoomReads,
+  useFrontRoomGuests,
   frontUnreadBy,
   type FrontAccount,
   type FrontMessage,
@@ -133,6 +134,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
   const [full, setFull] = useState(false) // 더 이전 메시지가 없음
   const accounts = useFrontAccounts(true)
   const reads = useFrontRoomReads(room.id)
+  const roomGuests = useFrontRoomGuests(room.id)
   const listRef = useRef<HTMLDivElement>(null)
   // 🎉 채팅 효과 (/축하 등): 프론트 앱과 같은 글이라 양쪽 다 효과가 나온다
   const fxList = useMemo(() => messages.map((m) => ({ id: m.id, text: m.text, at: m.createdAt || null, deleted: m.deleted })), [messages])
@@ -398,7 +400,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 showAuthor={!mine && !groupedWithPrev}
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
-                unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, m.authorId, m.createdAt)}
+                unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, roomGuests, m.authorId, m.createdAt)}
                 replyName={m.replyTo ? nameOf(m.replyTo.authorId) : ''}
                 onReply={() => {
                   setEditing(null)

@@ -467,9 +467,35 @@ export function useFrontRoomReads(ch: string) {
   return reads
 }
 
-// 말풍선 옆 노란 숫자: 프론트 앱과 같은 기준으로, 보낸 사람을 뺀 프론트 직원 중 아직 안 읽은 사람 수
-// (사용 중지된 직원, 가입 전이라 이 말을 못 보는 직원은 뺀다)
-export function frontUnreadBy(accounts: Map<string, FrontAccount>, reads: Map<string, number>, authorId: string | null | undefined, at: number) {
+// 이 방 게스트 명단 (방 문서 channels/{방}.guestIds = {g_아이디: 보이기 시작한 시각(0=전부)}, 프론트 서버가 맞춤).
+// 📌 고정 띠(useFrontPin)도 같은 방 문서를 지켜봐서 SDK가 한 번만 받는다(읽기 안 늘어남). 아직 없는 예전 방이면 null.
+export function useFrontRoomGuests(ch: string) {
+  const [guests, setGuests] = useState<Map<string, number> | null>(null)
+  useEffect(() => {
+    setGuests(null)
+    return onSnapshot(
+      doc(ydrDb, 'channels', ch),
+      (s) => {
+        const g = s.get('guestIds') as Record<string, unknown> | undefined
+        setGuests(g && typeof g === 'object' ? new Map(Object.entries(g).map(([id, f]) => [id, Number(f) || 0])) : null)
+      },
+      () => {},
+    )
+  }, [ch])
+  return guests
+}
+
+// 말풍선 옆 노란 숫자: 프론트 앱과 같은 기준 (GUEST_LINK 5번) = 프론트 직원 전부 + 이 방 게스트 중 아직 안 읽은 사람 수.
+// 직원: 사용 중(active)인 계정 전부(방을 안 연 직원도), 가입 전이라 이 말을 못 보는 직원은 뺀다.
+// 게스트: 방 문서 guestIds에 있는 게스트 전부(방을 안 연 게스트도), 보이기 시작한 시각이 이 말보다 늦으면 뺀다.
+// guestIds가 없는 예전 방은 읽음 기록(reads/g_…)이 있는 게스트로 대신. 보낸 사람은 뺀다.
+export function frontUnreadBy(
+  accounts: Map<string, FrontAccount>,
+  reads: Map<string, number>,
+  guests: Map<string, number> | null,
+  authorId: string | null | undefined,
+  at: number,
+) {
   const author = String(authorId ?? '').replace(/^acc_/, '')
   let n = 0
   for (const a of accounts.values()) {
@@ -477,10 +503,15 @@ export function frontUnreadBy(accounts: Map<string, FrontAccount>, reads: Map<st
     if (!a.admin && a.chatFrom > at) continue
     if ((reads.get(a.loginId) ?? 0) < at) n++
   }
-  // 👥 이 방 타부서 게스트(g_…)도 센다 (프론트 13.29 unreadByCount와 같게). 게스트는 다른 게스트 명단(guests)을
-  // 못 읽어서, 이 방 읽음 기록(reads/g_…)이 있는 게스트로 대신한다. 읽음 시각이 이 말보다 늦으면(= 들어온 뒤 읽음) 안 셈.
-  for (const [id, r] of reads) {
-    if (id.startsWith('g_') && id !== authorId && r < at) n++
+  if (guests) {
+    for (const [id, from] of guests) {
+      if (id === authorId || from > at) continue
+      if ((reads.get(id) ?? 0) < at) n++
+    }
+  } else {
+    for (const [id, r] of reads) {
+      if (id.startsWith('g_') && id !== authorId && r < at) n++
+    }
   }
   return n
 }
