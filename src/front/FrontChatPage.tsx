@@ -14,7 +14,7 @@ import { Avatar, rememberedPerson, showProfileCard } from '../ui/Avatar.tsx'
 import { chatFxOf } from '../chatfx.ts'
 import { ChatFxPick, FxTag, useChatFx } from '../ui/ChatFx.tsx'
 import { MoreButton, openMenu, useItemMenu, type MenuAction } from '../ui/ContextMenu.tsx'
-import { ask, askText, isTouchUi, toast } from '../ui/dialogs.tsx'
+import { ask, askText, isTouchUi, tell, toast } from '../ui/dialogs.tsx'
 import {
   assetLink,
   assetUrl,
@@ -30,6 +30,7 @@ import {
   useFrontRoomReads,
   useFrontRoomGuests,
   frontUnreadBy,
+  frontUnreadWho,
   type FrontAccount,
   type FrontMessage,
   type FrontRoom,
@@ -401,6 +402,15 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
                 unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, roomGuests, m.authorId, m.createdAt)}
+                onUnread={() => {
+                  const who = frontUnreadWho(accounts, reads, roomGuests, m.authorId, m.createdAt)
+                  void tell(
+                    `👀 아직 안 읽은 사람 ${who.length}명\n\n` + who.map((id) => {
+                        const n = authorName(id, uid, accounts)
+                        return '· ' + (n === '타부서' || n === '프론트 직원' ? `${n} (${id.slice(0, 8)}…)` : n)
+                      }).join('\n'),
+                  )
+                }}
                 replyName={m.replyTo ? nameOf(m.replyTo.authorId) : ''}
                 onReply={() => {
                   setEditing(null)
@@ -564,6 +574,7 @@ function FrontMessageItem(props: {
   time: string
   highlight: boolean
   unread: number
+  onUnread: () => void
   replyName: string
   onReply: () => void
   onEdit: () => void
@@ -679,7 +690,16 @@ function FrontMessageItem(props: {
         {(props.time || m.edited || props.unread > 0) && (
           <div className="meta">
             {props.unread > 0 && (
-              <span className="unread-count" title={`프론트 직원 ${props.unread}명이 아직 안 읽었어요`}>
+              <span
+                className="unread-count"
+                role="button"
+                style={{ cursor: 'pointer' }}
+                title={`${props.unread}명이 아직 안 읽었어요 (누르면 누군지)`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  props.onUnread()
+                }}
+              >
                 {badgeText(props.unread)}
               </span>
             )}
