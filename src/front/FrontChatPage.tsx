@@ -1,3 +1,4 @@
+import { useMemberProfiles } from '../hooks.ts'
 import { addDoc, deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { fixEmoji } from '../ui/emojiFix.ts'
 import { GameButton } from '../games/GameButton.tsx'
@@ -136,6 +137,11 @@ function FrontRoomView({ room, uid, myName, admin, onLeft }: { room: FrontRoom; 
   const accounts = useFrontAccounts(true)
   const reads = useFrontRoomReads(room.id)
   const roomGuests = useFrontRoomGuests(room.id)
+  // 같이 들어간 지원팀 직원(g_ + 우리 uid) 이름: 우리 users 문서를 읽어 둔다(다른 팀·최고 관리자도 "타부서" 대신 이름으로)
+  const guestUids = [...new Set([...(roomGuests?.keys() ?? []), ...reads.keys()])]
+    .filter((id) => id.startsWith('g_') && id !== uid)
+    .map((id) => id.slice(2))
+  useMemberProfiles(guestUids)
   const listRef = useRef<HTMLDivElement>(null)
   // 🎉 채팅 효과 (/축하 등): 프론트 앱과 같은 글이라 양쪽 다 효과가 나온다
   const fxList = useMemo(() => messages.map((m) => ({ id: m.id, text: m.text, at: m.createdAt || null, deleted: m.deleted })), [messages])
@@ -407,7 +413,8 @@ function FrontRoomView({ room, uid, myName, admin, onLeft }: { room: FrontRoom; 
                   void tell(
                     `👀 아직 안 읽은 사람 ${who.length}명\n\n` + who.map((id) => {
                         const n = authorName(id, uid, accounts)
-                        return '· ' + (n === '타부서' || n === '프론트 직원' ? `${n} (${id.slice(0, 8)}…)` : n)
+                        const where = id.startsWith('g_') ? '지원팀' : '프론트'
+                        return '· ' + (n === '타부서' || n === '프론트 직원' ? `${n} (${id.slice(0, 8)}…)` : `${n} · ${where}`)
                       }).join('\n'),
                   )
                 } : null}

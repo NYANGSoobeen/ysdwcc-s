@@ -524,5 +524,5 @@ export function frontUnreadWho(
       if (id.startsWith('g_') && id !== authorId && r < at) who.push(id)
     }
   }
-  return who
+  return [...new Set(who)]
 }
