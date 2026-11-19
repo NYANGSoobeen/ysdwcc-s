@@ -45,13 +45,13 @@ const PAGE = 100
 const MAX_TEXT = 4000
 
 // 프론트 채팅방은 우리 단체 채팅방과 같이 메뉴의 "단체 채팅" 묶음에 보인다. 여기서는 고른 방(없으면 첫 방)을 보여 준다.
-export function FrontChatPage(props: { roomId: string | null; onOpenRoom: (id: string | null) => void }) {
+export function FrontChatPage(props: { roomId: string | null; onOpenRoom: (id: string | null) => void; admin?: boolean }) {
   const front = useFront()
   if (front.status === 'connecting') return <div className="center muted">프론트 채팅에 연결하는 중…</div>
   if (front.status === 'off' || !front.uid) return <JoinPage />
   const room = front.rooms.find((r) => r.id === props.roomId) ?? front.rooms[0]
   if (!room) return <JoinPage />
-  return <FrontRoomView key={room.id} room={room} uid={front.uid} myName={front.name} onLeft={() => props.onOpenRoom(null)} />
+  return <FrontRoomView key={room.id} room={room} uid={front.uid} myName={front.name} admin={!!props.admin} onLeft={() => props.onOpenRoom(null)} />
 }
 
 async function joinWithCode() {
@@ -128,7 +128,7 @@ function JoinPage() {
 }
 
 // ── 방 ────────────────────────────────────────────────────────
-function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: string; myName: string; onLeft: () => void }) {
+function FrontRoomView({ room, uid, myName, admin, onLeft }: { room: FrontRoom; uid: string; myName: string; admin: boolean; onLeft: () => void }) {
   const [limitN, setLimitN] = useState(PAGE)
   const [messages, setMessages] = useState<FrontMessage[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -402,7 +402,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                 time={sameGroup(m, next) ? '' : new Date(m.createdAt).toLocaleTimeString('ko-KR', { timeStyle: 'short' })}
                 highlight={flashId === m.id}
                 unread={m.deleted ? 0 : frontUnreadBy(accounts, reads, roomGuests, m.authorId, m.createdAt)}
-                onUnread={() => {
+                onUnread={admin ? () => {
                   const who = frontUnreadWho(accounts, reads, roomGuests, m.authorId, m.createdAt)
                   void tell(
                     `👀 아직 안 읽은 사람 ${who.length}명\n\n` + who.map((id) => {
@@ -410,7 +410,7 @@ function FrontRoomView({ room, uid, myName, onLeft }: { room: FrontRoom; uid: st
                         return '· ' + (n === '타부서' || n === '프론트 직원' ? `${n} (${id.slice(0, 8)}…)` : n)
                       }).join('\n'),
                   )
-                }}
+                } : null}
                 replyName={m.replyTo ? nameOf(m.replyTo.authorId) : ''}
                 onReply={() => {
                   setEditing(null)
@@ -574,7 +574,7 @@ function FrontMessageItem(props: {
   time: string
   highlight: boolean
   unread: number
-  onUnread: () => void
+  onUnread: (() => void) | null
   replyName: string
   onReply: () => void
   onEdit: () => void
@@ -692,13 +692,17 @@ function FrontMessageItem(props: {
             {props.unread > 0 && (
               <span
                 className="unread-count"
-                role="button"
-                style={{ cursor: 'pointer' }}
-                title={`${props.unread}명이 아직 안 읽었어요 (누르면 누군지)`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  props.onUnread()
-                }}
+                role={props.onUnread ? 'button' : undefined}
+                style={props.onUnread ? { cursor: 'pointer' } : undefined}
+                title={`${props.unread}명이 아직 안 읽었어요${props.onUnread ? ' (누르면 누군지)' : ''}`}
+                onClick={
+                  props.onUnread
+                    ? (e) => {
+                        e.stopPropagation()
+                        props.onUnread?.()
+                      }
+                    : undefined
+                }
               >
                 {badgeText(props.unread)}
               </span>

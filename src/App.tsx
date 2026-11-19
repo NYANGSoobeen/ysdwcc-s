@@ -460,7 +460,7 @@ function SignedIn({ user }: { user: User }) {
               />
             )}
             {current === 'usage' && <UsagePage team={team} />}
-            {current === 'front' && <FrontChatPage roomId={frontRoomId} onOpenRoom={openFrontRoom} />}
+            {current === 'front' && <FrontChatPage roomId={frontRoomId} onOpenRoom={openFrontRoom} admin={isAdmin} />}
             {current === 'profile' && <ProfilePage user={user} profile={profile} team={team} onOpenAlerts={() => setTab('alerts')} />}
             {current === 'alerts' && <AlertsPage unread={badgeTotal} workSms={phoneBadges.sms} />}
           </div>
