@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase-admin/app'
+import { getApps, initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
@@ -132,6 +132,8 @@ export const onNoteDeleted = onDocumentDeleted(
 
 function requireUid(req: CallableRequest) {
   if (!req.auth) throw new HttpsError('unauthenticated', '로그인이 필요합니다.')
+  // 🤝 프론트 직원 로그인(frontAuth, token.front)은 프론트 공지만 쓰고 우리 기능은 못 씀
+  if (req.auth.token?.front === true) throw new HttpsError('permission-denied', '프론트 공지만 쓸 수 있어요.')
   return req.auth.uid
 }
 
@@ -1124,4 +1126,23 @@ export const setSearchKey = onCall({ timeoutSeconds: 20 }, async (req) => {
   }
   await ref.set({ key, updatedAt: FieldValue.serverTimestamp(), updatedBy: uid })
   return { ok: true }
+})
+
+// ── 🤝 프론트 공지 같이 쓰기 (프론트 GUEST_LINK 10, 2026-11-26) ─────────────
+// 프론트 앱이 프론트 로그인 ID 토큰을 보내면 확인하고, 우리 프로젝트에 'f_' + 프론트 uid 로그인 토큰(front 표시)을 준다.
+// 그 로그인은 보안 규칙상 frontNotices 만 읽고 쓸 수 있다(signedIn()이 front 토큰을 뺌). 프론트 쪽 게스트(= 우리 직원) 토큰은 거절.
+// ⚠️ createCustomToken 은 함수 실행 계정에 '서비스 계정 토큰 생성자' 역할이 있어야 한다.
+const FRONT_PROJECT = process.env.FRONT_PROJECT_ID || 'ysdwcc-f'
+const frontAdmin = () => getApps().find((a) => a.name === 'front') ?? initializeApp({ projectId: FRONT_PROJECT }, 'front')
+export const frontAuth = onCall({ cors: true }, async (req) => {
+  let t
+  try {
+    t = await getAuth(frontAdmin()).verifyIdToken(String(req.data?.idToken ?? ''))
+  } catch {
+    throw new HttpsError('unauthenticated', '프론트 로그인을 확인하지 못했어요.')
+  }
+  if (t.guest === true) throw new HttpsError('permission-denied', '프론트 직원만 쓸 수 있어요.')
+  const name = String(req.data?.name ?? '').trim().slice(0, 20)
+  const token = await getAuth().createCustomToken(`f_${t.uid}`, { front: true, name })
+  return { token }
 })

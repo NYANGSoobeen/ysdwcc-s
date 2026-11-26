@@ -477,3 +477,28 @@ test('📌 채팅방 위 고정: 편집 이상이 고정·내리기, 보기 권�
   await assertFails(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { pin: deleteField(), name: '바꿈' }))
   await assertSucceeds(updateDoc(doc(fs('ed'), 'teams/t1/channels/main'), { pin: deleteField() }))
 })
+
+test('🤝 프론트 공지: 우리 팀 직원과 프론트 직원(front 토큰)이 같이 쓰고, 프론트 토큰은 다른 데이터에 못 들어온다', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/viewer'), { name: '보기', email: 'v@x.com', teamIds: ['t1'] })
+  })
+  const front = env.authenticatedContext('f_kim', { front: true, name: '김프론트' }).firestore()
+  const base = { title: '', body: '내일 단체 손님', authorName: '김프론트 · 프론트', createdAt: 1000, from: 'front' }
+  await assertSucceeds(setDoc(doc(front, 'frontNotices/n1'), { ...base, authorId: 'f_kim' }))
+  await assertFails(setDoc(doc(front, 'frontNotices/n2'), { ...base, authorId: 'viewer' }))
+  await assertFails(setDoc(doc(front, 'frontNotices/n3'), { ...base, authorId: 'f_kim', secret: 1 }))
+  // 우리 직원(보기 권한도) 읽고 쓰기, 팀 밖 사람은 못 봄
+  await assertSucceeds(getDoc(doc(fs('viewer'), 'frontNotices/n1')))
+  await assertFails(getDoc(doc(fs('nobody'), 'frontNotices/n1')))
+  await assertSucceeds(setDoc(doc(fs('viewer'), 'frontNotices/s1'), { title: '공지', body: '지원팀 글', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 2000 }))
+  // 남의 글: 고정·순서만
+  await assertSucceeds(updateDoc(doc(fs('viewer'), 'frontNotices/n1'), { pinned: true, pinnedAt: 3000, pinnedBy: 'viewer' }))
+  await assertFails(updateDoc(doc(fs('viewer'), 'frontNotices/n1'), { body: '남의 글 고치기' }))
+  await assertFails(deleteDoc(doc(fs('viewer'), 'frontNotices/n1')))
+  await assertSucceeds(updateDoc(doc(front, 'frontNotices/n1'), { body: '고침', editedBy: 'f_kim', editedName: '김프론트 · 프론트', editedAt: 4000 }))
+  await assertSucceeds(deleteDoc(doc(front, 'frontNotices/n1')))
+  // 프론트 토큰은 signedIn()을 쓰는 다른 곳에 못 들어온다
+  await assertFails(getDoc(doc(front, 'users/viewer')))
+  await assertFails(getDoc(doc(front, 'teams/t1')))
+  await assertFails(getDoc(doc(front, 'stickers/x')))
+})

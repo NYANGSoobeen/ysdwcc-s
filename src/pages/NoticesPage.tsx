@@ -312,7 +312,7 @@ function NoticeComposer({ teamId }: { teamId: string }) {
 }
 
 const LINK_RE = /(https?:\/\/[^\s<>"']+)/g
-function linkifyText(text: string) {
+export function linkifyText(text: string) {
   return text.split(LINK_RE).map((part, i) =>
     i % 2 ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer">

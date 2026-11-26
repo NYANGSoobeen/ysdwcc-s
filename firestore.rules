@@ -3,8 +3,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // 우리 직원 로그인. 🤝 프론트 공지용 프론트 직원 로그인(frontAuth가 준 token.front)은 빼서
+    // signedIn()을 쓰는 다른 규칙에는 하나도 못 들어온다 (frontNotices만 isFront()로 따로 허락).
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.get('front', false) != true;
+    }
+    function isFront() {
+      return request.auth != null && request.auth.token.get('front', false) == true;
     }
 
     function members(teamId) {
@@ -138,6 +143,34 @@ service cloud.firestore {
         && (!('b2' in request.resource.data) || (request.resource.data.b2 is int && request.resource.data.b2 >= 0 && request.resource.data.b2 <= 1000000))
         && (!('b3' in request.resource.data) || (request.resource.data.b3 is int && request.resource.data.b3 >= 0 && request.resource.data.b3 <= 1000000));
       allow delete: if (col == 'cartScores' || col == 'lostScores' || col == 'stressScores') && inSomeTeam() && (id == request.auth.uid || isSuperAdmin());
+    }
+    // 🤝 프론트 공지 (2026-11-26, 프론트 GUEST_LINK 10): 모든 팀 공용 게시판 하나를 프론트 앱과 같이 쓴다.
+    // 우리 직원(팀에 속한 사람·최고 관리자)과 프론트 직원(isFront, uid = f_…)이 읽고 쓴다. 칸 모양은 프론트와 같게(createdAt = ms 숫자).
+    // 글 고치기·지우기는 쓴 사람만(최고 관리자는 지우기만), 고정·순서 칸은 누구나.
+    function fnWriter() {
+      return isFront() || inSomeTeam();
+    }
+    function fnKeys() {
+      return ['title', 'body', 'authorId', 'authorName', 'createdAt', 'from', 'pinned', 'pinnedAt', 'pinnedBy',
+        'pcol', 'prank', 'col', 'rank', 'editedBy', 'editedName', 'editedAt', 'imageUrl'];
+    }
+    function fnText(d) {
+      return d.title is string && d.title.size() <= 100 && d.body is string && d.body.size() <= 5000
+        && d.authorName is string && d.authorName.size() <= 60 && d.createdAt is number
+        && (!('imageUrl' in d) || d.imageUrl == null || (d.imageUrl is string && d.imageUrl.matches('https://.{1,1000}')));
+    }
+    match /frontNotices/{id} {
+      allow read: if fnWriter();
+      allow create: if fnWriter() && request.resource.data.keys().hasOnly(fnKeys())
+        && request.resource.data.authorId == request.auth.uid && fnText(request.resource.data)
+        && request.resource.data.body.size() > 0;
+      allow update: if fnWriter() && request.resource.data.keys().hasOnly(fnKeys())
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && fnText(request.resource.data)
+        && (resource.data.authorId == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned', 'pinnedAt', 'pinnedBy', 'pcol', 'prank', 'col', 'rank']));
+      allow delete: if (fnWriter() && resource.data.authorId == request.auth.uid) || isSuperAdmin();
     }
     // 🍱 식단표 (2026-11-04): 문서 하나, 모든 팀 공용. 팀에 속한 직원(또는 최고 관리자)은 누구나 올리고 지운다.
     match /meta/menu {
