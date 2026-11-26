@@ -1,6 +1,8 @@
-import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc } from 'firebase/firestore'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { useEffect, useState } from 'react'
-import { db } from './firebase.ts'
+import { db, storage } from './firebase.ts'
+import { resizeToJpeg } from './chat.ts'
 
 // 🤝 프론트 공지 (2026-11-26, 프론트 GUEST_LINK 10): 모든 팀 공용 게시판 하나를 프론트 앱과 같이 쓴다.
 // 우리 Firestore 최상위 frontNotices — 프론트 앱은 frontAuth(우리 함수)로 받은 'f_…' 로그인으로 같은 컬렉션을 읽고 쓴다.
@@ -73,24 +75,40 @@ export function sortFrontNotices(list: FrontNotice[]) {
 
 export const myFrontName = (name: string) => `${(name || '지원팀').slice(0, 20)} · 지원팀`
 
-export function addFrontNotice(uid: string, name: string, title: string, body: string) {
-  return addDoc(collection(db, FRONT_NOTICES), {
+// 📷 사진 한 장 (프론트 앱은 imageUrl 하나만 보여 줌): 긴 쪽 1600px JPEG로 줄여 Storage frontNotices/{글 id}/{시각}.jpg
+export type FrontPhoto = { imageUrl: string; imagePath: string } | null
+async function uploadPhoto(id: string, file: File, uid: string): Promise<FrontPhoto> {
+  const blob = (await resizeToJpeg(file, 1600, 0.85)).blob
+  const path = `${FRONT_NOTICES}/${id}/${Date.now()}.jpg`
+  const r = ref(storage, path)
+  await uploadBytes(r, blob, { contentType: 'image/jpeg', customMetadata: { uploaderUid: uid } })
+  return { imageUrl: await getDownloadURL(r), imagePath: path }
+}
+
+export async function addFrontNotice(uid: string, name: string, title: string, body: string, photo: File | null = null) {
+  const d = doc(collection(db, FRONT_NOTICES))
+  const pic = photo ? await uploadPhoto(d.id, photo, uid) : null
+  return setDoc(d, {
     title: title.trim().slice(0, 100),
     body: body.trim().slice(0, 5000),
     authorId: uid,
     authorName: myFrontName(name),
     createdAt: Date.now(),
     from: 'support',
+    ...(pic ?? {}),
   })
 }
 
-export function editFrontNotice(id: string, uid: string, name: string, title: string, body: string) {
+// photo: 새 파일이면 올려서 바꾸고, null이면 사진 빼기, undefined면 그대로
+export async function editFrontNotice(id: string, uid: string, name: string, title: string, body: string, photo?: File | null) {
+  const pic = photo instanceof File ? await uploadPhoto(id, photo, uid) : photo === null ? { imageUrl: null, imagePath: null } : {}
   return updateDoc(doc(db, FRONT_NOTICES, id), {
     title: title.trim().slice(0, 100),
     body: body.trim().slice(0, 5000),
     editedBy: uid,
     editedName: myFrontName(name),
     editedAt: Date.now(),
+    ...pic,
   })
 }
 

@@ -491,6 +491,11 @@ test('🤝 프론트 공지: 우리 팀 직원과 프론트 직원(front 토큰)
   await assertSucceeds(getDoc(doc(fs('viewer'), 'frontNotices/n1')))
   await assertFails(getDoc(doc(fs('nobody'), 'frontNotices/n1')))
   await assertSucceeds(setDoc(doc(fs('viewer'), 'frontNotices/s1'), { title: '공지', body: '지원팀 글', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 2000 }))
+  // 📷 사진: 우리 Storage 내려받기 주소 + 경로
+  await assertSucceeds(setDoc(doc(fs('viewer'), 'frontNotices/s2'), { title: '', body: '사진 공지', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 2100,
+    imageUrl: 'https://firebasestorage.googleapis.com/v0/b/x/o/frontNotices%2Fs2%2F1.jpg?alt=media', imagePath: 'frontNotices/s2/1.jpg' }))
+  await assertFails(setDoc(doc(fs('viewer'), 'frontNotices/s3'), { title: '', body: 'x', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 2100, imagePath: 'teams/t1/chat/a.jpg' }))
+  await assertFails(setDoc(doc(fs('viewer'), 'frontNotices/s4'), { title: '', body: 'x', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 2100, imageUrl: 'http://evil/x.jpg' }))
   // 남의 글: 고정·순서만
   await assertSucceeds(updateDoc(doc(fs('viewer'), 'frontNotices/n1'), { pinned: true, pinnedAt: 3000, pinnedBy: 'viewer' }))
   await assertFails(updateDoc(doc(fs('viewer'), 'frontNotices/n1'), { body: '남의 글 고치기' }))

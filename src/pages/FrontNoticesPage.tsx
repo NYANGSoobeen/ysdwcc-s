@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { errorMessage } from '../auth.ts'
 import { addFrontNotice, deleteFrontNotice, editFrontNotice, pinFrontNotice, sortFrontNotices, useFrontNotices, type FrontNotice } from '../frontNotices.ts'
 import { GameButton } from '../games/GameButton.tsx'
@@ -20,6 +21,7 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
   const shown = sorted.filter((n) => !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q))
   const desktop = useIsDesktop()
   const [editing, setEditing] = useState<FrontNotice | null>(null)
+  const [viewer, setViewer] = useState<ViewerPhoto[] | null>(null)
   const columns = desktop ? [shown.filter((_, i) => i % 2 === 0), shown.filter((_, i) => i % 2 === 1)] : [shown]
 
   async function remove(n: FrontNotice) {
@@ -43,7 +45,21 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
           )}
           {n.imageUrl && (
             <div className="notice-cover">
-              <img className="notice-cover-img" src={n.imageUrl} alt="" />
+              <img
+                className="notice-cover-img"
+                src={n.imageUrl}
+                alt=""
+                onClick={() =>
+                  setViewer([
+                    {
+                      attachment: { path: n.imageUrl, thumbPath: n.imageUrl, width: 0, height: 0, size: 0, thumbSize: 0 },
+                      author: n.authorName,
+                      createdAt: new Date(n.createdAt),
+                      load: async () => n.imageUrl,
+                    },
+                  ])
+                }
+              />
             </div>
           )}
           <div className="notice-inner">
@@ -113,6 +129,40 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
         </div>
       </div>
       {editing && <FrontNoticeEditor notice={editing} uid={uid} name={name} onClose={() => setEditing(null)} />}
+      {viewer && <PhotoViewer photos={viewer} index={0} onClose={() => setViewer(null)} />}
+    </div>
+  )
+}
+
+// 📷 사진 한 장 고르기 (프론트 앱은 공지 사진을 하나만 보여 줘서 한 장)
+function PhotoPick({ file, keepUrl, onPick, onClear, busy }: { file: File | null; keepUrl: string; onPick: (f: File) => void; onClear: () => void; busy: boolean }) {
+  const input = useRef<HTMLInputElement>(null)
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : ''), [file])
+  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview])
+  const shown = preview || keepUrl
+  return (
+    <div className="notice-photos">
+      {shown ? (
+        <button type="button" className="preview" onClick={onClear} disabled={busy} aria-label="사진 빼기">
+          <img src={shown} alt="" />
+          <span>✕</span>
+        </button>
+      ) : (
+        <button type="button" className="preview add" onClick={() => input.current?.click()} disabled={busy} aria-label="사진 붙이기">
+          🖼️<small>사진</small>
+        </button>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f && f.type.startsWith('image/') && !/svg/.test(f.type)) onPick(f)
+          e.target.value = ''
+        }}
+      />
     </div>
   )
 }
@@ -120,15 +170,17 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
 function FrontNoticeComposer({ uid, name }: { uid: string; name: string }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!body.trim()) return toast('공지 내용을 입력하세요.', { error: true })
     setBusy(true)
     try {
-      await addFrontNotice(uid, name, title, body)
+      await addFrontNotice(uid, name, title, body, photo)
       setTitle('')
       setBody('')
+      setPhoto(null)
       toast('공지를 올렸어요. 프론트 앱에도 보여요.')
     } catch (err) {
       toast(errorMessage(err), { error: true })
@@ -140,8 +192,9 @@ function FrontNoticeComposer({ uid, name }: { uid: string; name: string }) {
     <form className="notice-composer" onSubmit={submit}>
       <input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} placeholder="제목 (선택)" aria-label="공지 제목" />
       <textarea value={body} maxLength={5000} rows={3} onChange={(e) => setBody(e.target.value)} placeholder="프론트와 같이 볼 공지를 입력하세요" aria-label="공지 내용" />
+      <PhotoPick file={photo} keepUrl="" onPick={setPhoto} onClear={() => setPhoto(null)} busy={busy} />
       <div className="notice-composer-row">
-        <span className="muted small">사진은 아직 못 붙여요</span>
+        <span className="muted small">{photo ? '사진 1장' : '사진은 한 장까지'}</span>
         <button type="submit" className="primary post" disabled={busy}>
           {busy ? '올리는 중…' : '게시하기 📌'}
         </button>
@@ -153,13 +206,15 @@ function FrontNoticeComposer({ uid, name }: { uid: string; name: string }) {
 function FrontNoticeEditor({ notice, uid, name, onClose }: { notice: FrontNotice; uid: string; name: string; onClose: () => void }) {
   const [title, setTitle] = useState(notice.title)
   const [body, setBody] = useState(notice.body)
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [dropped, setDropped] = useState(false) // 원래 사진을 뺐는지
   const [busy, setBusy] = useState(false)
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!body.trim()) return toast('공지 내용을 입력하세요.', { error: true })
     setBusy(true)
     try {
-      await editFrontNotice(notice.id, uid, name, title, body)
+      await editFrontNotice(notice.id, uid, name, title, body, photo ?? (dropped && notice.imageUrl ? null : undefined))
       toast('공지를 고쳤어요.')
       onClose()
     } catch (err) {
@@ -179,6 +234,16 @@ function FrontNoticeEditor({ notice, uid, name, onClose }: { notice: FrontNotice
           내용
           <textarea value={body} maxLength={5000} rows={8} onChange={(e) => setBody(e.target.value)} placeholder="공지 내용" />
         </label>
+        <PhotoPick
+          file={photo}
+          keepUrl={dropped ? '' : notice.imageUrl}
+          onPick={(f) => setPhoto(f)}
+          onClear={() => {
+            setPhoto(null)
+            setDropped(true)
+          }}
+          busy={busy}
+        />
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onClose} disabled={busy}>
             취소

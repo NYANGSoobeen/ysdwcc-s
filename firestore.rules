@@ -152,12 +152,13 @@ service cloud.firestore {
     }
     function fnKeys() {
       return ['title', 'body', 'authorId', 'authorName', 'createdAt', 'from', 'pinned', 'pinnedAt', 'pinnedBy',
-        'pcol', 'prank', 'col', 'rank', 'editedBy', 'editedName', 'editedAt', 'imageUrl'];
+        'pcol', 'prank', 'col', 'rank', 'editedBy', 'editedName', 'editedAt', 'imageUrl', 'imagePath'];
     }
     function fnText(d) {
       return d.title is string && d.title.size() <= 100 && d.body is string && d.body.size() <= 5000
         && d.authorName is string && d.authorName.size() <= 60 && d.createdAt is number
-        && (!('imageUrl' in d) || d.imageUrl == null || (d.imageUrl is string && d.imageUrl.matches('https://.{1,1000}')));
+        && (!('imageUrl' in d) || d.imageUrl == null || (d.imageUrl is string && d.imageUrl.matches('https://.{1,1000}')))
+        && (!('imagePath' in d) || d.imagePath == null || (d.imagePath is string && d.imagePath.matches('frontNotices/[A-Za-z0-9_-]{1,40}/[A-Za-z0-9_.-]{1,60}')));
     }
     match /frontNotices/{id} {
       allow read: if fnWriter();

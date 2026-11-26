@@ -1176,3 +1176,31 @@ export const onFrontNoticeCreatedPush = onDocumentCreated('frontNotices/{id}', a
   const res = await Promise.allSettled(jobs)
   res.forEach((r) => r.status === 'rejected' && console.warn('front notice push', String(r.reason)))
 })
+
+// 📢 프론트 공지 사진 정리: 글을 지우면 사진 폴더째, 사진을 바꾸거나 빼면 지금 글이 안 쓰는 파일을 지운다
+// (10분 안에 올린 건 아직 저장 중일 수 있어 남김). 사진 경로는 글의 imagePath, 없으면 imageUrl에서 읽는다.
+function frontNoticePath(n: Record<string, unknown> | undefined) {
+  if (!n) return ''
+  if (typeof n.imagePath === 'string') return n.imagePath
+  const m = typeof n.imageUrl === 'string' ? /\/o\/([^?]+)/.exec(n.imageUrl) : null
+  return m ? decodeURIComponent(m[1]) : ''
+}
+export const onFrontNoticeWritten = onDocumentWritten('frontNotices/{id}', async (event) => {
+  const prefix = `frontNotices/${event.params.id}/`
+  const bucket = getStorage().bucket()
+  const after = event.data?.after
+  if (!after?.exists) {
+    await bucket.deleteFiles({ prefix }).catch(() => {})
+    return
+  }
+  const before = frontNoticePath(event.data?.before?.data())
+  const now = frontNoticePath(after.data())
+  if (before === now) return
+  const [files] = await bucket.getFiles({ prefix })
+  const cutoff = Date.now() - 10 * 60_000
+  await Promise.all(
+    files
+      .filter((f) => f.name !== now && Date.parse(String(f.metadata.timeCreated ?? '')) < cutoff)
+      .map((f) => f.delete().catch(() => {})),
+  )
+})

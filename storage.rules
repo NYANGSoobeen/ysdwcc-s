@@ -59,6 +59,23 @@ service firebase.storage {
         && request.resource.size <= 4 * 1024 * 1024;
     }
 
+    // 📢 프론트 공지 사진 (frontNotices, 모든 팀 공용 · 프론트 앱과 같이 씀): 팀에 속한 직원·최고 관리자가 올리고 지운다.
+    // 프론트 직원(token.front)도 같은 칸에 올릴 수 있게 열어 둠(프론트 앱이 만들면). 보기는 내려받기 주소(imageUrl)로 하므로 읽기 규칙은 우리 직원만.
+    // 글을 지우거나 사진을 바꾸면 Functions(onFrontNoticeWritten)가 안 쓰는 파일을 지운다.
+    function fnStaff() {
+      return isSuper() || (signedIn() && active()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('teamIds', []).size() > 0);
+    }
+    function fnFront() {
+      return request.auth != null && request.auth.token.get('front', false) == true;
+    }
+    match /frontNotices/{noticeId}/{fileName} {
+      allow read, delete: if fnStaff() || fnFront();
+      allow create: if (fnStaff() || fnFront())
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size <= 3 * 1024 * 1024;
+    }
+
     // 근무표(스케줄): 쪽 그림(PNG/JPEG)과 원본 PDF(1MB 이하만). 교체·삭제 시 Functions가 폴더째 지운다.
     match /teams/{teamId}/schedule/{uploadId}/{fileName} {
       allow read: if signedIn()
