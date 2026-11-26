@@ -231,3 +231,26 @@ export async function notifyNotice(teamId: string, n: Record<string, unknown>) {
   }
   return sendNotes(tokens.filter((t) => people.has(t.uid)).map((token) => ({ token, note })))
 }
+
+// 📢 프론트 공지 (frontNotices, 모든 팀 공용 · 프론트 앱과 같이 씀): 새 글이면 우리 직원 모두(팀에 속한 사람·최고 관리자, 사용 중)에게
+// 📢 새 공지 알림(kinds.notice를 켠 기기). 쓴 사람이 우리 직원이면 그 사람은 뺀다. 프론트 직원 알림은 프론트 서버 몫(index.ts가 알려 줌).
+export async function notifyFrontNotice(n: Record<string, unknown>) {
+  const db = getFirestore()
+  const users = await db.collection('users').get()
+  const people = users.docs
+    .filter((d) => d.get('active') !== false && d.id !== n.authorId && ((d.get('teamIds') ?? []).length > 0 || d.get('superAdmin') === true))
+    .map((d) => d.id)
+  if (people.length === 0) return 0
+  const tokens = (await tokensOf(people)).filter((t) => t.kinds.notice && reachable(t))
+  if (tokens.length === 0) return 0
+  const who = short(String(n.authorName ?? ''), 30)
+  const head = String(n.title ?? '').trim() || String(n.body ?? '')
+  const note: PushNote = {
+    title: '📢 새 공지 · 프론트 공지',
+    body: short(`${head}${who ? ` (${who})` : ''}`, 120),
+    url: '/?fnotice=1',
+    tag: 'fnotice',
+    kind: 'notice',
+  }
+  return sendNotes(tokens.map((token) => ({ token, note })))
+}

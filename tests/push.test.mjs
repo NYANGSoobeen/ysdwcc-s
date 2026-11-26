@@ -164,3 +164,30 @@ test('프론트 알림(ydrGuestPush): 비밀값이 맞을 때만, 나를 부른 
   assert.equal(sent.find((m) => m.token === 'tok-c1').data.title, '🔔 김프론트님이 나를 불렀어요 · 🏌️ 프론트 전체')
   assert.equal(sent.find((m) => m.token === 'tok-b1').data.title, '🏌️ 💬 프론트 전체')
 })
+
+test('📢 프론트 공지: 어디서 쓰든 우리 직원(공지 켠 기기)에게, 우리 직원이 썼으면 그 사람은 빼고', async () => {
+  const set = (id, uid, notice) => db.doc(`pushTokens/${id}`).set({ uid, token: `tok-${id}`, platform: 'web', mode: 'all', kinds: { chat: true, mention: true, notice, front: true } })
+  await db.doc('users/boss').set({ name: '최고', teamIds: [], superAdmin: true })
+  await set('p1', 'b', true)
+  await set('p2', 'c', false)
+  await set('p3', 'boss', true)
+  await set('p4', 'd', true) // 사용 중지
+  try {
+    await push.notifyFrontNotice({ title: '', body: '내일 단체 손님 40명', authorId: 'f_kim', authorName: '김프론트 · 프론트' })
+    let got = sent.map((m) => m.token)
+    assert.ok(got.includes('tok-p1') && got.includes('tok-p3'), '팀 직원·최고 관리자')
+    assert.ok(!got.includes('tok-p2') && !got.includes('tok-p4'), '공지 끈 기기·사용 중지는 빼고')
+    const n = sent.find((m) => m.token === 'tok-p1').data
+    assert.equal(n.url, '/?fnotice=1')
+    assert.equal(n.title, '📢 새 공지 · 프론트 공지')
+    assert.equal(n.body, '내일 단체 손님 40명 (김프론트 · 프론트)')
+
+    sent = []
+    await push.notifyFrontNotice({ title: '회의', body: 'x', authorId: 'b', authorName: '김지원 · 지원팀' })
+    got = sent.map((m) => m.token)
+    assert.ok(!got.includes('tok-p1') && got.includes('tok-p3'), '쓴 우리 직원은 빼고')
+  } finally {
+    for (const id of ['p1', 'p2', 'p3', 'p4']) await db.doc(`pushTokens/${id}`).delete()
+    await db.doc('users/boss').delete()
+  }
+})

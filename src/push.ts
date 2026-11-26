@@ -276,6 +276,7 @@ export type OpenRequest =
   | { kind: 'room'; teamId: string; channelId: string }
   | { kind: 'front'; ch: string }
   | { kind: 'notice'; teamId: string }
+  | { kind: 'fnotice' } // 📢 프론트 공지 (모든 팀 공용)
   // 갤럭시 앱 🔔 전화·문자 알림 (android/.../phone/PhoneAlerts.kt): ✉️ 그 번호 대화, 📞 최근기록, 📇 그 번호 고객
   | { kind: 'sms'; number: string }
   | { kind: 'calls' }
@@ -290,6 +291,7 @@ export function parseOpenUrl(url: string): OpenRequest | null {
   }
   const front = params.get('front')
   if (front) return { kind: 'front', ch: front }
+  if (params.get('fnotice')) return { kind: 'fnotice' }
   const notice = params.get('notice')
   if (notice) return { kind: 'notice', teamId: notice }
   const sms = params.get('sms')

@@ -8,7 +8,7 @@ import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-fu
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
-import { notifyChatMessage, notifyFront, notifyNotice, sendNotes, tokensOf } from './push.js'
+import { notifyChatMessage, notifyFront, notifyFrontNotice, notifyNotice, sendNotes, tokensOf } from './push.js'
 import { kakaoSearch, SearchError, type SearchKind } from './search.js'
 import { classifyTeamFiles, messageCollectionsOf, UNUSED, type StoredFile } from './usage.js'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
@@ -1145,4 +1145,34 @@ export const frontAuth = onCall({ cors: true }, async (req) => {
   const name = String(req.data?.name ?? '').trim().slice(0, 20)
   const token = await getAuth().createCustomToken(`f_${t.uid}`, { front: true, name })
   return { token }
+})
+
+// 📢 프론트 공지 새 글 알림 (어디서 써도): ① 우리 직원 — notifyFrontNotice ② 프론트 직원 — 프론트 서버 함수 supNoticePush 에
+// 알려 줌(프론트 알림 연동과 같은 비밀값 meta/frontLink.secret 을 머리글 x-ydr-secret 으로). 프론트가 아직 그 함수를 안 만들었으면 조용히 넘어감.
+const FRONT_NOTICE_PUSH_URL = process.env.FRONT_NOTICE_PUSH_URL || 'https://us-west1-ysdwcc-f.cloudfunctions.net/supNoticePush'
+export const onFrontNoticeCreatedPush = onDocumentCreated('frontNotices/{id}', async (event) => {
+  const n = event.data?.data()
+  if (!n) return
+  const jobs: Promise<unknown>[] = [notifyFrontNotice(n)]
+  const secret = String((await getFirestore().doc('meta/frontLink').get()).get('secret') ?? '')
+  if (secret) {
+    jobs.push(
+      fetch(FRONT_NOTICE_PUSH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-ydr-secret': secret },
+        body: JSON.stringify({
+          id: event.params.id,
+          title: String(n.title ?? '').slice(0, 100),
+          body: String(n.body ?? '').slice(0, 200),
+          authorId: String(n.authorId ?? ''),
+          authorName: String(n.authorName ?? '').slice(0, 60),
+        }),
+        signal: AbortSignal.timeout(8000),
+      }).then((r) => {
+        if (!r.ok) console.warn('front notice push', r.status)
+      }),
+    )
+  }
+  const res = await Promise.allSettled(jobs)
+  res.forEach((r) => r.status === 'rejected' && console.warn('front notice push', String(r.reason)))
 })

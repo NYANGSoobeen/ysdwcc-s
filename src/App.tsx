@@ -283,6 +283,7 @@ function SignedIn({ user }: { user: User }) {
     }
     if (req.kind === 'caller') return void openCallerCustomer(req.number)
     if (req.kind === 'callend') return checkCallEnd()
+    if (req.kind === 'fnotice') return setTab('fnotices')
     if (!teamIds.includes(req.teamId)) return
     if (req.teamId !== team?.id) selectTeam(req.teamId)
     if (req.kind === 'notice') return setTab('notices')
@@ -299,7 +300,7 @@ function SignedIn({ user }: { user: User }) {
   useEffect(() => setBadge(badgeTotal), [badgeTotal])
   // 지금 보고 있는 방: 그 방 알림은 띄우지 않고, 이미 뜬 알림은 지운다 (앱을 내리면 없음).
   const viewingTag =
-    tab === 'chat' && team && roomId ? roomTag(team.id, roomId) : tab === 'front' && frontRoomId ? frontTag(frontRoomId) : tab === 'notices' && team ? `notice-${team.id}` : null
+    tab === 'chat' && team && roomId ? roomTag(team.id, roomId) : tab === 'front' && frontRoomId ? frontTag(frontRoomId) : tab === 'notices' && team ? `notice-${team.id}` : tab === 'fnotices' ? 'fnotice' : null
   useEffect(() => {
     const send = () => tellViewing(document.visibilityState === 'visible' ? viewingTag : null)
     send()
