@@ -6907,17 +6907,25 @@ html.keyboard-open .sms-composer {
 }
 .fn-comment-av {
   flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  background: var(--accent);
+  display: flex;
 }
-.fn-comment-av.f { background: #e8846b; }
+.fn-comment-av .avatar,
+.fn-author .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 12px;
+  overflow: hidden;
+}
+.fn-comment-av .avatar-button,
+.fn-author .avatar-button { padding: 0; min-height: 0; border: none; background: none; }
+.fn-front-face { background: #e8846b !important; }
+.fn-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fn-author .avatar { width: 22px; height: 22px; font-size: 11px; }
 .fn-comment-body {
   flex: 1;
   min-width: 0;

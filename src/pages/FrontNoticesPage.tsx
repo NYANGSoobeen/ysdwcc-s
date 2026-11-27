@@ -9,15 +9,38 @@ import { ask, Modal, toast } from '../ui/dialogs.tsx'
 import { SearchBar, useTabSearch } from '../ui/search.tsx'
 import { useIsDesktop } from '../useMedia.ts'
 import { linkifyText } from './NoticesPage.tsx'
+import { useMemberProfiles, type Profile } from '../hooks.ts'
+import { Avatar, AvatarFace } from '../ui/Avatar.tsx'
 
 // 🤝 프론트 공지 (2026-11-26, 프론트 GUEST_LINK 10): 모든 팀 직원과 프론트 직원이 같이 보는 게시판 하나.
 // 모양은 📢 공지 카드를 그대로 쓰고(사진·스티커·끌어 옮기기는 없음), 고치기·지우기는 쓴 사람만(최고 관리자는 지우기),
 // 📌 고정은 쓰기 권한이 있는 사람 누구나. 보기 권한(viewer)은 읽기만.
+// 쓴 사람 표시: 우리 직원은 우리 프로필(사진·이름·직급)로, 프론트 직원(f_…)은 글에 적힌 이름 그대로.
+type People = Record<string, Profile>
+function personName(id: string, fallback: string, people: People) {
+  const p = people[id]
+  if (!id.startsWith('f_') && p?.name) return p.position ? `${p.name} ${p.position}` : p.name
+  return fallback.replace(/ · 지원팀$/, '') || (id.startsWith('f_') ? '프론트' : '지원팀')
+}
+function PersonFace({ id, name }: { id: string; name: string }) {
+  if (id.startsWith('f_')) return <AvatarFace uid={id} name={name.replace(/ · 프론트$/, '')} className="fn-front-face" />
+  return <Avatar uid={id} name={name} card />
+}
+
 export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: string; name: string; canWrite: boolean; superAdmin: boolean }) {
   const list = useFrontNotices()
   const { query } = useTabSearch()
   const q = query.trim().toLowerCase()
   const sorted = sortFrontNotices(list ?? [])
+  const ourIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const n of list ?? []) {
+      if (!n.authorId.startsWith('f_')) ids.add(n.authorId)
+      for (const c of n.comments) if (!c.authorId.startsWith('f_')) ids.add(c.authorId)
+    }
+    return [...ids].sort()
+  }, [list])
+  const people = useMemberProfiles(ourIds)
   const shown = sorted.filter((n) => !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q))
   const desktop = useIsDesktop()
   const [editing, setEditing] = useState<FrontNotice | null>(null)
@@ -66,8 +89,9 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
             {n.title && <h3 className="notice-title">{n.title}</h3>}
             {n.body && <p className="notice-text">{linkifyText(fixEmoji(n.body))}</p>}
             <footer className="notice-foot">
-              <span className="muted">
-                {n.authorName || (n.authorId.startsWith('f_') ? '프론트' : '지원팀')} · {when}
+              <span className="muted fn-author">
+                <PersonFace id={n.authorId} name={n.authorName} />
+                {personName(n.authorId, n.authorName, people)} · {when}
                 {n.editedAt != null && ` · 수정: ${n.editedName || '다른 사람'}`}
               </span>
               <span className="notice-tools">
@@ -95,7 +119,7 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
                 )}
               </span>
             </footer>
-            <FrontComments notice={n} uid={uid} name={name} canWrite={canWrite} />
+            <FrontComments notice={n} uid={uid} name={name} canWrite={canWrite} people={people} />
           </div>
         </article>
       </div>
@@ -171,7 +195,7 @@ function PhotoPick({ file, keepUrl, onPick, onClear, busy }: { file: File | null
 // 💬 댓글 (프론트 GUEST_LINK 10-5, 프론트 앱과 같은 모양): 처음엔 접힌 "💬 댓글 달기"/"💬 댓글 N ▾",
 // 누르면 펼쳐서 오래된 순 목록(동그라미 프/지 · 이름(내 것은 "나") · 시각 · 내 것만 ✕) + 입력칸·등록.
 // PC는 Enter 등록·Ctrl/Shift+Enter 줄바꿈(한글 조합 중 Enter 무시), 휴대폰은 Enter 줄바꿈.
-function FrontComments({ notice, uid, name, canWrite }: { notice: FrontNotice; uid: string; name: string; canWrite: boolean }) {
+function FrontComments({ notice, uid, name, canWrite, people }: { notice: FrontNotice; uid: string; name: string; canWrite: boolean; people: People }) {
   const desktop = useIsDesktop()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
@@ -220,16 +244,15 @@ function FrontComments({ notice, uid, name, canWrite }: { notice: FrontNotice; u
           {list.length > 0 && (
             <div className="fn-comment-list">
               {list.map((c) => {
-                const front = c.authorId.startsWith('f_')
                 const mine = c.authorId === uid
                 return (
                   <div key={c.id} className="fn-comment">
-                    <span className={'fn-comment-av' + (front ? ' f' : '')} aria-hidden>
-                      {front ? '프' : '지'}
+                    <span className="fn-comment-av">
+                      <PersonFace id={c.authorId} name={c.authorName} />
                     </span>
                     <div className="fn-comment-body">
                       <div className="fn-comment-who">
-                        <b>{mine ? '나' : c.authorName || (front ? '프론트' : '지원팀')}</b>
+                        <b>{mine ? '나' : personName(c.authorId, c.authorName, people)}</b>
                         <span className="muted">
                           ·{' '}
                           {new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
