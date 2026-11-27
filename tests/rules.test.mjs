@@ -511,6 +511,14 @@ test('🤝 프론트 공지: 우리 팀 직원과 프론트 직원(front 토큰)
   await assertFails(updateDoc(doc(front, 'frontNotices/s1'), { comments: arrayUnion({ ...c2, id: 'c3', authorId: 'viewer' }) }))
   await assertFails(updateDoc(doc(fs('viewer'), 'frontNotices/s1'), { comments: [] })) // 글쓴이도 남의 댓글은 못 지움
   await assertSucceeds(updateDoc(doc(front, 'frontNotices/s1'), { comments: arrayRemove(c2) }))
+  // 프론트 앱 방식(14.70): 글을 읽고 배열 통째로 바꾸기 — 프론트 직원이 쓴 글에도
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'frontNotices/f1'), { ...base, authorId: 'f_lee', pinned: false, pinnedAt: 0, pinnedBy: '', pcol: 0, prank: 0, col: 0, rank: 1, imageUrl: null, imagePath: null })
+  })
+  const fc = { id: Date.now().toString(36) + 'ab12', text: '프론트 댓글', authorId: 'f_kim', authorName: '김프론트 · 프론트', at: 6000 }
+  await assertSucceeds(updateDoc(doc(front, 'frontNotices/f1'), { comments: [fc] }))
+  await assertSucceeds(updateDoc(doc(fs('viewer'), 'frontNotices/f1'), { comments: [fc, c1] }))
+  await assertSucceeds(updateDoc(doc(front, 'frontNotices/f1'), { comments: [c1] }))
   await assertFails(setDoc(doc(fs('viewer'), 'frontNotices/s9'), { title: '', body: 'x', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 1, comments: [c2] }))
   // 프론트 토큰은 signedIn()을 쓰는 다른 곳에 못 들어온다
   await assertFails(getDoc(doc(front, 'users/viewer')))

@@ -168,11 +168,22 @@ function PhotoPick({ file, keepUrl, onPick, onClear, busy }: { file: File | null
   )
 }
 
-// 💬 댓글 (프론트 GUEST_LINK 10-5): 오래된 순, 내 댓글만 ✕, 아래 한 줄 입력칸 (Enter 보내기, 한글 조합 중 Enter 무시)
+// 💬 댓글 (프론트 GUEST_LINK 10-5, 프론트 앱과 같은 모양): 처음엔 접힌 "💬 댓글 달기"/"💬 댓글 N ▾",
+// 누르면 펼쳐서 오래된 순 목록(동그라미 프/지 · 이름(내 것은 "나") · 시각 · 내 것만 ✕) + 입력칸·등록.
+// PC는 Enter 등록·Ctrl/Shift+Enter 줄바꿈(한글 조합 중 Enter 무시), 휴대폰은 Enter 줄바꿈.
 function FrontComments({ notice, uid, name, canWrite }: { notice: FrontNotice; uid: string; name: string; canWrite: boolean }) {
+  const desktop = useIsDesktop()
+  const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const list = notice.comments
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [text, open])
   async function send(e?: FormEvent) {
     e?.preventDefault()
     const t = text.trim()
@@ -192,45 +203,83 @@ function FrontComments({ notice, uid, name, canWrite }: { notice: FrontNotice; u
     if (!(await ask({ title: '댓글 삭제', message: '이 댓글을 지울까요?', ok: '삭제', danger: true }))) return
     deleteFrontComment(notice.id, c).catch((err) => toast(errorMessage(err), { error: true }))
   }
+  function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next && desktop) setTimeout(() => inputRef.current?.focus(), 0)
+  }
   if (!list.length && !canWrite) return null
   return (
     <div className="fn-comments">
-      {list.length > 0 && <div className="fn-comments-head">💬 댓글 {list.length}</div>}
-      {list.map((c) => (
-        <div key={c.id} className="fn-comment">
-          <div className="fn-comment-who">
-            <b>{c.authorName || (c.authorId.startsWith('f_') ? '프론트' : '지원팀')}</b>
-            <span className="muted">
-              {new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-            </span>
-            {c.authorId === uid && (
-              <button type="button" className="ghost fn-comment-del" aria-label="댓글 삭제" title="댓글 삭제" onClick={() => void remove(c)}>
-                ✕
+      <button type="button" className={'fn-comments-toggle' + (list.length ? ' has' : '')} aria-expanded={open} onClick={toggle}>
+        💬 댓글{list.length ? ` ${list.length}` : ' 달기'}
+        {list.length > 0 || open ? (open ? ' ▴' : ' ▾') : ''}
+      </button>
+      {open && (
+        <>
+          {list.length > 0 && (
+            <div className="fn-comment-list">
+              {list.map((c) => {
+                const front = c.authorId.startsWith('f_')
+                const mine = c.authorId === uid
+                return (
+                  <div key={c.id} className="fn-comment">
+                    <span className={'fn-comment-av' + (front ? ' f' : '')} aria-hidden>
+                      {front ? '프' : '지'}
+                    </span>
+                    <div className="fn-comment-body">
+                      <div className="fn-comment-who">
+                        <b>{mine ? '나' : c.authorName || (front ? '프론트' : '지원팀')}</b>
+                        <span className="muted">
+                          ·{' '}
+                          {new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {mine && (
+                          <button type="button" className="ghost fn-comment-del" aria-label="댓글 삭제" title="댓글 삭제" onClick={() => void remove(c)}>
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <div className="fn-comment-text">{linkifyText(fixEmoji(c.text))}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {canWrite && (
+            <form className="fn-comment-form" onSubmit={send}>
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={text}
+                maxLength={1000}
+                placeholder={desktop ? '댓글 입력... (Enter 등록 · Ctrl+Enter 줄바꿈)' : '댓글 입력...'}
+                aria-label="댓글"
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (!desktop || e.key !== 'Enter' || e.nativeEvent.isComposing) return
+                  if (e.ctrlKey || e.shiftKey || e.metaKey) {
+                    if (e.ctrlKey || e.metaKey) {
+                      e.preventDefault()
+                      const el = e.currentTarget
+                      const at = el.selectionStart
+                      const v = text.slice(0, at) + '\n' + text.slice(el.selectionEnd)
+                      setText(v)
+                      setTimeout(() => el.setSelectionRange(at + 1, at + 1), 0)
+                    }
+                    return
+                  }
+                  e.preventDefault()
+                  void send()
+                }}
+              />
+              <button type="submit" className="fn-comment-send" disabled={busy || !text.trim()}>
+                {busy ? '…' : '등록'}
               </button>
-            )}
-          </div>
-          <div className="fn-comment-text">{linkifyText(fixEmoji(c.text))}</div>
-        </div>
-      ))}
-      {canWrite && (
-        <form className="fn-comment-form" onSubmit={send}>
-          <input
-            value={text}
-            maxLength={1000}
-            placeholder="댓글 달기"
-            aria-label="댓글"
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                void send()
-              }
-            }}
-          />
-          <button type="submit" className="primary" disabled={busy || !text.trim()}>
-            {busy ? '…' : '등록'}
-          </button>
-        </form>
+            </form>
+          )}
+        </>
       )}
     </div>
   )
