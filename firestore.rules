@@ -152,7 +152,26 @@ service cloud.firestore {
     }
     function fnKeys() {
       return ['title', 'body', 'authorId', 'authorName', 'createdAt', 'from', 'pinned', 'pinnedAt', 'pinnedBy',
-        'pcol', 'prank', 'col', 'rank', 'editedBy', 'editedName', 'editedAt', 'imageUrl', 'imagePath'];
+        'pcol', 'prank', 'col', 'rank', 'editedBy', 'editedName', 'editedAt', 'imageUrl', 'imagePath', 'comments'];
+    }
+    // 💬 댓글 (2026-11-27, 프론트 GUEST_LINK 10-5): 글 문서의 comments 배열 {id, text(1000자), authorId, authorName, at(ms)}.
+    // 프론트 직원·우리 직원 누구나 "내 댓글 하나 더하기" 또는 "내 댓글 하나 지우기"만 (200개까지). 프론트 규칙과 같은 모양.
+    function cm(d) {
+      return d.get('comments', []);
+    }
+    function fnCommentOk() {
+      let after = cm(request.resource.data);
+      let before = cm(resource.data);
+      let added = after.removeAll(before);
+      let removed = before.removeAll(after);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
+        && after is list && after.size() <= 200
+        && ((after.size() == before.size() + 1 && added.size() == 1 && added[0].authorId == request.auth.uid
+              && added[0].keys().hasOnly(['id', 'text', 'authorId', 'authorName', 'at'])
+              && added[0].id is string && added[0].id.size() <= 40
+              && added[0].text is string && added[0].text.size() > 0 && added[0].text.size() <= 1000
+              && added[0].authorName is string && added[0].authorName.size() <= 60 && added[0].at is number)
+          || (after.size() == before.size() - 1 && removed.size() == 1 && removed[0].authorId == request.auth.uid));
     }
     function fnText(d) {
       return d.title is string && d.title.size() <= 100 && d.body is string && d.body.size() <= 5000
@@ -164,13 +183,15 @@ service cloud.firestore {
       allow read: if fnWriter();
       allow create: if fnWriter() && request.resource.data.keys().hasOnly(fnKeys())
         && request.resource.data.authorId == request.auth.uid && fnText(request.resource.data)
-        && request.resource.data.body.size() > 0;
+        && request.resource.data.body.size() > 0 && !('comments' in request.resource.data);
       allow update: if fnWriter() && request.resource.data.keys().hasOnly(fnKeys())
         && request.resource.data.authorId == resource.data.authorId
         && request.resource.data.createdAt == resource.data.createdAt
         && fnText(request.resource.data)
-        && (resource.data.authorId == request.auth.uid
-          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned', 'pinnedAt', 'pinnedBy', 'pcol', 'prank', 'col', 'rank']));
+        && ((resource.data.authorId == request.auth.uid
+              && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['comments']))
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned', 'pinnedAt', 'pinnedBy', 'pcol', 'prank', 'col', 'rank'])
+          || fnCommentOk());
       allow delete: if (fnWriter() && resource.data.authorId == request.auth.uid) || isSuperAdmin();
     }
     // 🍱 식단표 (2026-11-04): 문서 하나, 모든 팀 공용. 팀에 속한 직원(또는 최고 관리자)은 누구나 올리고 지운다.

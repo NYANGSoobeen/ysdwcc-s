@@ -3,12 +3,12 @@ import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { setGlobalOptions } from 'firebase-functions/v2'
-import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https'
 import { handleCardDav, hashSecret, newCredentials } from './carddav.js'
 import { fetchPreview, previewKey } from './linkPreview.js'
 import { passwordProblem } from './password.js'
-import { notifyChatMessage, notifyFront, notifyFrontNotice, notifyNotice, sendNotes, tokensOf } from './push.js'
+import { notifyChatMessage, notifyFront, notifyFrontComment, notifyFrontNotice, notifyNotice, sendNotes, tokensOf } from './push.js'
 import { kakaoSearch, SearchError, type SearchKind } from './search.js'
 import { classifyTeamFiles, messageCollectionsOf, UNUSED, type StoredFile } from './usage.js'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
@@ -1203,4 +1203,37 @@ export const onFrontNoticeWritten = onDocumentWritten('frontNotices/{id}', async
       .filter((f) => f.name !== now && Date.parse(String(f.metadata.timeCreated ?? '')) < cutoff)
       .map((f) => f.delete().catch(() => {})),
   )
+})
+
+// 💬 프론트 공지 새 댓글 알림 (프론트 GUEST_LINK 10-5, 2026-11-27): comments가 늘면 새 댓글로
+// ① 우리 직원 — notifyFrontComment ② 프론트 직원 — 프론트 서버 supCommentPush (새 공지 알림과 같은 비밀값).
+// participants = 글쓴이 + 그 글에 댓글 단 사람 전부 (프론트는 그중 f_ 직원에게만, 우리는 나머지에게).
+const FRONT_COMMENT_PUSH_URL = process.env.FRONT_COMMENT_PUSH_URL || 'https://us-west1-ysdwcc-f.cloudfunctions.net/supCommentPush'
+type FnComment = { id?: string; text?: string; authorId?: string; authorName?: string; at?: number }
+export const onFrontNoticeCommentPush = onDocumentUpdated('frontNotices/{id}', async (event) => {
+  const before = (event.data?.before.get('comments') ?? []) as FnComment[]
+  const n = event.data?.after.data()
+  const after = (n?.comments ?? []) as FnComment[]
+  if (!n || !Array.isArray(after) || after.length <= before.length) return
+  const old = new Set(before.map((c) => c.id))
+  const fresh = after.filter((c) => !old.has(c.id)).sort((a, b) => Number(a.at ?? 0) - Number(b.at ?? 0)).pop()
+  if (!fresh?.text || !fresh.authorId) return
+  const c = { text: String(fresh.text).slice(0, 300), authorId: String(fresh.authorId), authorName: String(fresh.authorName ?? '').slice(0, 60) }
+  const participants = [...new Set([String(n.authorId ?? ''), ...after.map((x) => String(x.authorId ?? ''))].filter(Boolean))]
+  const jobs: Promise<unknown>[] = [notifyFrontComment(n, c, participants)]
+  const secret = String((await getFirestore().doc('meta/frontLink').get()).get('secret') ?? '')
+  if (secret) {
+    jobs.push(
+      fetch(FRONT_COMMENT_PUSH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-ydr-secret': secret },
+        body: JSON.stringify({ id: event.params.id, title: String(n.title ?? '').slice(0, 100), ...c, participants }),
+        signal: AbortSignal.timeout(8000),
+      }).then((r) => {
+        if (!r.ok) console.warn('front comment push', r.status)
+      }),
+    )
+  }
+  const res = await Promise.allSettled(jobs)
+  res.forEach((r) => r.status === 'rejected' && console.warn('front comment push', String(r.reason)))
 })

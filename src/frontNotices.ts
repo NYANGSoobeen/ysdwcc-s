@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { useEffect, useState } from 'react'
 import { db, storage } from './firebase.ts'
@@ -10,7 +10,10 @@ import { resizeToJpeg } from './chat.ts'
 export const FRONT_NOTICES = 'frontNotices'
 const PAGE = 300
 
+export type FrontComment = { id: string; text: string; authorId: string; authorName: string; at: number }
+
 export type FrontNotice = {
+  comments: FrontComment[]
   id: string
   title: string
   body: string
@@ -53,6 +56,9 @@ export function useFrontNotices() {
                 rank: num(x.rank),
                 editedName: String(x.editedName ?? ''),
                 editedAt: num(x.editedAt),
+                comments: (Array.isArray(x.comments) ? (x.comments as FrontComment[]) : [])
+                  .filter((c) => c && typeof c.text === 'string')
+                  .sort((a, b) => Number(a.at ?? 0) - Number(b.at ?? 0)),
                 imageUrl: typeof x.imageUrl === 'string' && /^https:\/\//.test(x.imageUrl) ? x.imageUrl : '',
               }
             }),
@@ -121,4 +127,19 @@ export function pinFrontNotice(id: string, uid: string, on: boolean) {
 
 export function deleteFrontNotice(id: string) {
   return deleteDoc(doc(db, FRONT_NOTICES, id))
+}
+
+// 💬 댓글 (프론트 GUEST_LINK 10-5): 글 문서의 comments 배열에 내 댓글 하나 더하기·지우기 (규칙이 그것만 허락)
+export function addFrontComment(id: string, uid: string, name: string, text: string) {
+  const c: FrontComment = {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+    text: text.trim().slice(0, 1000),
+    authorId: uid,
+    authorName: myFrontName(name),
+    at: Date.now(),
+  }
+  return updateDoc(doc(db, FRONT_NOTICES, id), { comments: arrayUnion(c) })
+}
+export function deleteFrontComment(id: string, c: FrontComment) {
+  return updateDoc(doc(db, FRONT_NOTICES, id), { comments: arrayRemove(c) })
 }

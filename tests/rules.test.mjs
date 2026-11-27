@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes } from 'firebase/storage'
 
 const PROJECT = 'demo-workphone'
@@ -502,6 +502,16 @@ test('🤝 프론트 공지: 우리 팀 직원과 프론트 직원(front 토큰)
   await assertFails(deleteDoc(doc(fs('viewer'), 'frontNotices/n1')))
   await assertSucceeds(updateDoc(doc(front, 'frontNotices/n1'), { body: '고침', editedBy: 'f_kim', editedName: '김프론트 · 프론트', editedAt: 4000 }))
   await assertSucceeds(deleteDoc(doc(front, 'frontNotices/n1')))
+  // 💬 댓글: 누구나 내 댓글 하나 더하기·지우기만
+  const c1 = { id: 'c1', text: '확인했어요', authorId: 'viewer', authorName: '보기 · 지원팀', at: 5000 }
+  const c2 = { id: 'c2', text: '네!', authorId: 'f_kim', authorName: '김프론트 · 프론트', at: 5001 }
+  await assertSucceeds(updateDoc(doc(fs('viewer'), 'frontNotices/s1'), { comments: arrayUnion(c1) }))
+  await assertSucceeds(updateDoc(doc(front, 'frontNotices/s1'), { comments: arrayUnion(c2) }))
+  await assertFails(updateDoc(doc(front, 'frontNotices/s1'), { comments: arrayRemove(c1) }))
+  await assertFails(updateDoc(doc(front, 'frontNotices/s1'), { comments: arrayUnion({ ...c2, id: 'c3', authorId: 'viewer' }) }))
+  await assertFails(updateDoc(doc(fs('viewer'), 'frontNotices/s1'), { comments: [] })) // 글쓴이도 남의 댓글은 못 지움
+  await assertSucceeds(updateDoc(doc(front, 'frontNotices/s1'), { comments: arrayRemove(c2) }))
+  await assertFails(setDoc(doc(fs('viewer'), 'frontNotices/s9'), { title: '', body: 'x', authorId: 'viewer', authorName: '보기 · 지원팀', createdAt: 1, comments: [c2] }))
   // 프론트 토큰은 signedIn()을 쓰는 다른 곳에 못 들어온다
   await assertFails(getDoc(doc(front, 'users/viewer')))
   await assertFails(getDoc(doc(front, 'teams/t1')))

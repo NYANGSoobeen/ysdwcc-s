@@ -254,3 +254,23 @@ export async function notifyFrontNotice(n: Record<string, unknown>) {
   }
   return sendNotes(tokens.map((token) => ({ token, note })))
 }
+
+// 💬 프론트 공지 새 댓글 (frontNotices.comments, 2026-11-27): 그 글을 쓴 사람·댓글 단 사람 중 우리 직원(f_ 아닌 uid)에게
+// "💬 새 댓글 · 프론트 공지 / 제목 · 이름: 댓글" (📢 공지 알림 켠 기기). 단 사람은 뺀다. 프론트 직원 몫은 index.ts가 프론트 서버에 알려 줌.
+export async function notifyFrontComment(n: Record<string, unknown>, c: { text: string; authorId: string; authorName: string }, participants: string[]) {
+  const ours = [...new Set(participants)].filter((u) => u && !u.startsWith('f_') && u !== c.authorId)
+  if (ours.length === 0) return 0
+  const people = await activeUsers(ours)
+  if (people.size === 0) return 0
+  const tokens = (await tokensOf([...people.keys()])).filter((t) => t.kinds.notice && reachable(t))
+  if (tokens.length === 0) return 0
+  const title = String(n.title ?? '').trim() || String(n.body ?? '').trim()
+  const note: PushNote = {
+    title: short(`💬 새 댓글 · ${title || '프론트 공지'}`, 80),
+    body: short(`${String(c.authorName || '').replace(/ · .*$/, '') || '누군가'}: ${c.text}`, 120),
+    url: '/?fnotice=1',
+    tag: 'fnotice',
+    kind: 'notice',
+  }
+  return sendNotes(tokens.map((token) => ({ token, note })))
+}

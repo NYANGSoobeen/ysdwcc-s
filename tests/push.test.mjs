@@ -191,3 +191,21 @@ test('📢 프론트 공지: 어디서 쓰든 우리 직원(공지 켠 기기)�
     await db.doc('users/boss').delete()
   }
 })
+
+test('💬 프론트 공지 댓글: 글쓴이·댓글 단 우리 직원에게, 단 사람·프론트 직원(f_)은 빼고', async () => {
+  const set = (id, uid) => db.doc(`pushTokens/${id}`).set({ uid, token: `tok-${id}`, platform: 'web', mode: 'all', kinds: { chat: true, mention: true, notice: true, front: true } })
+  await set('q1', 'a')
+  await set('q2', 'b')
+  await set('q3', 'c')
+  try {
+    await push.notifyFrontComment({ title: '단체 손님', body: 'x' }, { text: '확인했어요', authorId: 'b', authorName: '김지원 · 지원팀' }, ['a', 'f_kim', 'b'])
+    const got = sent.map((m) => m.token)
+    assert.ok(got.includes('tok-q1'), '글쓴이(우리 직원)는 받음')
+    assert.ok(!got.includes('tok-q2') && !got.includes('tok-q3'), '단 사람·참여 안 한 사람은 빼고')
+    const n = sent.find((m) => m.token === 'tok-q1').data
+    assert.equal(n.title, '💬 새 댓글 · 단체 손님')
+    assert.equal(n.body, '김지원: 확인했어요')
+  } finally {
+    for (const id of ['q1', 'q2', 'q3']) await db.doc(`pushTokens/${id}`).delete()
+  }
+})

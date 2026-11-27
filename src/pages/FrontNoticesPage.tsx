@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { PhotoViewer, type ViewerPhoto } from '../components/PhotoViewer.tsx'
 import { errorMessage } from '../auth.ts'
-import { addFrontNotice, deleteFrontNotice, editFrontNotice, pinFrontNotice, sortFrontNotices, useFrontNotices, type FrontNotice } from '../frontNotices.ts'
+import { addFrontComment, addFrontNotice, deleteFrontComment, deleteFrontNotice, editFrontNotice, pinFrontNotice, sortFrontNotices, useFrontNotices, type FrontComment, type FrontNotice } from '../frontNotices.ts'
 import { GameButton } from '../games/GameButton.tsx'
 import { MenuButton } from '../menu.tsx'
 import { fixEmoji } from '../ui/emojiFix.ts'
@@ -95,6 +95,7 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
                 )}
               </span>
             </footer>
+            <FrontComments notice={n} uid={uid} name={name} canWrite={canWrite} />
           </div>
         </article>
       </div>
@@ -163,6 +164,74 @@ function PhotoPick({ file, keepUrl, onPick, onClear, busy }: { file: File | null
           e.target.value = ''
         }}
       />
+    </div>
+  )
+}
+
+// 💬 댓글 (프론트 GUEST_LINK 10-5): 오래된 순, 내 댓글만 ✕, 아래 한 줄 입력칸 (Enter 보내기, 한글 조합 중 Enter 무시)
+function FrontComments({ notice, uid, name, canWrite }: { notice: FrontNotice; uid: string; name: string; canWrite: boolean }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const list = notice.comments
+  async function send(e?: FormEvent) {
+    e?.preventDefault()
+    const t = text.trim()
+    if (!t || busy) return
+    if (list.length >= 200) return toast('댓글은 200개까지 달 수 있어요.', { error: true })
+    setBusy(true)
+    try {
+      await addFrontComment(notice.id, uid, name, t)
+      setText('')
+    } catch (err) {
+      toast(errorMessage(err), { error: true })
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function remove(c: FrontComment) {
+    if (!(await ask({ title: '댓글 삭제', message: '이 댓글을 지울까요?', ok: '삭제', danger: true }))) return
+    deleteFrontComment(notice.id, c).catch((err) => toast(errorMessage(err), { error: true }))
+  }
+  if (!list.length && !canWrite) return null
+  return (
+    <div className="fn-comments">
+      {list.length > 0 && <div className="fn-comments-head">💬 댓글 {list.length}</div>}
+      {list.map((c) => (
+        <div key={c.id} className="fn-comment">
+          <div className="fn-comment-who">
+            <b>{c.authorName || (c.authorId.startsWith('f_') ? '프론트' : '지원팀')}</b>
+            <span className="muted">
+              {new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </span>
+            {c.authorId === uid && (
+              <button type="button" className="ghost fn-comment-del" aria-label="댓글 삭제" title="댓글 삭제" onClick={() => void remove(c)}>
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="fn-comment-text">{linkifyText(fixEmoji(c.text))}</div>
+        </div>
+      ))}
+      {canWrite && (
+        <form className="fn-comment-form" onSubmit={send}>
+          <input
+            value={text}
+            maxLength={1000}
+            placeholder="댓글 달기"
+            aria-label="댓글"
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                void send()
+              }
+            }}
+          />
+          <button type="submit" className="primary" disabled={busy || !text.trim()}>
+            {busy ? '…' : '등록'}
+          </button>
+        </form>
+      )}
     </div>
   )
 }
