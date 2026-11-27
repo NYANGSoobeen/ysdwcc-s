@@ -11,19 +11,31 @@ import { useIsDesktop } from '../useMedia.ts'
 import { linkifyText } from './NoticesPage.tsx'
 import { useMemberProfiles, type Profile } from '../hooks.ts'
 import { Avatar, AvatarFace } from '../ui/Avatar.tsx'
+import { useFront, useFrontAccounts, type FrontAccount } from '../front/ydr.ts'
+import { FrontAvatar } from '../front/FrontChatPage.tsx'
 
 // 🤝 프론트 공지 (2026-11-26, 프론트 GUEST_LINK 10): 모든 팀 직원과 프론트 직원이 같이 보는 게시판 하나.
 // 모양은 📢 공지 카드를 그대로 쓰고(사진·스티커·끌어 옮기기는 없음), 고치기·지우기는 쓴 사람만(최고 관리자는 지우기),
 // 📌 고정은 쓰기 권한이 있는 사람 누구나. 보기 권한(viewer)은 읽기만.
-// 쓴 사람 표시: 우리 직원은 우리 프로필(사진·이름·직급)로, 프론트 직원(f_…)은 글에 적힌 이름 그대로.
-type People = Record<string, Profile>
+// 쓴 사람 표시: 우리 직원은 우리 프로필(사진·이름), 프론트 직원(f_{프론트 uid})은 프론트 accounts(이름·사진,
+// 🏌️ 프론트 채팅에 들어가 있을 때만 읽을 수 있음), 못 찾으면 글에 적힌 이름 + 첫 글자 동그라미.
+type People = Record<string, Profile> & { __front?: Map<string, FrontAccount> }
+function frontAccount(id: string, people: People) {
+  return id.startsWith('f_') ? people.__front?.get(id.slice(2)) : undefined
+}
 function personName(id: string, fallback: string, people: People) {
   const p = people[id]
   if (!id.startsWith('f_') && p?.name) return p.name
-  return fallback.replace(/ · 지원팀$/, '') || (id.startsWith('f_') ? '프론트' : '지원팀')
+  const a = frontAccount(id, people)
+  if (a?.name) return a.name
+  return fallback.replace(/ · (지원팀|프론트)$/, '') || (id.startsWith('f_') ? '프론트' : '지원팀')
 }
-function PersonFace({ id, name }: { id: string; name: string }) {
-  if (id.startsWith('f_')) return <AvatarFace uid={id} name={name.replace(/ · 프론트$/, '')} className="fn-front-face" />
+function PersonFace({ id, name, people }: { id: string; name: string; people: People }) {
+  if (id.startsWith('f_')) {
+    const a = frontAccount(id, people)
+    if (a) return <FrontAvatar authorKey={`acc_${a.loginId}`} name={a.name} avatarAssetId={a.avatarAssetId} />
+    return <AvatarFace uid={id} name={name.replace(/ · 프론트$/, '')} className="fn-front-face" />
+  }
   return <Avatar uid={id} name={name} card />
 }
 
@@ -40,7 +52,14 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
     }
     return [...ids].sort()
   }, [list])
-  const people = useMemberProfiles(ourIds)
+  const ourPeople = useMemberProfiles(ourIds)
+  const frontOn = useFront().status === 'on'
+  const accounts = useFrontAccounts(frontOn)
+  const people = useMemo<People>(() => {
+    const byUid = new Map<string, FrontAccount>()
+    for (const a of accounts.values()) if (a.uid) byUid.set(a.uid, a)
+    return Object.assign({ ...ourPeople }, { __front: byUid })
+  }, [ourPeople, accounts])
   const shown = sorted.filter((n) => !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q))
   const desktop = useIsDesktop()
   const [editing, setEditing] = useState<FrontNotice | null>(null)
@@ -90,7 +109,7 @@ export function FrontNoticesPage({ uid, name, canWrite, superAdmin }: { uid: str
             {n.body && <p className="notice-text">{linkifyText(fixEmoji(n.body))}</p>}
             <footer className="notice-foot">
               <span className="muted fn-author">
-                <PersonFace id={n.authorId} name={n.authorName} />
+                <PersonFace id={n.authorId} name={n.authorName} people={people} />
                 {personName(n.authorId, n.authorName, people)} · {when}
                 {n.editedAt != null && ` · 수정: ${n.editedName || '다른 사람'}`}
               </span>
@@ -248,7 +267,7 @@ function FrontComments({ notice, uid, name, canWrite, people }: { notice: FrontN
                 return (
                   <div key={c.id} className="fn-comment">
                     <span className="fn-comment-av">
-                      <PersonFace id={c.authorId} name={c.authorName} />
+                      <PersonFace id={c.authorId} name={c.authorName} people={people} />
                     </span>
                     <div className="fn-comment-body">
                       <div className="fn-comment-who">

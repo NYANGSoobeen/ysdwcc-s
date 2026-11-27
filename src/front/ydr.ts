@@ -296,6 +296,7 @@ export function assetLink(id: string) {
 // ── 프론트 직원 이름 (accounts/{아이디}, authorId = acc_아이디) ────
 export type FrontAccount = {
   loginId: string
+  uid: string // 프론트 로그인 uid (프론트 공지 authorId = f_{uid})
   name: string
   position: string
   avatarAssetId: string | null
@@ -315,6 +316,7 @@ export function useFrontAccounts(enabled: boolean) {
             `acc_${d.id}`,
             {
               loginId: d.id,
+              uid: String(d.get('uid') ?? ''),
               name: String(d.get('name') ?? ''),
               position: String(d.get('position') ?? ''),
               avatarAssetId: d.get('avatarAssetId') ?? null,

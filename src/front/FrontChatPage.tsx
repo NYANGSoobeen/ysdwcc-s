@@ -480,7 +480,7 @@ function authorName(id: string | null, me: string, accounts: Map<string, FrontAc
 
 // 보낸 사람 사진 (2026-11-02 "프론트랑 서로 프사가 안 보여"): 프론트 직원은 프론트 accounts의 avatarAssetId 사진
 // (프론트 Storage assets/{id}, 게스트도 보기만 가능), 같이 들어간 우리 직원(g_{uid})은 우리 프로필 사진.
-function FrontAvatar({ authorKey, name, avatarAssetId }: { authorKey: string; name: string; avatarAssetId: string | null }) {
+export function FrontAvatar({ authorKey, name, avatarAssetId }: { authorKey: string; name: string; avatarAssetId: string | null }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     setUrl(null)
