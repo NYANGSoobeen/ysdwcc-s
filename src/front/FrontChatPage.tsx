@@ -469,12 +469,13 @@ function authorName(id: string | null, me: string, accounts: Map<string, FrontAc
   if (!id) return '프론트'
   if (id === me) return '나'
   // 같이 들어간 게스트는 우리 앱 직원(g_{우리 uid}) → 불러 둔 우리 직원이면 이름 (2026-11-02)
+  // 채팅 말풍선은 이름(닉네임)만, 직급은 안 붙임 (0.9.104, 2026-11-27 사용자 요청)
   if (id.startsWith('g_')) {
     const p = rememberedPerson(id.slice(2))
-    return p?.name ? [p.name, p.position].filter(Boolean).join(' ') : '타부서'
+    return p?.name || '타부서'
   }
   const a = accounts.get(id)
-  return a ? [a.name, a.position].filter(Boolean).join(' ') || '프론트 직원' : '프론트 직원'
+  return a?.name || '프론트 직원'
 }
 
 // 보낸 사람 사진 (2026-11-02 "프론트랑 서로 프사가 안 보여"): 프론트 직원은 프론트 accounts의 avatarAssetId 사진

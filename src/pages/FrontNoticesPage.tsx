@@ -19,7 +19,7 @@ import { Avatar, AvatarFace } from '../ui/Avatar.tsx'
 type People = Record<string, Profile>
 function personName(id: string, fallback: string, people: People) {
   const p = people[id]
-  if (!id.startsWith('f_') && p?.name) return p.position ? `${p.name} ${p.position}` : p.name
+  if (!id.startsWith('f_') && p?.name) return p.name
   return fallback.replace(/ · 지원팀$/, '') || (id.startsWith('f_') ? '프론트' : '지원팀')
 }
 function PersonFace({ id, name }: { id: string; name: string }) {
